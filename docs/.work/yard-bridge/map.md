@@ -8,6 +8,7 @@ Planning status: approved on 28 September 2026. The user confirmed the shared sp
 - [Current stack research](stack-research.md)
 - [Current spec](spec.md)
 - [Convex decision](../../adr/0001-convex-game-backend.md)
+- [Ticket 01: project foundation](tasks/01-project-foundation.md) is ready for the owner to split into subtasks. Tickets 02–18 are ready for agents after their blockers clear.
 - The game is the couple's Odessa yard Bridge variant, not contract bridge.
 - [A Ukrainian account](https://sovet.kidstaff.com.ua/question-184470) says the first player past the score limit loses; it does not settle how to rank a group. The group ranking and continuation rules below are this project's extension.
 - [Odessa players](https://forumodua.com/showthread.php?t=16194) disagree on whether a Bridge declarer scores cards left in hand. Counting those cards also avoids a strategy one player identified: draw a large hand, collect four of a rank, then declare Bridge without a penalty.
@@ -17,7 +18,7 @@ Planning status: approved on 28 September 2026. The user confirmed the shared sp
 
 - The primary use is for two people living apart to play together.
 - The first playable version should support two to four players, with the two-player case primary. With five cards dealt from a 36-card deck, four players leave more draw cards than five; revisit a fifth seat after playtesting.
-- A round is one deal. A game, also called a match, continues across rounds until a player loses.
+- A round is one deal. A game, also called a match, continues across rounds until a final winner or ranking is known.
 - The experience should be a mobile-first PWA that also works on desktop web.
 - Use SvelteKit with TypeScript for the frontend. Use Bun for local package management and scripts where the toolchain supports it. Build plain TypeScript domain functions first; do not introduce Effect.ts at launch.
 - Use Convex for server-authoritative state, live updates, and persistence. Start with Convex Auth rather than Better Auth, subject to a small SvelteKit sign-in integration check because Convex Auth is beta and its Svelte adapter is community maintained.
@@ -62,6 +63,27 @@ Planning status: approved on 28 September 2026. The user confirmed the shared sp
 - A normal `.com` sender domain at about $10/year renewal plus Resend Free meets that cost condition; a receiving mailbox is unnecessary for sending login codes. Choose the exact domain when provisioning, check renewal pricing, and enable auto-renew.
 - Bun is the local package manager and build runner. Convex hosts its functions in its own runtimes; Railway serves the static frontend build.
 - Keep recoverable, private off-site data exports and test a restore before launch. The exact backup destination is an implementation choice.
+
+## Implementation tickets
+
+1. [Establish the project foundation](tasks/01-project-foundation.md) — ready-for-human.
+2. [Sign in with an email code](tasks/02-email-code-sign-in.md)
+3. [Create and resume a Game](tasks/03-create-and-resume-game.md)
+4. [Invite and approve Seats](tasks/04-invite-and-approve-seats.md)
+5. [Configure rules and ready the table](tasks/05-configure-rules-and-ready.md)
+6. [Open a Round with private hands](tasks/06-open-round-with-private-hands.md)
+7. [Play ordinary turns](tasks/07-play-ordinary-turns.md)
+8. [Play wild cards and ordered groups](tasks/08-play-wild-and-ordered-cards.md)
+9. [Resolve draw-card effects](tasks/09-resolve-draw-card-effects.md)
+10. [Resolve Ace effects](tasks/10-resolve-ace-effects.md)
+11. [End and score ordinary Rounds](tasks/11-end-and-score-ordinary-rounds.md)
+12. [Add Bridge and scoring edge rules](tasks/12-add-bridge-and-scoring-edge-rules.md)
+13. [Resolve the Score cutoff](tasks/13-resolve-score-cutoff.md)
+14. [Handle Host interventions](tasks/14-handle-host-interventions.md)
+15. [Export and restore Games](tasks/15-export-and-restore-games.md)
+16. [Make the PWA installable and useful offline](tasks/16-installable-offline-pwa.md)
+17. [Complete English and Ukrainian UI](tasks/17-complete-english-and-ukrainian-ui.md)
+18. [Release the private Game](tasks/18-release-private-game.md)
 
 ## Fog
 
