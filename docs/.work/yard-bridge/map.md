@@ -4,6 +4,8 @@
 
 - [Rules and prior discussion](../../yard-bridge-handoff.md)
 - [Current stack research](stack-research.md)
+- [Current spec](spec.md)
+- [Convex decision](../../adr/0001-convex-game-backend.md)
 - The game is the couple's Odessa yard Bridge variant, not contract bridge.
 - [A Ukrainian account](https://sovet.kidstaff.com.ua/question-184470) says the first player past the score limit loses; it does not settle how to rank a group. The group ranking and continuation rules below are this project's extension.
 - [Odessa players](https://forumodua.com/showthread.php?t=16194) disagree on whether a Bridge declarer scores cards left in hand. Counting those cards also avoids a strategy one player identified: draw a large hand, collect four of a rank, then declare Bridge without a penalty.
@@ -15,7 +17,10 @@
 - The first playable version should support two to four players, with the two-player case primary. With five cards dealt from a 36-card deck, four players leave more draw cards than five; revisit a fifth seat after playtesting.
 - A round is one deal. A game, also called a match, continues across rounds until a player loses.
 - The experience should be a mobile-first PWA that also works on desktop web.
-- Use SvelteKit with TypeScript for the frontend. Consider Effect.ts only where it pays for itself in the game rules or state boundary.
+- Use SvelteKit with TypeScript for the frontend. Use Bun for local package management and scripts where the toolchain supports it. Build plain TypeScript domain functions first; do not introduce Effect.ts at launch.
+- Use Convex for server-authoritative state, live updates, and persistence. Start with Convex Auth rather than Better Auth, subject to a small SvelteKit sign-in integration check because Convex Auth is beta and its Svelte adapter is community maintained.
+- Use selected shadcn-svelte controls for forms, settings, and dialogs. Build the card table and card interactions specifically for this game.
+- Deploy the frontend on Railway under its provided domain. The user already pays for Railway and accepts cold starts. Start with SvelteKit's static adapter and a lightweight static file server, subject to the auth integration check; Convex serves the live data. Keep Convex Free initially, with willingness to pay for usage or upgrade later.
 - The server owns the shuffled deck, hidden hands, legal moves, and scoring. It validates and commits each move atomically; clients receive only their authorized view.
 - The installed PWA may show cached content while offline, but submitting turns requires a connection.
 - Live play has no turn timer. Progress, history, and rules configurations must persist so players can resume after a long break.
@@ -38,6 +43,7 @@
 - Players arrange same-rank cards before placing them. Normally only the top card's special action fires, but paired 7s and paired 8s add their draw effects in that play. Two 7s make the next player draw two and still play; two 8s make them draw four and skip once. Draw penalties do not pass between players' turns.
 - Under the optional Ace cancellation rule, a targeted player can play an Ace from hand immediately to cancel a whole incoming draw or skip effect, including a stacked effect. The Ace becomes the top card, uses that player's turn, and play passes to the next player.
 - If no card can be drawn or recycled while a player must cover a 6, end that cover obligation and pass play to the next player.
+- If the draw pile is empty, nothing can be recycled, and every active player has passed once without a legal play, end the round. Everyone scores their remaining hand; nobody receives a Jack finish deduction.
 - Closing the app or losing connection preserves the exact round state without an automatic loss or turn timer. The host may stop the current round and remove any player. The stopped round adds no points; the next round retains previous game scores. History records the administrative removal separately from a score loss. If one player remains, that player wins by forfeit. If the host leaves, host control passes to the longest-seated remaining player. Players may also unanimously end an unfinished game as abandoned.
 - When the host changes rules before the game starts, clear all players' ready status so they can review the change and ready again.
 - After a round, reveal each player's remaining hand and the point calculation in the shared history. Keep hands private while the round is active.
@@ -50,13 +56,15 @@
 - Offer English and Ukrainian at launch. An LLM can draft Ukrainian copy; game terms should receive a separate review. Russian is outside the first release.
 - Test the portrait UI first on a Pixel with Chrome and Firefox-family browsers and an iPhone with Safari or Chrome, then desktop web.
 - Ship a private playable game as soon as practical.
+- Prefer email-code sign-in with a small sender domain if the purchase and upkeep are modest. The app can still use its Railway domain. Google sign-in is an acceptable fallback if email delivery is more trouble or cost than warranted.
+- A normal `.com` sender domain at about $10/year renewal plus Resend Free meets that cost condition; a receiving mailbox is unnecessary for sending login codes. Choose the exact domain when provisioning, check renewal pricing, and enable auto-renew.
+- Bun is the local package manager and build runner. Convex hosts its functions in its own runtimes; Railway serves the static frontend build.
+- Keep recoverable, private off-site data exports and test a restore before launch. The exact backup destination is an implementation choice.
 
 ## Fog
 
 - Whether a fifth seat works after playtesting.
-- Whether Convex fits the server-authoritative game, and whether Convex Auth or Better Auth offers a simple SvelteKit email-code flow.
-- Whether production email codes can be sent reliably without owning an email domain.
-- Whether Railway's current idle behavior and billing meet the goal of near-zero cost during inactivity; the user prefers Railway deployment and its provided app domain.
-- Whether shadcn-svelte saves work for a card-table UI and whether Effect.ts earns its complexity in this small project.
+- Whether the Convex Auth Svelte adapter and a static SvelteKit frontend pass a narrow end-to-end sign-in test.
+- Which exact sender domain to register and where to store scheduled off-site exports. These are provisioning choices, not blockers to the agreed architecture.
 - Exact visual palette and card motion details, to be settled with a UI prototype.
 - The Jack finish alternative and other uncertain local rules outside the agreed first-release default.

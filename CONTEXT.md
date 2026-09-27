@@ -5,7 +5,7 @@ Yard Bridge is the local shedding card game this project aims to let friends pla
 ## Language
 
 **Game**:
-A continuing contest made up of rounds whose scores carry forward until a player loses.
+A continuing contest made up of rounds whose scores carry forward until play ends with a final winner or ranking. In a group game, some players may leave after losing while the others continue.
 
 **Match**:
 Another name for a game.
@@ -17,13 +17,13 @@ One deal of cards, ending when a player goes out or another selected ending cond
 Playing all four cards of one rank to end a round, even if the declaring player still holds other cards.
 
 **Penalty points**:
-Points added to a player's game score under the scoring rules at the end of a round. Accumulated penalty points help determine the eventual loser.
+The net points assigned to a player's game score at the end of a round. A finish bonus can make that round's net points negative. The accumulated score helps determine losses and ranking.
 
 **Rules configuration**:
 The selected values and optional rules that govern one game. A saved configuration can be reused for another game.
 
 **Host**:
-The player who creates a game, invites other players, and chooses its rules configuration.
+The player with authority to invite players, approve seats, and choose rules before the game starts. The creator holds this role first, but it can pass to another player.
 
 **Seat**:
 A player's place in a game, approved by the host and retained when that player reconnects.
