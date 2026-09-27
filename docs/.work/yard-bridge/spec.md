@@ -1,56 +1,129 @@
 # Yard Bridge: private playable game
 
-Status: planning, awaiting final shared-understanding check.
+Status: approved product plan; ready-for-agent implementation spec.
 
-## Purpose
+## Problem Statement
 
-Let two people in different countries play their familiar Odessa yard Bridge game together on their phones. Support two to four players from the first release, while making the two-player table the clearest path. Games continue across rounds and can be resumed after a long break.
+Two partners living in Germany and the Netherlands want to keep playing the Odessa yard Bridge variant they play together in person. They need a private phone-friendly game that remembers a round exactly when either person leaves, carries scores across rounds, and remains available until the game reaches a definitive result. Their local rules have several configurable details, so a fixed generic card game would lose the version they know.
 
-This is the couple's remembered local variant, not contract bridge or a claim of canonical rules. The [handoff](../../yard-bridge-handoff.md) records the original memories and sources. The [planning map](map.md) records the detailed decisions made during the grill.
+## Solution
 
-## Player flow
+Build a private, mobile-first PWA for two to four players. The host invites players, chooses a rules configuration, and starts a game after everyone reviews the rules and marks ready. An authoritative server deals cards, validates moves, resolves effects, calculates penalty points, and saves the complete game. Players see only their own active hand, receive live updates, and can return later. The first release includes English and Ukrainian, round results, reusable configurations, and recovery through emailed one-time codes.
 
-1. A player signs in with an emailed one-time code and stays signed in on that device. The host creates and names a private game, choosing the default rules or a saved configuration.
-2. The host invites two to four players total and approves each new seat once. Returning players reclaim their seats without another approval.
-3. Invitees see the core rules and any changes, then mark ready. A pre-game rule change clears ready states. Rules lock when the first round begins.
-4. Each player sees their own hand, shared table state, scores, turn indicator, and legal actions. The server validates and commits every move. Disconnection preserves the exact game state; there is no turn timer.
-5. At a round's end, everyone sees the final hands and point calculation. They can continue into another round until the game ends. Players may have several unfinished games and reuse saved rules configurations.
+## User Stories
 
-## Rules contract
+1. As a player, I want to enter a one-time code sent to my email, so that I can recover my games without a password.
+2. As a player, I want my session to remain signed in on my phone, so that returning to a game takes one tap.
+3. As a host, I want to create a private game, so that only invited people can join my table.
+4. As a host, I want to name a game, so that I can distinguish several ongoing games.
+5. As a host, I want to invite players to a game, so that we can play while apart.
+6. As a host, I want to approve each new seat once, so that an invitation alone does not grant access to a player's private state.
+7. As a returning player, I want to reclaim my approved seat after signing in, so that a new device or lost session does not erase my place.
+8. As a player, I want to keep several unfinished games, so that one group or rules configuration does not replace another.
+9. As a host, I want a default rules configuration, so that I can start a familiar game quickly.
+10. As a host, I want to save a changed rules configuration, so that I can reuse it in later games.
+11. As a host, I want the main settings visible and detailed settings expandable, so that common choices are easy to find.
+12. As an invited player, I want to see the core rules and any deviations from the defaults, so that I know what I am agreeing to play.
+13. As an invited player, I want to mark myself ready, so that the host knows I have reviewed the rules.
+14. As an invited player, I want my ready state cleared when the host edits the rules, so that I can review the new configuration.
+15. As a player, I want the rules locked once the first round begins, so that the game does not change underneath us.
+16. As a host, I want to start a game with two, three, or four approved players, so that the couple's game also works with friends.
+17. As a player, I want one 36-card deck dealt under the chosen hand size, so that the game follows our local variant.
+18. As a player, I want the first starter chosen randomly, so that neither player always opens.
+19. As a first-round starter, I want my fifth dealt card placed face up while four remain in my hand, so that the opening follows our remembered procedure.
+20. As a host, I want to choose whether the opening card's special effect fires, so that I can match the version we play.
+21. As a host, I want to configure the later-round starter rule, so that the table can use our default losing-player-first rule or a different agreed rule.
+22. As a player, I want later-round starter ties resolved from the previous round and then randomly, so that the default is deterministic until a true tie remains.
+23. As a player, I want to play by matching suit or rank, so that ordinary turns feel like the physical game.
+24. As a player, I want to use a 6 or Jack as a wild card, so that their special placement rule works regardless of the current top card.
+25. As a player, I want to order cards of one rank before placing them together, so that I control which card is on top.
+26. As a player, I want a Jack to set the active suit, so that the next player knows what to match.
+27. As a player, I want to cover a played 6 with a valid card before passing the turn, so that a 6 cannot finish a round uncovered.
+28. As a player without a legal card, I want to draw until I can play, so that the turn advances under our chosen rule.
+29. As a player, I want to play a newly drawn playable card immediately, so that drawing cannot be used to stockpile a legal card.
+30. As a player, I want the pile below its top card recycled when the draw pile empties, so that a round can continue.
+31. As a player, I want a 7 to make the next player draw one and then play, so that its penalty matches our rules.
+32. As a player, I want an 8 to make the next player draw two and skip, so that its penalty matches our rules.
+33. As a player, I want the Queen of Spades to make the next player draw five, so that its special effect works in any table size.
+34. As a host, I want a separate King of Spades toggle, so that I can enable its seven-card draw without changing the score cutoff.
+35. As a player, I want 7s and 8s in one same-rank play to add their draws, so that those stacks work as agreed.
+36. As a player, I want only the top card's special effect to fire in other same-rank plays, so that card order has a clear result.
+37. As a player, I want an Ace to skip the next player by default, so that the ordinary Ace rule is simple.
+38. As a host, I want the alternative Ace cancellation rule available, so that a targeted player can use an Ace to cancel one incoming draw or skip effect.
+39. As a player, I want to declare Bridge by playing all four cards of one rank when that rule is enabled, so that the round can end even if I still hold cards.
+40. As a player, I want a round to end when a hand empties, so that scores can be calculated promptly.
+41. As a player, I want the final played card's effect resolved before scoring, so that finishing with a special card still matters.
+42. As a player, I want the agreed remaining-card values applied to every hand, so that my round score is explainable.
+43. As a player, I want the first pile recycle to apply the selected scoring multiplier once, so that repeated recycles do not compound it.
+44. As a player, I want a Jack finish deduction of 20 per finishing Jack after the multiplier, so that even a negative game score is possible.
+45. As a host, I want to set the score cutoff independently of the King toggle, so that I can control game length.
+46. As a player, I want an exact hit on the score cutoff to reset my score to zero, so that the threshold rule works as remembered.
+47. As a player, I want to see my round's remaining hand and point calculation after it ends, so that I can understand the result.
+48. As a player, I want every active player's hand hidden during a round, so that remote play is fair.
+49. As a player in a group game, I want the remaining players to decide unanimously whether to continue after someone loses, so that the table can finish or play on.
+50. As a player, I want surviving and eliminated players ranked under the agreed score and elimination rules, so that a group game has a clear result.
+51. As a host, I want to stop a current round and remove a player without scoring that round, so that the table can handle a real-life interruption.
+52. As a remaining player, I want host control to pass to the longest-seated player if the host leaves, so that the game can continue.
+53. As a player, I want to abandon an unfinished game only by unanimous agreement, so that one person cannot erase the others' game.
+54. As a player, I want the exact round state to survive a closed app or lost connection, so that I can resume later without a timer loss.
+55. As a player, I want a cached read-only view when offline, so that I can inspect my last known game state while turns wait for a connection.
+56. As a player, I want the game to end a full-table no-move deadlock and score held cards, so that the round cannot get stuck forever.
+57. As a phone player, I want a portrait layout with clear card handling and turn feedback, so that I can play comfortably with one hand.
+58. As a desktop player, I want the same game available in a web browser, so that I am not required to install the PWA.
+59. As a player, I want English and Ukrainian interface options, so that we can each read the game comfortably.
+60. As a player who prefers reduced motion, I want the card animation to follow my device setting, so that play remains comfortable.
+61. As a player, I want stale or repeated move submissions rejected safely, so that a poor connection cannot duplicate a turn.
+62. As a game owner, I want exportable history and rules data with a tested restore process, so that long-running games do not depend on a short-lived backup.
 
-- Use one 36-card deck, ranks 6 through Ace. Deal five cards per player by default; the host can change hand size before a game.
-- Randomly choose the first round's starter. Give that player four cards in hand and place their fifth card face up as the opening play. Opening special effects fire by default; the host can change this. For later rounds, choose the active player with the highest accumulated penalty score, then the highest score from the previous round, then randomly among remaining ties.
-- Play a card matching suit or rank, or play a 6 or Jack as a wild card. Players may order and play multiple cards of one rank. A Jack chooses the active suit. A 6 must be covered before play passes; a 6 of any suit or a card matching its suit can cover it. Covering cards apply their effects. A player cannot finish on an uncovered 6.
-- A player unable to play draws until they can; a playable drawn card is played immediately. Recycle the pile below its top card when the draw pile runs out. If no draw or recycle is possible while covering a 6, waive the cover and pass. If the draw pile is empty, nothing can be recycled, and every active player has passed once without a legal play, end the round. Everyone scores the cards still in hand; nobody receives a Jack finish deduction.
-- A 7 makes the next player draw one and then play. An 8 makes the next player draw two and skip. The Queen of Spades makes the next player draw five. An optional King of Spades effect makes the next player draw seven without skipping. Same-rank 7s and 8s played together stack their draw amounts; otherwise only the top card in a same-rank play fires its special effect. Draw penalties do not pass across turns.
-- An Ace skips the next player by default. An alternative host setting lets a targeted player play an Ace immediately to cancel an incoming draw or skip, including a stacked effect. That Ace uses the targeted player's turn and play passes onward.
-- Emptying a hand ends a round after its final card effect resolves. An enabled Bridge declaration, playing all four cards of one rank, ends the round even when the declarer has cards left; all players score their remaining hands. Finishing with Jacks deducts 20 per finishing Jack after other score calculations. A Bridge declaration with cards still held earns no Jack finish deduction.
-- Remaining-hand points are 6–9: 0; 10, ordinary Queen and ordinary King: 10; Ace: 15; Jack: 20; Queen of Spades: 50; enabled special King of Spades: 80. With that King effect disabled, it is an ordinary King worth 10.
-- The score cutoff is 200 by default and is independent of the King toggle. Reaching it exactly resets that player's game score to zero; crossing it triggers loss. Once a round first recycles the pile, multiply remaining-card points by the host's selected multiplier of ×1, ×2, or ×3, default ×2. Later recycles do not multiply again. Apply a Jack finish deduction afterward. Negative scores are valid.
-- If several players cross the cutoff together, ask the remaining players whether to continue without them. Continuation requires unanimity. If not unanimous, end the game and rank by score. Continuing players outrank eliminated players; later eliminations outrank earlier ones; points break ties within an elimination wave. Tied scores share rank. One remaining player wins; if all cross together, end and rank by score.
-- The host may stop the current round and remove any player. That round scores nothing and earlier game scores remain. Record this separately from a score loss. If the host leaves, control passes to the longest-seated remaining player. The group can unanimously abandon an unfinished game.
+## Implementation Decisions
 
-## Product and interface
+- Use the domain terms Game, Match, Round, Bridge declaration, Penalty points, Rules configuration, Host, Seat, Score cutoff, and Eliminated player as defined in the project glossary.
+- Use SvelteKit and TypeScript for the PWA. Use Bun for local package management, scripts, and the frontend build. Start with a static SvelteKit build served on Railway's provided domain. Convex provides persistent state and live updates; hosted Convex functions run in its own JavaScript or Node.js runtimes.
+- Use Convex in its Ireland region for the authoritative game state. A public game command checks identity, approved Seat, current turn, expected game version, legal cards, and the frozen Rules configuration, then commits state and history in one mutation. The client sends intentions, never an asserted deck, score, or opponent hand.
+- Keep an explicit boundary between shared table data and Seat-specific active hand data. Every query checks authorization. An invitation identifies a Game and starts the Seat approval flow; it does not grant access to hidden state.
+- Start with Convex Auth for email-code sign-in and its Svelte adapter. Prove sign-in, session return, and Seat recovery in a narrow integration check before building the full game. If that fails, revisit Better Auth or Google sign-in before inventing a custom identity system.
+- Use a verified low-cost sender domain with Resend Free for codes. The domain is for email sending; the app remains on Railway's provided domain. Choose the exact domain and enable auto-renew during provisioning.
+- Model a Game as a durable aggregate containing its players, frozen Rules configuration, score and status; model a Round with ordered turn state, draw and played piles, private hands, current effects, and result. Persist accepted events and round summaries so history remains comprehensible after reconnecting. Do not use live transport messages or runtime logs as the permanent record.
+- Default to a five-card hand, with the first starter receiving four in hand and placing the fifth as the opening play. Randomly choose the first starter. Default later-round starter to the active player with the highest accumulated Penalty points, breaking ties by previous-round points and then at random; make the starter policy configurable.
+- Freeze settings at the first Round start. Core settings include score cutoff, King of Spades effect, and hand size. Advanced settings include opening effects, Bridge declaration, Ace behavior, recycle multiplier, and starter policy. Present all players with core rules and changed details before readying; clear ready states after any host edit.
+- A 6 and Jack may be played regardless of suit or rank. Cover a 6 with a card of its suit or another 6; another 6 continues the obligation. Covering cards apply their effects. If the draw pile and recyclable played cards are exhausted, waive an unfulfillable cover and pass.
+- Draw until a legal play exists, then play the newly drawn playable card immediately. Recycle played cards except the top when necessary. When every active player has passed once with no legal play and no drawable or recyclable card remains, end the Round and score all remaining hands without a Jack finish deduction.
+- Resolve 7 as draw one then play, 8 as draw two then skip, Queen of Spades as draw five, and enabled King of Spades as draw seven without skipping. Each targets the next active player in table order. Same-rank 7s and 8s in one play add their draws; other same-rank plays trigger only the top card's special effect. Penalties do not transfer across turns.
+- Default Ace behavior skips the next player. In the alternative Ace rule, a targeted player may immediately play an Ace from hand to cancel the entire incoming draw or skip, including a stack. That Ace uses the player's turn and play passes onward.
+- An enabled Bridge declaration ends the Round even when the declarer holds cards. Emptying a hand also ends the Round, after its final card effect resolves. A Bridge declarer scores cards still held.
+- Score remaining hands as follows: 6 through 9 are zero; 10, ordinary Queen, and ordinary King are 10; Ace is 15; Jack is 20; Queen of Spades is 50; enabled special King of Spades is 80. With its toggle off, King of Spades is an ordinary King worth 10.
+- Apply the chosen recycle multiplier of one, two, or three after the first recycle of a Round, default two. Later recycles do not compound it. Deduct 20 per Jack in a final hand-emptying play after the multiplier. A Bridge declaration with cards still held gets no Jack finish deduction. Allow negative accumulated scores.
+- Default the Score cutoff to 200, independently of the King toggle. An exact cutoff hit resets the player's score to zero; a score above it triggers loss. In group play, remaining active players decide unanimously whether to continue. If continuation is declined, rank by points. If it continues, survivors outrank eliminated players; later Eliminated players outrank earlier ones; points break ties within one elimination wave; tied scores share a rank. One active survivor wins; if all active players cross together, end and rank by score.
+- Let the Host stop the current Round and remove any player. That Round scores nothing, earlier scores remain, and history distinguishes the removal from score elimination. Transfer Host control to the longest-seated remaining player if necessary. Record unanimous abandonment separately from a normal result.
+- Keep multiple unfinished Games and saved Rules configurations. Record each Round's ending, final hands, and point calculation. Preserve the exact active Round through disconnects without turn timers.
+- Design portrait mobile play first, adapting to desktop. Take color, card handling, motion, and simplicity cues from Offsuit, while choosing separate typography. Use selected shadcn-svelte controls for forms and dialogs and custom card-table interactions. Follow system reduced-motion preferences and omit sound.
+- Offer English and Ukrainian at launch. An LLM may draft Ukrainian copy; review card and rule terms separately.
+- Use Convex Free initially and upgrade if its hard caps become a problem. Railway cold starts are acceptable. Schedule a daily export to private off-site storage and verify a restore before launch.
 
-- Make a portrait phone PWA first and adapt it to desktop. Test Pixel Chrome and Firefox-family browsers, plus iPhone Safari and Chrome. The installed app can show its last cached view offline; turns need a connection.
-- Take color, card handling, motion, and simplicity cues from Offsuit, with different typography. Use subtle animation, respect the device's reduced-motion preference, and skip sound at launch.
-- Offer English and Ukrainian. Draft Ukrainian copy with an LLM, then review game terms. Do not add Russian at launch.
-- Keep core host settings visible and detailed options expandable. Use selected shadcn-svelte controls for forms and dialogs; make the card table custom.
-- Preserve round results, final hands, and score calculations. A full move-by-move replay is outside this first release.
+## Testing Decisions
 
-## Technical approach
+- Test observable behavior through the highest useful seam: authenticated public game commands followed by each Seat's authorized state. Use this seam for rules, scoring, invitations, history, reconnection, access control, and concurrent or repeated commands. Assert the result a player can observe, not private helper calls or document layout.
+- Make the game rules deterministic under a supplied deck order and random choice for testing. This lets the public command seam reproduce first plays, recycles, ties, penalties, and rare deadlocks without depending on chance.
+- Cover two-player defaults, every configurable rule, and four-player next-seat effects. Include exact-cutoff reset, negative scores, multiple simultaneous losses, administrative removal, host transfer, and unfinished-game recovery.
+- Verify that one Seat cannot query another active hand, and that stale or simultaneous moves cannot both commit.
+- Use a small number of browser checks for email-code sign-in, Seat recovery, PWA installation, cached offline view, Railway cold-start recovery, and mobile layout. Run them on Pixel Chrome and Firefox-family browsers and iPhone Safari and Chrome, then desktop.
+- Check English and Ukrainian layouts, card labels, and system reduced-motion behavior on phones.
+- Test an export and restore against a representative Game with active Round, Seats, saved Rules configuration, and completed history.
+- This repository has no application code or test suite yet, so there is no existing test pattern to copy. The authenticated command-and-view seam is the first integration boundary.
 
-- Use SvelteKit, TypeScript, and Bun for local installs, scripts, and the frontend build. Start with `adapter-static` and serve the built PWA on Railway's provided domain. Convex handles live state and backend functions. Hosted Convex functions use Convex or Node.js runtimes, not Bun.
-- Use Convex in its Ireland region. One mutation validates identity, seat, turn, selected cards, frozen rules, and game version, then commits the resulting state and history atomically. Queries must never send another player's hidden hand. Treat invite links as game discovery, not authorization.
-- Start with Convex Auth. Prove SvelteKit sign-in and return-to-seat on desktop and iPhone before building the game around its community-maintained adapter. Use a verified, inexpensive sender domain with Resend Free for one-time codes; the app URL stays on Railway. If this integration fails, reconsider Better Auth or Google sign-in before implementing a custom auth system.
-- Use Convex Free initially, then upgrade to a paid plan if its hard caps become a problem. The owner already pays for Railway and accepts cold starts. Export Convex data regularly to private off-site storage and test restoration before launch; game history must not depend on short-lived built-in backups alone.
-- Use plain TypeScript for the game rules. Add Effect.ts only if a concrete part of the rules or server boundary benefits from it.
+## Out of Scope
 
-## First-release checks
+- Five-player tables before playtesting the four-player game.
+- Public matchmaking, spectators, chat, turn clocks, push notifications, and sound.
+- Russian translation, a dedicated personal welcome-note screen, and alternate typography copied from Offsuit.
+- Full card-by-card replay. First-release history shows Round endings, final hands, and point calculations.
+- The unconfirmed alternative Jack-finish punishment rule and other local variants not included in the approved configuration.
+- Effect.ts unless a concrete need appears during implementation.
+- Purchasing a custom app domain; Railway's provided domain is sufficient.
 
-- Two players can sign in, join, play, disconnect, and resume one unfinished game from their phones without losing state.
-- A four-player game runs with the same hidden-hand and turn guarantees, including penalties aimed at the next player.
-- Concurrent, stale, or illegal move submissions cannot corrupt a round or reveal another hand.
-- Default and changed rule configurations produce the agreed scoring and turn outcomes, including exact-cutoff reset, recycling multiplier, Bridge declaration, and optional King effect.
-- English and Ukrainian fit the phone UI; invitation, installation, offline view, and cold-start recovery work on the target browsers.
-- A backup export can restore a game, seats, rules configuration, and round history.
+## Further Notes
+
+- This spec formalizes the approved planning map and uses the project glossary. The Convex architecture decision explains the backend trade-off. The handoff records the couple's memories and source accounts; those accounts are evidence of variants, not a canonical override.
+- The [planning map](map.md), [domain glossary](../../../CONTEXT.md), [Convex decision](../../adr/0001-convex-game-backend.md), [research](stack-research.md), and [original handoff](../../yard-bridge-handoff.md) supply context for implementation.
+- The domain and sender account, backup destination, and production credentials are provisioning choices. They must be made and tested before the surprise launch.
+- The first implementation check is the SvelteKit, Convex Auth, email-code, and return-to-Seat flow. Its result can change the auth adapter without changing the Game rules.

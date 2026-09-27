@@ -1,5 +1,7 @@
 # Yard Bridge planning map
 
+Planning status: approved on 28 September 2026. The user confirmed the shared spec after the final stalemate rule was added.
+
 ## Notes
 
 - [Rules and prior discussion](../../yard-bridge-handoff.md)
