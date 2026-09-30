@@ -15,4 +15,3 @@ Players can take turns playing a card that matches suit or rank, or drawing unti
 - [ ] A player without a legal play draws until one appears and must play a newly drawn playable card immediately.
 - [ ] When the draw pile empties, played cards below its top card recycle into the draw pile.
 - [ ] A stale, repeated, or simultaneous move cannot commit twice; each Seat sees the resulting turn and card counts through authorized views.
-

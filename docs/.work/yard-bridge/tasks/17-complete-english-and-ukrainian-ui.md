@@ -15,4 +15,3 @@ Players can use every first-release flow in English or Ukrainian, including rule
 - [ ] All first-release screens and error states have both languages; game terms receive a separate review after any LLM draft.
 - [ ] Both languages fit portrait phone layouts and remain understandable in the offline view and final ranking.
 - [ ] Browser checks cover representative Game flows in each language. Russian remains outside this release.
-

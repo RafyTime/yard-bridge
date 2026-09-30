@@ -15,4 +15,3 @@ The Host can invite people to a private Game, approve each new Seat once, and we
 - [ ] An approved player returns to the same Seat after signing in again, and duplicate or excess Seats cannot enter the Game.
 - [ ] Invitation possession alone does not authorize private Game or Seat data.
 - [ ] The lobby works for two, three, and four Seats, with command-and-view tests for approval and access boundaries.
-

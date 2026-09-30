@@ -16,4 +16,3 @@ The couple can open the Railway-provided URL, sign in by email code, install the
 - [ ] Two-player and four-player smoke Games work across Pixel Chrome or Firefox-family browsers, iPhone Safari or Chrome, and desktop web.
 - [ ] Cold-start recovery, reconnection, private hands, stale-command handling, English and Ukrainian, and offline read-only behavior pass final checks.
 - [ ] A recent export can be restored in a test deployment before the surprise launch.
-

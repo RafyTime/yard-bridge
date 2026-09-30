@@ -15,4 +15,3 @@ A signed-in player can create a named private Game, become its Host, see it amon
 - [ ] The player's Game list shows multiple unfinished Games and reopens the selected one after a new session or device sign-in.
 - [ ] Another identity cannot claim the Host Seat or read private Game data.
 - [ ] Public command-and-view tests cover create, list, and resume behavior.
-

@@ -15,4 +15,3 @@ The Host can stop the current Round and remove a player when real life interrupt
 - [ ] History identifies administrative removal separately from a score loss. A sole remaining player wins by forfeit.
 - [ ] If the Host leaves, Host control passes to the longest-seated remaining player.
 - [ ] Unanimous abandonment ends an unfinished Game without presenting it as a scored win. Tests cover unauthorized attempts and reconnection after intervention.
-

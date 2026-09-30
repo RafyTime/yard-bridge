@@ -15,4 +15,3 @@ Players can place a 6 or Jack regardless of the top card, cover a 6 before passi
 - [ ] A 6 requires a valid cover before play passes, including chained 6s. A player cannot end on an uncovered 6; an impossible cover is waived when no card can be drawn or recycled.
 - [ ] A player can arrange a same-rank group before committing it, and the last card placed is the top card used for later effects.
 - [ ] Opening 6 and Jack states follow the chosen opening-effect rule, with command-and-view tests for each Seat.
-

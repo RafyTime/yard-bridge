@@ -15,4 +15,3 @@ A player can request an email code, sign in, and return to a signed-in mobile vi
 - [ ] Invalid or expired codes fail clearly without granting an authenticated view.
 - [ ] A signed-in view reads the player's identity through the authenticated backend boundary; an unsigned player cannot read it.
 - [ ] The flow is usable in the target phone browsers and has an automated command-and-view check. Record the integration result before extending auth to Seats.
-

@@ -15,4 +15,3 @@ Once everyone is ready, the Host can start a Round. Each player sees the common 
 - [ ] The starter has four cards in hand under the default deal and their fifth dealt card becomes the face-up opening card; the selected opening-effect setting is recorded with the Round.
 - [ ] Rules freeze when the first Round starts. Each Seat sees only its own active hand, the shared top card, starter, and current opening state.
 - [ ] A reconnect shows the same deck, hands, and opening state. Command-and-view tests use controlled card order and random choice without exposing the real deck to players.
-

@@ -15,4 +15,3 @@ An Ace skips the next player by default. Under the alternative rule, a targeted 
 - [ ] With the alternative rule enabled, a targeted player can use an Ace from hand to cancel an entire pending effect, including a stacked 7 or 8.
 - [ ] A cancellation places the Ace on top, uses that player's turn, and passes play onward. A player who is not targeted cannot use the reaction.
 - [ ] Command-and-view tests cover both Ace modes with two and four players.
-

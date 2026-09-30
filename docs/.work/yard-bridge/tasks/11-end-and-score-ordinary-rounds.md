@@ -15,4 +15,3 @@ When a player empties their hand, the final card effect resolves, the Round ends
 - [ ] Remaining cards use the approved point values, including the Queen of Spades and both King of Spades modes.
 - [ ] Every player sees the completed Round's final hands, point calculation, and accumulated Game score while active hands stayed private before the result.
 - [ ] The next Round uses the configured starter policy; under the default, ties use previous-Round results and then a random choice.
-

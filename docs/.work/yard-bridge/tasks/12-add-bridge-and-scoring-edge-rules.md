@@ -16,4 +16,3 @@ Players can end a Round with an enabled Bridge declaration, earn a Jack finish d
 - [ ] The first recycle applies the selected multiplier of one, two, or three to remaining-hand points; later recycles do not compound it.
 - [ ] If no draw or recycle is possible and every active Seat passes once without a legal play, the Round ends, everyone scores cards held, and nobody receives a Jack finish deduction.
 - [ ] Tests exercise each ending through public commands and compare the visible score breakdown for every Seat.
-
