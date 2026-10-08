@@ -1,21 +1,35 @@
+# AGENTS.md
+
 ## Project Configuration
 
 - **Language**: TypeScript
 - **Package Manager**: bun
 - **Add-ons**: prettier, eslint, vitest, playwright, tailwindcss, sveltekit-adapter, paraglide
 
----
-
-## Agent skills
-
-### Issue tracker
+## Issue tracker
 
 Specs and tasks are local Markdown files under `docs/.work/`. See `docs/agents/issue-tracker.md`.
 
-### Triage labels
+## Triage labels
 
 Use the default five triage roles as task statuses. See `docs/agents/triage-labels.md`.
 
-### Domain docs
+## Domain docs
 
 Use a single root `CONTEXT.md` and `docs/adr/`. See `docs/agents/domain.md`.
+
+## Convex
+
+<!-- convex-ai-start -->
+
+This project uses [Convex](https://convex.dev) as its backend.
+
+When working on Convex code, **always read
+`src/convex/_generated/ai/guidelines.md` first** for important guidelines on
+how to correctly use Convex APIs and patterns. The file contains rules that
+override what you may have learned about Convex from training data.
+
+Convex agent skills for common tasks can be installed by running
+`npx convex ai-files install`.
+
+<!-- convex-ai-end -->
