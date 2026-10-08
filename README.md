@@ -41,6 +41,48 @@ You can preview the production build with `npm run preview`.
 
 > To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
 
+## Convex connection check
+
+Convex functions live in `src/convex/`. Run `bunx convex dev` while changing backend
+code to sync it to your development deployment and regenerate the API types.
+Run `bun run dev` in another terminal for the frontend. Frontend-only work can use
+the already-running hosted deployment without the Convex watcher.
+
+Set `PUBLIC_CONVEX_URL` in the ignored `.env.local` to your development deployment's
+`.convex.cloud` URL. The frontend connects through `setupConvex` in the root layout.
+That public URL is embedded in the static build; build each environment with its
+own URL. Keep deployment credentials out of public environment variables.
+
+The homepage has a temporary shared counter to verify the connection:
+
+1. Open the homepage in two tabs and wait for the counter to load.
+2. Click Increment counter in either tab. Both values should update.
+3. Reload a tab. The saved count should remain.
+
+`schema.ts` defines the `smokeCounters` table. `counter.increment` reads and writes
+the count in one transaction. `counter.get` is the live query used by the page.
+These demo endpoints are unauthenticated and intended for development. Remove the
+counter, its table, and its smoke tests before the production release. They are not
+the authorization pattern for Game commands. The demo copy is English only.
+
+Run the isolated backend test with:
+
+```sh
+bun run test:unit --run --project convex
+```
+
+The browser smoke test is opt-in because it writes two increments to the configured
+deployment. Use your development URL only. In PowerShell:
+
+```powershell
+$env:RUN_CONVEX_SMOKE = '1'
+bunx playwright test tests/convex-counter.e2e.ts
+Remove-Item Env:RUN_CONVEX_SMOKE
+```
+
+The browser test builds the static app, verifies two-tab updates, and reloads to
+check persistence. Ordinary browser test runs skip this live backend check.
+
 ## PWA baseline
 
 The web app manifest uses the Railway domain's root path and standalone display mode.
