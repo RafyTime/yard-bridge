@@ -20,7 +20,9 @@ export default defineConfig({
 		paraglideVitePlugin({
 			project: './project.inlang',
 			outdir: './src/lib/paraglide',
-			emitTsDeclarations: true
+			emitTsDeclarations: true,
+			// Static pages and their cached copies must agree on the URL's locale.
+			strategy: ['url', 'baseLocale']
 		})
 	],
 	test: {
