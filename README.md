@@ -1,17 +1,10 @@
-# sv
+# Yard Bridge
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+A private, phone-friendly card game built with SvelteKit, TypeScript, Bun, and Convex.
 
 ## Creating a project
 
-If you're seeing this, you've probably already done this step. Congrats!
-
-```sh
-# create a new project
-npx sv create my-app
-```
-
-To recreate this project with the same configuration:
+The initial app was generated with:
 
 ```sh
 # recreate this project
@@ -20,13 +13,15 @@ bun x sv@0.17.1 create --template minimal --types ts --add prettier eslint vites
 
 ## Developing
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+Use the Bun version in `package.json`. Install dependencies, configure `.env.local`
+as described below, and start the frontend:
 
 ```sh
-npm run dev
+bun install --frozen-lockfile
+bun run dev
 
 # or start the server and open the app in a new browser tab
-npm run dev -- --open
+bun run dev --open
 ```
 
 ## Building
@@ -34,12 +29,46 @@ npm run dev -- --open
 To create a production version of your app:
 
 ```sh
-npm run build
+bun run build
 ```
 
-You can preview the production build with `npm run preview`.
+You can preview the production build with `bun run preview`.
 
 > To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+
+## Quality checks and CI
+
+Install Chromium once for both component tests and browser tests:
+
+```sh
+bun run test:install
+bun run quality
+```
+
+`quality` checks formatting, lints, typechecks the frontend and backend, runs Vitest
+unit/component/Convex tests, then builds the static app and runs Playwright.
+Each failing command stops verification. You can also run each gate separately:
+
+| Command                   | Check                                        |
+| ------------------------- | -------------------------------------------- |
+| `bun run format:check`    | Formatting of authored files                 |
+| `bun run lint`            | ESLint with no warnings allowed              |
+| `bun run check`           | Svelte/TypeScript and Convex TypeScript      |
+| `bun run test:unit`       | Unit, component, and in-memory backend tests |
+| `bun run test:unit:watch` | Vitest watch mode                            |
+| `bun run build`           | Static production build                      |
+| `bun run test:e2e`        | Static build followed by browser tests       |
+
+Use `bun run format` to apply formatting. Convex-generated files keep Convex's
+formatting. Only the generic shadcn Button is exempt from the navigation resolver
+rule; application links should still use SvelteKit's `resolve()`.
+
+`.github/workflows/ci.yml` runs these gates on pushes, pull requests, and manual
+runs. It uses the locked dependencies, installs Chromium and its Linux dependencies,
+and builds with `PUBLIC_CONVEX_URL=https://ci.invalid`. Backend tests use `convex-test`
+in memory. CI has no deployment keys, does not sync Convex, and skips the live
+counter test. The workflow will run once it is pushed to GitHub. To block merges
+on failures, require the `Quality checks` status in your repository's branch rules.
 
 ## Convex connection check
 
@@ -68,7 +97,7 @@ the authorization pattern for Game commands. The demo copy is English only.
 Run the isolated backend test with:
 
 ```sh
-bun run test:unit --run --project convex
+bun run test:unit --project convex
 ```
 
 The browser smoke test is opt-in because it writes two increments to the configured
@@ -76,11 +105,12 @@ deployment. Use your development URL only. In PowerShell:
 
 ```powershell
 $env:RUN_CONVEX_SMOKE = '1'
+bun run build
 bunx playwright test tests/convex-counter.e2e.ts
 Remove-Item Env:RUN_CONVEX_SMOKE
 ```
 
-The browser test builds the static app, verifies two-tab updates, and reloads to
+The browser test previews the static app, verifies two-tab updates, and reloads to
 check persistence. Ordinary browser test runs skip this live backend check.
 
 ## PWA baseline

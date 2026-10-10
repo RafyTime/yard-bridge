@@ -10,6 +10,7 @@ const gitignorePath = path.resolve(import.meta.dirname, '.gitignore');
 
 export default defineConfig(
 	includeIgnoreFile(gitignorePath),
+	{ ignores: ['src/convex/_generated/**'] },
 	js.configs.recommended,
 	ts.configs.recommended,
 	svelte.configs.recommended,
@@ -34,8 +35,8 @@ export default defineConfig(
 		}
 	},
 	{
-		// Override or add rule settings here, such as:
-		// 'svelte/button-has-type': 'error'
-		rules: {}
+		files: ['src/lib/components/ui/button/button.svelte'],
+		// Callers resolve internal links. The generic Button also accepts external URLs.
+		rules: { 'svelte/no-navigation-without-resolve': 'off' }
 	}
 );

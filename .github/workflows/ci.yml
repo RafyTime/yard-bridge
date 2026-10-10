@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Quality checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # Only local shell/browser checks and in-memory backend tests run in CI.
+      PUBLIC_CONVEX_URL: https://ci.invalid
+      RUN_CONVEX_SMOKE: '0'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Check formatting
+        run: bun run format:check
+      - name: Lint
+        run: bun run lint
+      - name: Typecheck frontend and backend
+        run: bun run check
+      - name: Install Chromium
+        run: bun run test:install --with-deps
+      - name: Unit, component, and backend tests
+        run: bun run test:unit
+      - name: Static build and browser tests
+        run: bun run test:e2e

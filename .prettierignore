@@ -7,3 +7,6 @@ bun.lockb
 
 # Miscellaneous
 /static/
+
+# Convex owns the formatting of generated code and guidelines.
+/src/convex/_generated/
