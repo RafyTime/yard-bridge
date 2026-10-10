@@ -6,15 +6,17 @@ Planning status: approved on 28 September 2026. The user confirmed the shared sp
 
 - [Rules and prior discussion](../../yard-bridge-handoff.md)
 - [Current stack research](stack-research.md)
-- [Current spec](spec.md)
+- [Current spec](yard-bridge-spec.md)
 - [Convex decision](../../adr/0001-convex-game-backend.md)
-- [Ticket 01: project foundation](tasks/01-project-foundation.md) is ready for the owner to split into subtasks. Tickets 02–18 are ready for agents after their blockers clear.
+- [Ticket 01: project foundation](tasks/01-project-foundation.md) is implemented and verified, pending the owner's documentation review. Tickets 02–18 are ready for agents after their blockers clear.
 - The game is the couple's Odessa yard Bridge variant, not contract bridge.
 - [A Ukrainian account](https://sovet.kidstaff.com.ua/question-184470) says the first player past the score limit loses; it does not settle how to rank a group. The group ranking and continuation rules below are this project's extension.
 - [Odessa players](https://forumodua.com/showthread.php?t=16194) disagree on whether a Bridge declarer scores cards left in hand. Counting those cards also avoids a strategy one player identified: draw a large hand, collect four of a rank, then declare Bridge without a penalty.
 - The accounts above use limits of 125 or 150 points. They do not establish a single correct limit for this couple's rules, so the project's editable default of 200 reflects the user's memory and choice.
 
 ## Decisions-so-far
+
+- Foundation verification on 10 October 2026 passed in a temporary clean checkout; GitHub CI passed, and the owner confirmed Railway and phone PWA operation. The early Railway URL uses the development Convex backend. [Ticket 01](tasks/01-project-foundation.md) records the evidence; [the README](../../../README.md) records setup and environment boundaries.
 
 - The primary use is for two people living apart to play together.
 - The first playable version should support two to four players, with the two-player case primary. With five cards dealt from a 36-card deck, four players leave more draw cards than five; revisit a fifth seat after playtesting.
