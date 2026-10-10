@@ -1,6 +1,6 @@
 ---
 name: convex-billing
-description: "Add Stripe billing/payments to the Convex app via @convex-dev/stripe (checkout + webhook + gating)."
+description: 'Add Stripe billing/payments to the Convex app via @convex-dev/stripe (checkout + webhook + gating).'
 ---
 
 <!-- GENERATED from convex-agents content/capabilities/billing.json — do not edit by hand. -->
@@ -38,24 +38,38 @@ Wire Stripe to Convex using @convex-dev/stripe: a checkout action, an httpAction
    import { v } from 'convex/values';
    const stripeClient = new StripeSubscriptions(components.stripe, {});
    export const createSubscriptionCheckout = action({
-     args: { priceId: v.string() },
-     returns: v.object({ sessionId: v.string(), url: v.union(v.string(), v.null()) }),
-     handler: async (ctx, args) => {
-       const identity = await ctx.auth.getUserIdentity();
-       if (!identity) throw new Error('Not authenticated');
-       const customer = await stripeClient.getOrCreateCustomer(ctx, { userId: identity.subject, email: identity.email, name: identity.name });
-       return await stripeClient.createCheckoutSession(ctx, { priceId: args.priceId, customerId: customer.customerId, mode: 'subscription', successUrl: `${process.env.SITE_URL ?? 'http://localhost:3000'}/?success=true`, cancelUrl: `${process.env.SITE_URL ?? 'http://localhost:3000'}/?canceled=true`, subscriptionMetadata: { userId: identity.subject } });
-     },
+   	args: { priceId: v.string() },
+   	returns: v.object({ sessionId: v.string(), url: v.union(v.string(), v.null()) }),
+   	handler: async (ctx, args) => {
+   		const identity = await ctx.auth.getUserIdentity();
+   		if (!identity) throw new Error('Not authenticated');
+   		const customer = await stripeClient.getOrCreateCustomer(ctx, {
+   			userId: identity.subject,
+   			email: identity.email,
+   			name: identity.name
+   		});
+   		return await stripeClient.createCheckoutSession(ctx, {
+   			priceId: args.priceId,
+   			customerId: customer.customerId,
+   			mode: 'subscription',
+   			successUrl: `${process.env.SITE_URL ?? 'http://localhost:3000'}/?success=true`,
+   			cancelUrl: `${process.env.SITE_URL ?? 'http://localhost:3000'}/?canceled=true`,
+   			subscriptionMetadata: { userId: identity.subject }
+   		});
+   	}
    });
    export const isSubscribed = query({
-     args: {},
-     returns: v.boolean(),
-     handler: async (ctx) => {
-       const identity = await ctx.auth.getUserIdentity();
-       if (!identity) return false;
-       const subscriptions = await ctx.runQuery(components.stripe.public.listSubscriptionsByUserId, { userId: identity.subject });
-       return subscriptions.some((sub) => sub.status === 'active' || sub.status === 'trialing');
-     },
+   	args: {},
+   	returns: v.boolean(),
+   	handler: async (ctx) => {
+   		const identity = await ctx.auth.getUserIdentity();
+   		if (!identity) return false;
+   		const subscriptions = await ctx.runQuery(
+   			components.stripe.public.listSubscriptionsByUserId,
+   			{ userId: identity.subject }
+   		);
+   		return subscriptions.some((sub) => sub.status === 'active' || sub.status === 'trialing');
+   	}
    });
    ```
 6. Run `npx convex dev --once` — it will install the component and push the functions. Verify output shows `✔ Installed component stripe.`

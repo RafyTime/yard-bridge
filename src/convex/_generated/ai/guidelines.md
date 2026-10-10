@@ -131,27 +131,27 @@ These guidelines target Convex `^1.44.0`.
 HTTP endpoints are registered with this shape:
 
 ```typescript
-import { httpRouter } from "convex/server";
-import { httpAction } from "./_generated/server";
+import { httpRouter } from 'convex/server';
+import { httpAction } from './_generated/server';
 const http = httpRouter();
 http.route({
-  path: "/echo",
-  method: "POST",
-  handler: httpAction(async (ctx, req) => {
-    const body = await req.bytes();
-    return new Response(body, { status: 200 });
-  }),
+	path: '/echo',
+	method: 'POST',
+	handler: httpAction(async (ctx, req) => {
+		const body = await req.bytes();
+		return new Response(body, { status: 200 });
+	})
 });
 ```
 
 An array validator is:
 
 ```typescript
-import { mutation } from "./_generated/server";
-import { v } from "convex/values";
+import { mutation } from './_generated/server';
+import { v } from 'convex/values';
 export const exampleMutation = mutation({
-  args: { simpleArray: v.array(v.union(v.string(), v.number())) },
-  handler: async (ctx, args) => {},
+	args: { simpleArray: v.array(v.union(v.string(), v.number())) },
+	handler: async (ctx, args) => {}
 });
 ```
 
@@ -159,12 +159,12 @@ A discriminated union uses `v.union` with `v.literal` members, for example:
 
 ```typescript
 export default defineSchema({
-  results: defineTable(
-    v.union(
-      v.object({ kind: v.literal("error"), errorMessage: v.string() }),
-      v.object({ kind: v.literal("success"), value: v.number() }),
-    ),
-  ),
+	results: defineTable(
+		v.union(
+			v.object({ kind: v.literal('error'), errorMessage: v.string() }),
+			v.object({ kind: v.literal('success'), value: v.number() })
+		)
+	)
 });
 ```
 
@@ -172,32 +172,32 @@ Nested limits are the optional third argument:
 
 ```ts
 try {
-  await ctx.runMutation(internal.example.writeBatch, args, {
-    transactionLimits: { documentsWritten: 100, bytesWritten: 1024 * 1024 },
-  });
+	await ctx.runMutation(internal.example.writeBatch, args, {
+		transactionLimits: { documentsWritten: 100, bytesWritten: 1024 * 1024 }
+	});
 } catch (e) {
-  // The nested mutation's writes rolled back; this mutation can still write.
+	// The nested mutation's writes rolled back; this mutation can still write.
 }
 ```
 
 Same-file calls can use an explicit result annotation:
 
 ```ts
-const result: string = await ctx.runQuery(api.example.f, { name: "Bob" });
+const result: string = await ctx.runQuery(api.example.f, { name: 'Bob' });
 ```
 
 Pagination passes the validator and options through unchanged:
 
 ```ts
 export const listWithExtraArg = query({
-  args: { paginationOpts: paginationOptsValidator, author: v.string() },
-  handler: async (ctx, args) => {
-    return await ctx.db
-      .query("messages")
-      .withIndex("by_author", (q) => q.eq("author", args.author))
-      .order("desc")
-      .paginate(args.paginationOpts);
-  },
+	args: { paginationOpts: paginationOptsValidator, author: v.string() },
+	handler: async (ctx, args) => {
+		return await ctx.db
+			.query('messages')
+			.withIndex('by_author', (q) => q.eq('author', args.author))
+			.order('desc')
+			.paginate(args.paginationOpts);
+	}
 });
 ```
 
@@ -205,12 +205,12 @@ An auth provider config has this shape:
 
 ```typescript
 export default {
-  providers: [
-    {
-      domain: "https://your-auth-provider.com",
-      applicationID: "convex",
-    },
-  ],
+	providers: [
+		{
+			domain: 'https://your-auth-provider.com',
+			applicationID: 'convex'
+		}
+	]
 };
 ```
 
@@ -218,14 +218,14 @@ An external auth client uses `ConvexProviderWithAuth` with `useAuth`:
 
 ```tsx
 <ConvexProviderWithAuth client={convex} useAuth={useYourAuthHook}>
-  {children}
+	{children}
 </ConvexProviderWithAuth>
 ```
 
 A typed ID-keyed map is:
 
 ```ts
-const idToUsername: Record<Id<"users">, string> = {};
+const idToUsername: Record<Id<'users'>, string> = {};
 ```
 
 Vector indexes declare the field, dimensions, and filters:
@@ -245,18 +245,18 @@ documents: defineTable({
 The vector call is action-only:
 
 ```ts
-const results = await ctx.vectorSearch("documents", "by_embedding", {
-  vector: args.embedding,
-  limit: 10,
-  filter: (q) => q.eq("category", args.category),
+const results = await ctx.vectorSearch('documents', 'by_embedding', {
+	vector: args.embedding,
+	limit: 10,
+	filter: (q) => q.eq('category', args.category)
 });
 ```
 
 Mounting a component follows this pattern:
 
 ```ts
-import { defineApp } from "convex/server";
-import aggregate from "@convex-dev/aggregate/convex.config";
+import { defineApp } from 'convex/server';
+import aggregate from '@convex-dev/aggregate/convex.config';
 const app = defineApp();
 app.use(aggregate);
 export default app;
@@ -266,21 +266,21 @@ Cron wiring uses a top-level object and a reference:
 
 ```ts
 const crons = cronJobs();
-crons.interval("delete inactive users", { hours: 2 }, internal.crons.empty, {});
+crons.interval('delete inactive users', { hours: 2 }, internal.crons.empty, {});
 export default crons;
 ```
 
 Convex tests require the module map:
 
 ```typescript
-import { convexTest } from "convex-test";
-const modules = import.meta.glob("./**/*.ts");
+import { convexTest } from 'convex-test';
+const modules = import.meta.glob('./**/*.ts');
 const t = convexTest(schema, modules);
-await t.mutation(api.messages.send, { body: "Hi!", author: "Sarah" });
+await t.mutation(api.messages.send, { body: 'Hi!', author: 'Sarah' });
 ```
 
 Storage metadata comes from the system table:
 
 ```ts
-const metadata = await ctx.db.system.get("_storage", fileId);
+const metadata = await ctx.db.system.get('_storage', fileId);
 ```
