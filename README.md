@@ -49,6 +49,9 @@ bun run quality
 unit/component/Convex tests, then builds the static app and runs Playwright.
 Each failing command stops verification. You can also run each gate separately:
 
+Frontend typechecks generate the ignored Paraglide modules first through
+`bun run i18n:compile`, so they work on a clean checkout before running dev or build.
+
 | Command                   | Check                                        |
 | ------------------------- | -------------------------------------------- |
 | `bun run format:check`    | Formatting of authored files                 |
