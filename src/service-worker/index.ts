@@ -1,11 +1,14 @@
-/// <reference lib="webworker" />
+import { self as worker } from '$app/service-worker';
+import { version } from '$app/env';
+import { immutable, assets, prerendered } from '$app/manifest';
+import { resolve } from '$app/paths';
+import type { Path } from '$app/types';
 
-import { build, files, prerendered, version } from '$service-worker';
-
-const worker = self as unknown as ServiceWorkerGlobalScope;
 const cachePrefix = 'yard-bridge-shell-';
 const cacheName = `${cachePrefix}${version}`;
-const shellPaths = new Set([...build, ...files, ...prerendered]);
+const shellPaths = new Set<string>(
+	[...immutable, ...assets, ...prerendered].map(({ path }) => resolve(path as Path))
+);
 
 worker.addEventListener('install', (event) => {
 	event.waitUntil(

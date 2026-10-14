@@ -126,10 +126,13 @@ bun run test:install
 PUBLIC_CONVEX_URL=https://ci.invalid RUN_CONVEX_SMOKE=0 bun run quality
 ```
 
-`quality` checks formatting, lints, typechecks the frontend and backend, runs Vitest
+`quality` checks formatting, lints, typechecks the frontend, backend, and service worker, runs Vitest
 unit/component/Convex tests, then builds the static app and runs Playwright.
 Each failing command stops verification. You can also run each gate separately:
 
+Framework synchronization creates the `$app/tsconfig` base used by the frontend.
+Library imports use the `#lib` package subpath declared in `package.json`, with
+explicit file extensions; `components.json` uses the same generator aliases.
 Frontend typechecks generate the ignored Paraglide modules first through
 `bun run i18n:compile`, so they work on a clean checkout before running dev or build.
 
@@ -137,7 +140,7 @@ Frontend typechecks generate the ignored Paraglide modules first through
 | ------------------------- | -------------------------------------------- |
 | `bun run format:check`    | Formatting of authored files                 |
 | `bun run lint`            | ESLint with no warnings allowed              |
-| `bun run check`           | Svelte/TypeScript and Convex TypeScript      |
+| `bun run check`           | Frontend, backend, and worker TypeScript     |
 | `bun run test:unit`       | Unit, component, and in-memory backend tests |
 | `bun run test:unit:watch` | Vitest watch mode                            |
 | `bun run build`           | Static production build                      |
@@ -206,7 +209,9 @@ Temporary PNG icons include 192px and 512px app icons, a maskable icon, and an
 the PNGs on Windows with `powershell -File scripts/generate-pwa-icons.ps1` after
 updating the script's matching geometry.
 
-SvelteKit builds and registers `src/service-worker.ts` automatically in production.
+SvelteKit 3 builds and registers `src/service-worker/index.ts` as a module worker
+automatically in production. Its separate TypeScript project extends
+`$app/tsconfig/service-worker`; `bun run check:worker` checks it explicitly.
 It precaches build assets, static files, and prerendered pages, including generated
 language variants. It serves those files from a cache specific to the build.
 Paraglide chooses the locale from the URL, with English at `/`, Spanish at `/es`,

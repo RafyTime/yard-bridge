@@ -38,7 +38,7 @@ jobs:
         run: bun run format:check
       - name: Lint
         run: bun run lint
-      - name: Typecheck frontend and backend
+      - name: Typecheck frontend, backend, and worker
         run: bun run check
       - name: Install Chromium
         run: bun run test:install --with-deps
