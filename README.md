@@ -13,8 +13,9 @@ bun x sv@0.17.1 create --template minimal --types ts --add prettier eslint vites
 
 ## Developing
 
-Use the Bun version in `package.json`. Install dependencies, configure `.env.local`
-as described below, and start the frontend:
+Use Bun 1.4.3, pinned in `package.json`, and Node 24.11 or newer in the Node 24
+release line. `bunfig.toml` retains the existing hoisted dependency layout. Install
+dependencies, configure `.env.local` as described below, and start the frontend:
 
 ```sh
 bun install --frozen-lockfile
@@ -115,11 +116,14 @@ the private production release.
 
 ## Quality checks and CI
 
-Install Chromium once for both component tests and browser tests:
+From a clean checkout, install dependencies and Chromium for both component and
+browser tests, then run quality. For isolated frontend and in-memory backend
+verification, use the dummy backend URL and leave the live smoke test disabled:
 
 ```sh
+bun install --frozen-lockfile
 bun run test:install
-bun run quality
+PUBLIC_CONVEX_URL=https://ci.invalid RUN_CONVEX_SMOKE=0 bun run quality
 ```
 
 `quality` checks formatting, lints, typechecks the frontend and backend, runs Vitest
@@ -140,13 +144,14 @@ Frontend typechecks generate the ignored Paraglide modules first through
 | `bun run test:e2e`        | Static build followed by browser tests       |
 
 Use `bun run format` to apply formatting. Convex-generated files keep Convex's
-formatting. Only the generic shadcn Button is exempt from the navigation resolver
-rule; application links should still use SvelteKit's `resolve()`.
+formatting, as do Inlang-generated project metadata and its README. Only the generic
+shadcn Button is exempt from the navigation resolver rule; application links should
+still use SvelteKit's `resolve()`.
 
 `.github/workflows/ci.yml` runs these gates on pushes, pull requests, and manual
-runs. It uses the locked dependencies, installs Chromium and its Linux dependencies,
-and builds with `PUBLIC_CONVEX_URL=https://ci.invalid`. Backend tests use `convex-test`
-in memory. CI has no deployment keys, does not sync Convex, and skips the live
+runs. It selects the pinned Bun version from `package.json`, uses the locked
+dependencies, installs Chromium and its Linux dependencies, and builds with
+`PUBLIC_CONVEX_URL=https://ci.invalid`. Backend tests use `convex-test` in memory. CI has no deployment keys, does not sync Convex, and skips the live
 counter test. The workflow will run once it is pushed to GitHub. To block merges
 on failures, require the `Quality checks` status in your repository's branch rules.
 

@@ -10,3 +10,7 @@ bun.lockb
 
 # Convex owns the formatting of generated code and guidelines.
 /src/convex/_generated/
+
+# Inlang owns these generated project files.
+/project.inlang/.meta.json
+/project.inlang/README.md
