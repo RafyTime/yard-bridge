@@ -1,0 +1,3 @@
+[install]
+# Preserve the existing dependency layout when upgrading Bun.
+linker = "hoisted"

@@ -42,22 +42,35 @@ test('installs an app shell that reloads offline in every configured language', 
 	await context.setOffline(true);
 	await page.reload();
 	await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-	for (const path of ['/es', '/uk', '/uk/demo/paraglide']) {
+	for (const [path, locale] of [
+		['/es', 'es'],
+		['/uk', 'uk'],
+		['/uk/demo/paraglide', 'uk']
+	]) {
 		await page.goto(path);
 		await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+		await expect(page.locator('html')).toHaveAttribute('lang', locale);
 	}
-	expect(await page.locator('html').getAttribute('lang')).toBe('uk');
 
 	// No cached app shell may masquerade as a backend response.
-	const backendUnavailable = await page.evaluate(async () => {
-		try {
-			await fetch('/api/pwa-test', { method: 'POST' });
-			return false;
-		} catch {
-			return true;
-		}
-	});
-	expect(backendUnavailable).toBe(true);
+	for (const [path, method] of [
+		['/api/pwa-test', 'POST'],
+		['/api/pwa-test', 'GET'],
+		['/unknown-pwa-test', 'GET']
+	]) {
+		const unavailable = await page.evaluate(
+			async ({ path, method }) => {
+				try {
+					await fetch(path, { method });
+					return false;
+				} catch {
+					return true;
+				}
+			},
+			{ path, method }
+		);
+		expect(unavailable).toBe(true);
+	}
 	const cachedPaths = await page.evaluate(async () => {
 		const names = await caches.keys();
 		const paths = await Promise.all(

@@ -4,7 +4,15 @@
 
 - **Language**: TypeScript
 - **Package Manager**: bun
-- **Add-ons**: prettier, eslint, vitest, playwright, tailwindcss, sveltekit-adapter, paraglide
+- **Toolchain**: pinned project-local Vite+, ESLint, Playwright, Tailwind CSS, SvelteKit, Paraglide
+
+## Verification
+
+Run `bun run quality` after completing a unit of work. Vite+ owns formatting,
+JS/TS correctness linting, and Vitest; ESLint preserves Svelte and existing TS rules.
+Frontend checks generate Paraglide before Svelte diagnostics; backend and worker
+checks use separate TypeScript projects. See README's Quality checks and CI for
+runtime pins, tool configuration ownership, and isolated validation.
 
 ## Issue tracker
 

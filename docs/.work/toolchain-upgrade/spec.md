@@ -1,6 +1,6 @@
 # Upgrade the project toolchain
 
-Status: ready-for-agent
+Status: resolved
 
 ## Problem Statement
 
@@ -93,3 +93,17 @@ Primary references:
 - [Svelte browser-test helper manifest](https://github.com/vitest-community/vitest-browser-svelte/blob/main/package.json).
 
 Execution tasks are ordered in the accompanying task directory. Each task records migration findings, verification, and remaining limitations under Comments.
+
+## Completion
+
+Implemented on `codex/toolchain-upgrade` in local commits `ae280d3`, `9f04e60`, and
+`be21e8c`. All three tasks are resolved, with migration reports and verification
+recorded in their Comments. The final toolchain uses Bun 1.4.3, Node 24.21.0,
+SvelteKit 3.0.1, and project-local Vite+ 1.1.0.
+
+The final review compared `78efec4...be21e8c`. Both the Standards and Spec axes
+reported zero actionable findings. Clean frozen installation and the complete
+local quality workflow passed, including all three Vitest projects and localized
+offline browser checks. GitHub Actions and hosted/device checks remain unexecuted.
+No push, pull request, deployment, hosted setting change, or live data write was
+performed.

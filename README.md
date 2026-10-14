@@ -13,8 +13,10 @@ bun x sv@0.17.1 create --template minimal --types ts --add prettier eslint vites
 
 ## Developing
 
-Use the Bun version in `package.json`. Install dependencies, configure `.env.local`
-as described below, and start the frontend:
+Use Bun 1.4.3, pinned in `package.json`, and Node 24.21.0, pinned in
+`.node-version` and selected by CI (Vite+ supports Node 24.11 or newer in that release line). `bunfig.toml` retains the existing hoisted dependency layout. Install
+dependencies, configure `.env.local` as described below, and start the frontend.
+The scripts invoke pinned project-local Vite+ 1.1.0; no global CLI is required:
 
 ```sh
 bun install --frozen-lockfile
@@ -115,38 +117,62 @@ the private production release.
 
 ## Quality checks and CI
 
-Install Chromium once for both component tests and browser tests:
+From a clean checkout, install dependencies and Chromium for both component and
+browser tests, then run quality. For isolated frontend and in-memory backend
+verification, use the dummy backend URL and leave the live smoke test disabled:
 
 ```sh
+bun install --frozen-lockfile
 bun run test:install
-bun run quality
+PUBLIC_CONVEX_URL=https://ci.invalid RUN_CONVEX_SMOKE=0 bun run quality
 ```
 
-`quality` checks formatting, lints, typechecks the frontend and backend, runs Vitest
-unit/component/Convex tests, then builds the static app and runs Playwright.
-Each failing command stops verification. You can also run each gate separately:
+`quality` runs Vite+ formatting and correctness linting, retained ESLint rules,
+frontend/backend/service-worker diagnostics, all three Vitest projects, and the
+static build with standalone Playwright tests.
+Each failing command stops verification. Vite+ and ESLint both reject warnings.
+You can also run each gate separately:
 
+Framework synchronization creates the `$app/tsconfig` base used by the frontend.
+Library imports use the `#lib` package subpath declared in `package.json`, with
+explicit file extensions; `components.json` uses the same generator aliases.
 Frontend typechecks generate the ignored Paraglide modules first through
 `bun run i18n:compile`, so they work on a clean checkout before running dev or build.
 
 | Command                   | Check                                        |
 | ------------------------- | -------------------------------------------- |
 | `bun run format:check`    | Formatting of authored files                 |
-| `bun run lint`            | ESLint with no warnings allowed              |
-| `bun run check`           | Svelte/TypeScript and Convex TypeScript      |
+| `bun run check:toolchain` | Vite+ formatting and correctness linting     |
+| `bun run lint`            | Vite+ and ESLint with no warnings allowed    |
+| `bun run check`           | Frontend, backend, and worker TypeScript     |
 | `bun run test:unit`       | Unit, component, and in-memory backend tests |
 | `bun run test:unit:watch` | Vitest watch mode                            |
 | `bun run build`           | Static production build                      |
 | `bun run test:e2e`        | Static build followed by browser tests       |
 
-Use `bun run format` to apply formatting. Convex-generated files keep Convex's
-formatting. Only the generic shadcn Button is exempt from the navigation resolver
-rule; application links should still use SvelteKit's `resolve()`.
+Use `bun run format` to apply formatting. `vite.config.ts` owns the Vite+ lint,
+format, and test settings, including Svelte formatting and Tailwind class sorting
+against `src/routes/layout.css`. It preserves tabs, single quotes, no trailing
+commas, and a 100-column width. `eslint.config.js` retains the existing recommended
+JavaScript/TypeScript and Svelte rules because Oxlint does not provide equivalent
+Svelte template/navigation coverage. Vite+'s experimental TypeScript checker cannot
+resolve Svelte's named component exports; Svelte diagnostics and the explicit
+backend/worker TypeScript projects remain the authoritative type gates.
+
+The pinned Vite+ release bundles Vite 8.3.3, Vitest 5.0.3, Oxlint 1.87.0, and Oxfmt
+0.72.0. Vite's package alias and the Vite/Vitest overrides keep transitive users on
+that same toolchain; the browser provider is also 5.0.3. The Svelte browser helper
+3.1.0 supports this runner and uses asynchronous rendering. Standalone Playwright
+remains separate from Vitest's browser component project.
+
+Convex-generated files keep Convex's formatting, as do Inlang-generated project metadata and its README. Only the generic
+shadcn Button is exempt from the navigation resolver rule; application links should
+still use SvelteKit's `resolve()`.
 
 `.github/workflows/ci.yml` runs these gates on pushes, pull requests, and manual
-runs. It uses the locked dependencies, installs Chromium and its Linux dependencies,
-and builds with `PUBLIC_CONVEX_URL=https://ci.invalid`. Backend tests use `convex-test`
-in memory. CI has no deployment keys, does not sync Convex, and skips the live
+runs. It selects Bun from `package.json` and Node from `.node-version`, uses the locked
+dependencies, installs Chromium and its Linux dependencies, and builds with
+`PUBLIC_CONVEX_URL=https://ci.invalid`. Backend tests use `convex-test` in memory. CI has no deployment keys, does not sync Convex, and skips the live
 counter test. The workflow will run once it is pushed to GitHub. To block merges
 on failures, require the `Quality checks` status in your repository's branch rules.
 
@@ -201,7 +227,9 @@ Temporary PNG icons include 192px and 512px app icons, a maskable icon, and an
 the PNGs on Windows with `powershell -File scripts/generate-pwa-icons.ps1` after
 updating the script's matching geometry.
 
-SvelteKit builds and registers `src/service-worker.ts` automatically in production.
+SvelteKit 3 builds and registers `src/service-worker/index.ts` as a module worker
+automatically in production. Its separate TypeScript project extends
+`$app/tsconfig/service-worker`; `bun run check:worker` checks it explicitly.
 It precaches build assets, static files, and prerendered pages, including generated
 language variants. It serves those files from a cache specific to the build.
 Paraglide chooses the locale from the URL, with English at `/`, Spanish at `/es`,

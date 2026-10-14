@@ -1,12 +1,12 @@
 <script lang="ts">
-	import type { Pathname } from '$app/types';
+	import type { Path } from '$app/types';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import { locales, localizeHref } from '$lib/paraglide/runtime';
+	import { locales, localizeHref } from '#lib/paraglide/runtime.js';
 	import './layout.css';
 	import { ModeWatcher } from 'mode-watcher';
 	import { setupConvex } from 'convex-svelte';
-	import { PUBLIC_CONVEX_URL } from '$env/static/public';
+	import { PUBLIC_CONVEX_URL } from '$app/env/public';
 
 	let { children } = $props();
 
@@ -18,6 +18,6 @@
 
 <div style="display:none">
 	{#each locales as locale (locale)}
-		<a href={resolve(localizeHref(page.url.pathname, { locale }) as Pathname)}>{locale}</a>
+		<a href={resolve(localizeHref(page.url.pathname, { locale }) as Path)}>{locale}</a>
 	{/each}
 </div>
