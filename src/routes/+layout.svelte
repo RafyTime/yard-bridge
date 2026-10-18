@@ -6,11 +6,13 @@
 	import './layout.css';
 	import { ModeWatcher } from 'mode-watcher';
 	import { setupConvex } from 'convex-svelte';
+	import { setupConvexAuth } from '@mmailaender/convex-auth-svelte/svelte';
 	import { PUBLIC_CONVEX_URL } from '$app/env/public';
 
 	let { children } = $props();
 
-	setupConvex(PUBLIC_CONVEX_URL);
+	const client = setupConvex(PUBLIC_CONVEX_URL);
+	setupConvexAuth({ client, convexUrl: PUBLIC_CONVEX_URL });
 </script>
 
 <ModeWatcher />

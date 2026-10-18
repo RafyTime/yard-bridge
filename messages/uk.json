@@ -1,4 +1,24 @@
 {
 	"$schema": "https://inlang.com/schema/inlang-message-format",
-	"hello_world": "Hello, {name} from uk!"
+	"hello_world": "Hello, {name} from uk!",
+	"auth_welcome": "Вітаємо в Yard Bridge",
+	"auth_intro": "Увійдіть за кодом з електронної пошти, щоб зберегти своє місце за столом.",
+	"auth_email_label": "Електронна пошта",
+	"auth_send": "Надіслати код",
+	"auth_working": "Зачекайте…",
+	"auth_check_email": "Введіть код, надісланий на {email}.",
+	"auth_code_label": "Код для входу",
+	"auth_code_hint": "Вісім цифр. Код дійсний протягом 15 хвилин.",
+	"auth_continue": "Продовжити",
+	"auth_resend": "Надіслати новий код",
+	"auth_change_email": "Використати іншу адресу",
+	"auth_code_sent": "Код надіслано. Перевірте пошту.",
+	"auth_send_error": "Не вдалося надіслати код. Перевірте з’єднання та спробуйте ще раз.",
+	"auth_code_error": "Код недійсний або термін його дії минув. Спробуйте ще раз або отримайте новий код.",
+	"auth_loading": "Перевіряємо ваш сеанс…",
+	"auth_signed_in": "Ви увійшли",
+	"auth_return_hint": "Можна закрити застосунок і повернутися, поки сеанс дійсний.",
+	"auth_sign_out": "Вийти",
+	"auth_sign_out_error": "Не вдалося вийти. Спробуйте ще раз.",
+	"auth_identity_error": "Не вдалося перевірити сеанс. Перевірте з’єднання або вийдіть і спробуйте ще раз."
 }

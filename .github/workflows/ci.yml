@@ -40,7 +40,7 @@ jobs:
         run: bun run lint:eslint
       - name: Typecheck frontend, backend, and worker
         run: bun run check
-      - name: Install Chromium
+      - name: Install browser engines
         run: bun run test:install --with-deps
       - name: Unit, component, and backend tests
         run: bun run test:unit

@@ -108,16 +108,86 @@ target-browser matrix remain release checks.
 
 ## Remaining provisioning
 
-Foundation infrastructure is ready. Later tickets still need manual setup for an
-email sender domain and provider credentials, isolated preview and production
+Foundation infrastructure is ready. Email sign-in still needs the sender and
+backend configuration below, isolated preview and production
 backends, and private off-site backups with a restore check. Production backend
 deployment automation will be added with that environment; the current CI and
 Railway integration cover the frontend only. Remove the development counter before
 the private production release.
 
+## Email-code sign-in
+
+The homepage uses Convex Auth 0.0.96 and the client-only Svelte adapter 0.1.4,
+which fits the static Railway build. Resend delivers eight-digit codes that expire
+after 15 minutes. Convex Auth owns code verification, failed-attempt limits,
+sessions, and refresh tokens. The adapter stores tokens in browser local storage.
+The default session lifetime and inactivity limit are both 30 days. Clearing site
+data or using private browsing can end persistence sooner.
+
+The signed-in view waits for `players.viewer` to read the verified email through
+the authenticated backend. The query rejects unsigned requests, missing sessions,
+and unverified users. No player identity is accepted as an argument. The temporary
+counter remains at `/demo/convex`.
+
+Provision these variables on the **intended Convex test deployment**, not in
+Railway or in `PUBLIC_` frontend variables:
+
+| Variable          | Value                                                                        |
+| ----------------- | ---------------------------------------------------------------------------- |
+| `AUTH_RESEND_KEY` | Resend API key with permission to send from the verified domain              |
+| `AUTH_EMAIL_FROM` | Sender such as `Yard Bridge <signin@your-domain>`                            |
+| `SITE_URL`        | Frontend origin, such as `http://localhost:5173` or the Railway HTTPS origin |
+| `JWT_PRIVATE_KEY` | Private signing key generated below                                          |
+| `JWKS`            | Matching public verification keys generated below                            |
+
+Generate a key pair locally without printing it into chat:
+
+```sh
+bun scripts/generate-auth-keys.mjs > .env.auth.local
+```
+
+Copy the two values into that deployment's Convex dashboard environment settings.
+The surrounding quotes on `JWT_PRIVATE_KEY` delimit the dotenv value; do not include
+them in the dashboard value. `.env.auth.local` is ignored. Delete it after saving
+the keys securely. Generate keys once per deployment; replacing an existing pair
+invalidates its access tokens. Convex supplies `CONVEX_SITE_URL` automatically.
+
+After the owner authorizes the target, sync with `bunx convex dev --once` and test
+against its public URL. The current development backend is shared with Railway,
+so a sync changes that testing channel too. Local verification below does not sync it.
+
+Open the homepage, request a code, enter it, reload, close and reopen the app,
+then sign out. Try an incorrect code and one older than 15 minutes. Repeat on
+Pixel Chrome and Firefox-family browsers, iPhone Safari and Chrome, including the
+installed PWA. Check inbox delivery and the configured sender. Record the hosted
+result in task 02 before extending authentication to Seats.
+
+`src/convex/auth.test.ts` tests public auth commands and protected identity reads
+in memory, with email delivery stubbed. It covers wrong, expired, replaced,
+wrong-email and reused codes, separate player identities, token refresh, revoked
+sessions, and provider failure. `tests/auth.e2e.ts` drives the real browser adapter
+and those backend functions through an in-memory transport, with real signed JWTs.
+It checks code entry, resend, delivery failure, refresh/reopen persistence and
+sign-out in Chromium, Pixel emulation, Firefox and iPhone WebKit emulation.
+These checks do not prove hosted JWT configuration, DNS, real email delivery,
+physical-device behavior, or Seat recovery.
+
+```sh
+bun run test:unit --project convex src/convex/auth.test.ts
+# Build with the dummy URL before this command for fully isolated browser checks.
+bunx playwright test tests/auth.e2e.ts
+```
+
+The adapter's peer ranges do not include the current SvelteKit 3, Convex Auth,
+or convex-svelte versions. Keep it pinned and rerun the auth browser checks when
+upgrading. The client-only integration passes locally; the hosted check is still
+required. Setup follows the [Convex Auth manual setup](https://labs.convex.dev/auth/setup/manual),
+[email OTP guide](https://labs.convex.dev/auth/config/otps), and the
+[adapter's client-only guide](https://github.com/mmailaender/convex-auth-svelte/blob/main/src/lib/svelte/README.md).
+
 ## Quality checks and CI
 
-From a clean checkout, install dependencies and Chromium for both component and
+From a clean checkout, install dependencies and browser engines for component and
 browser tests, then run quality. For isolated frontend and in-memory backend
 verification, use the dummy backend URL and leave the live smoke test disabled:
 
@@ -171,7 +241,7 @@ still use SvelteKit's `resolve()`.
 
 `.github/workflows/ci.yml` runs these gates on pushes, pull requests, and manual
 runs. It selects Bun from `package.json` and Node from `.node-version`, uses the locked
-dependencies, installs Chromium and its Linux dependencies, and builds with
+dependencies, installs Chromium, Firefox, WebKit and their Linux dependencies, and builds with
 `PUBLIC_CONVEX_URL=https://ci.invalid`. Backend tests use `convex-test` in memory. CI has no deployment keys, does not sync Convex, and skips the live
 counter test. The workflow will run once it is pushed to GitHub. To block merges
 on failures, require the `Quality checks` status in your repository's branch rules.
@@ -188,9 +258,9 @@ Set `PUBLIC_CONVEX_URL` in the ignored `.env.local` to your development deployme
 That public URL is embedded in the static build; build each environment with its
 own URL. Keep deployment credentials out of public environment variables.
 
-The homepage has a temporary shared counter to verify the connection:
+The `/demo/convex` page has a temporary shared counter to verify the connection:
 
-1. Open the homepage in two tabs and wait for the counter to load.
+1. Open `/demo/convex` in two tabs and wait for the counter to load.
 2. Click Increment counter in either tab. Both values should update.
 3. Reload a tab. The saved count should remain.
 

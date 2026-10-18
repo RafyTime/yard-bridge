@@ -2,12 +2,12 @@ import { expect, test } from '@playwright/test';
 
 test('counter updates in another tab and persists through a reload', async ({ page, context }) => {
 	test.skip(process.env.RUN_CONVEX_SMOKE !== '1', 'Opt in to writing to the dev counter.');
-	await page.goto('/');
+	await page.goto('/demo/convex');
 	const value = page.getByRole('status', { name: 'Counter value' });
 	await expect(value).toHaveText(/^\d+$/);
 	const initial = Number(await value.textContent());
 	const other = await context.newPage();
-	await other.goto('/');
+	await other.goto('/demo/convex');
 	const otherValue = other.getByRole('status', { name: 'Counter value' });
 	await expect(otherValue).toHaveText(String(initial));
 	await page.getByRole('button', { name: 'Increment counter', exact: true }).click();

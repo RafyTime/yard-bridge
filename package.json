@@ -23,7 +23,7 @@
 		"test:unit": "vp test run",
 		"test:unit:watch": "vp test",
 		"test": "bun run test:unit && bun run test:e2e",
-		"test:install": "playwright install chromium",
+		"test:install": "playwright install chromium firefox webkit",
 		"test:e2e": "bun run build && playwright test",
 		"quality": "bun run check:toolchain && bun run lint:eslint && bun run check && bun run test"
 	},
@@ -34,6 +34,7 @@
 		"@hugeicons/core-free-icons": "^4.3.5",
 		"@hugeicons/svelte": "^1.1.5",
 		"@inlang/paraglide-js": "^2.18.2",
+		"@internationalized/date": "^3.12.0",
 		"@playwright/test": "^1.60.0",
 		"@sveltejs/adapter-static": "^4.0.0",
 		"@sveltejs/kit": "^3.0.0",
@@ -41,12 +42,14 @@
 		"@tailwindcss/vite": "^4.3.0",
 		"@types/node": "^24",
 		"@vitest/browser-playwright": "5.0.3",
+		"bits-ui": "^2.18.0",
 		"cn": "^0.3.0",
 		"convex-test": "^0.0.60",
 		"eslint": "^10.4.1",
 		"eslint-config-prettier": "^10.1.8",
 		"eslint-plugin-svelte": "^3.19.0",
 		"globals": "^17.6.0",
+		"jose": "6.2.12",
 		"playwright": "^1.60.0",
 		"shadcn-svelte": "^1.7.0",
 		"svelte": "^5.57.1",
@@ -62,6 +65,9 @@
 		"vitest-browser-svelte": "3.1.0"
 	},
 	"dependencies": {
+		"@convex-dev/auth": "0.0.96",
+		"@mmailaender/convex-auth-svelte": "0.1.4",
+		"@oslojs/crypto": "1.0.1",
 		"convex": "^1.46.0",
 		"convex-svelte": "^0.14.0",
 		"mode-watcher": "^1.1.0"

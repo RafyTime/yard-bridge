@@ -1,4 +1,24 @@
 {
 	"$schema": "https://inlang.com/schema/inlang-message-format",
-	"hello_world": "Hello, {name} from en!"
+	"hello_world": "Hello, {name} from en!",
+	"auth_welcome": "Welcome to Yard Bridge",
+	"auth_intro": "Sign in with an email code to keep your place at the table.",
+	"auth_email_label": "Email address",
+	"auth_send": "Send code",
+	"auth_working": "Please wait…",
+	"auth_check_email": "Enter the code sent to {email}.",
+	"auth_code_label": "Sign-in code",
+	"auth_code_hint": "Eight digits. The code expires in 15 minutes.",
+	"auth_continue": "Continue",
+	"auth_resend": "Send a new code",
+	"auth_change_email": "Use a different email",
+	"auth_code_sent": "Code sent. Check your inbox.",
+	"auth_send_error": "Could not send a code. Check your connection and try again.",
+	"auth_code_error": "That code is invalid or has expired. Try again or request a new code.",
+	"auth_loading": "Checking your session…",
+	"auth_signed_in": "You are signed in",
+	"auth_return_hint": "You can close the app and return while your session remains valid.",
+	"auth_sign_out": "Sign out",
+	"auth_sign_out_error": "Could not sign out. Please try again.",
+	"auth_identity_error": "Could not verify your session. Check your connection, or sign out and try again."
 }
