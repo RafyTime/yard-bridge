@@ -8,13 +8,15 @@ Planning status: approved on 28 September 2026. The user confirmed the shared sp
 - [Current stack research](stack-research.md)
 - [Current spec](yard-bridge-spec.md)
 - [Convex decision](../../adr/0001-convex-game-backend.md)
-- [Ticket 01: project foundation](tasks/01-project-foundation.md) is implemented and verified, pending the owner's documentation review. Tickets 02–18 are ready for agents after their blockers clear.
+- [Ticket 01: project foundation](tasks/01-project-foundation.md) is implemented and verified, pending the owner's documentation review. [Ticket 02: email-code sign-in](tasks/02-email-code-sign-in.md) is resolved. Tickets 03–18 are ready for agents after their blockers clear.
 - The game is the couple's Odessa yard Bridge variant, not contract bridge.
 - [A Ukrainian account](https://sovet.kidstaff.com.ua/question-184470) says the first player past the score limit loses; it does not settle how to rank a group. The group ranking and continuation rules below are this project's extension.
 - [Odessa players](https://forumodua.com/showthread.php?t=16194) disagree on whether a Bridge declarer scores cards left in hand. Counting those cards also avoids a strategy one player identified: draw a large hand, collect four of a rank, then declare Bridge without a penalty.
 - The accounts above use limits of 125 or 150 points. They do not establish a single correct limit for this couple's rules, so the project's editable default of 200 reflects the user's memory and choice.
 
 ## Decisions-so-far
+
+- Email-code sign-in passed automated integration checks and owner verification of real email delivery, session persistence, invalid/expired codes, target phone browsers, and installed PWA mode on 18 October 2026. [Ticket 02](tasks/02-email-code-sign-in.md) is resolved. Resend's account-only test sender is sufficient for this check; a verified sender domain is still required before other players can receive codes.
 
 - Foundation verification on 10 October 2026 passed in a temporary clean checkout; GitHub CI passed, and the owner confirmed Railway and phone PWA operation. The early Railway URL uses the development Convex backend. [Ticket 01](tasks/01-project-foundation.md) records the evidence; [the README](../../../README.md) records setup and environment boundaries.
 
@@ -69,7 +71,7 @@ Planning status: approved on 28 September 2026. The user confirmed the shared sp
 ## Implementation tickets
 
 1. [Establish the project foundation](tasks/01-project-foundation.md) — ready-for-human.
-2. [Sign in with an email code](tasks/02-email-code-sign-in.md)
+2. [Sign in with an email code](tasks/02-email-code-sign-in.md) — resolved.
 3. [Create and resume a Game](tasks/03-create-and-resume-game.md)
 4. [Invite and approve Seats](tasks/04-invite-and-approve-seats.md)
 5. [Configure rules and ready the table](tasks/05-configure-rules-and-ready.md)
@@ -90,7 +92,6 @@ Planning status: approved on 28 September 2026. The user confirmed the shared sp
 ## Fog
 
 - Whether a fifth seat works after playtesting.
-- Whether the Convex Auth Svelte adapter and a static SvelteKit frontend pass a narrow end-to-end sign-in test.
 - Which exact sender domain to register and where to store scheduled off-site exports. These are provisioning choices, not blockers to the agreed architecture.
 - Exact visual palette and card motion details, to be settled with a UI prototype.
 - The Jack finish alternative and other uncertain local rules outside the agreed first-release default.
