@@ -8,7 +8,7 @@ Planning status: approved on 28 September 2026. The user confirmed the shared sp
 - [Current stack research](stack-research.md)
 - [Current spec](yard-bridge-spec.md)
 - [Convex decision](../../adr/0001-convex-game-backend.md)
-- [Ticket 01: project foundation](tasks/01-project-foundation.md) is implemented and verified, pending the owner's documentation review. [Ticket 02: email-code sign-in](tasks/02-email-code-sign-in.md) is resolved. Tickets 03–18 are ready for agents after their blockers clear.
+- [Ticket 01: project foundation](tasks/01-project-foundation.md) is implemented and verified, pending the owner's documentation review. [Ticket 02: email-code sign-in](tasks/02-email-code-sign-in.md) is resolved. Tickets 03–06 are resolved. Tickets 07–18 are ready for agents after their blockers clear.
 - The game is the couple's Odessa yard Bridge variant, not contract bridge.
 - [A Ukrainian account](https://sovet.kidstaff.com.ua/question-184470) says the first player past the score limit loses; it does not settle how to rank a group. The group ranking and continuation rules below are this project's extension.
 - [Odessa players](https://forumodua.com/showthread.php?t=16194) disagree on whether a Bridge declarer scores cards left in hand. Counting those cards also avoids a strategy one player identified: draw a large hand, collect four of a rank, then declare Bridge without a penalty.

@@ -3,20 +3,11 @@ import { convexTest } from 'convex-test';
 import { expect, test } from 'vite-plus/test';
 import { api } from './_generated/api';
 import schema from './schema';
+import { createPlayer } from '../../tests/fixtures/convex-player';
 const modules = import.meta.glob(['./**/*.{ts,js}', '!./**/*.test.ts', '!./**/*.d.ts']);
 async function table() {
 	const t = convexTest(schema, modules);
-	async function player(email: string) {
-		const subject = await t.run(async (ctx) => {
-			const userId = await ctx.db.insert('users', { email, emailVerificationTime: 1 });
-			const sessionId = await ctx.db.insert('authSessions', {
-				userId,
-				expirationTime: Date.now() + 100000
-			});
-			return `${userId}|${sessionId}`;
-		});
-		return t.withIdentity({ subject });
-	}
+	const player = (email: string) => createPlayer(t, email);
 	return { t, player };
 }
 test('an invitation requests host approval before it grants a seat or private game view', async () => {

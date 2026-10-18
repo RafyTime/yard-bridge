@@ -1,5 +1,6 @@
 import { ConvexError, v } from 'convex/values';
 import { mutation, query } from './_generated/server';
+import type { QueryCtx } from './_generated/server';
 import { requirePlayer } from './access';
 import { defaultRules, rulesValidator } from './rules';
 import schema from './schema';
@@ -121,6 +122,28 @@ export const invite = mutation({
 		return token;
 	}
 });
+async function invitationContext(ctx: QueryCtx, token: string) {
+	const player = await requirePlayer(ctx);
+	const invitation = await ctx.db
+		.query('invitations')
+		.withIndex('by_token', (q) => q.eq('token', token))
+		.unique();
+	const game = invitation && (await ctx.db.get('games', invitation.gameId));
+	if (!game) throw new ConvexError('Invitation unavailable');
+	const seat = await ctx.db
+		.query('seats')
+		.withIndex('by_gameId_and_userId', (q) => q.eq('gameId', game._id).eq('userId', player.id))
+		.unique();
+	// Approved Seats remain recoverable after the lobby closes.
+	if (seat) return { player, game, seat, request: null };
+	if (game.status !== 'lobby') throw new ConvexError('Lobby closed');
+	const request = await ctx.db
+		.query('seatRequests')
+		.withIndex('by_gameId_and_userId', (q) => q.eq('gameId', game._id).eq('userId', player.id))
+		.unique();
+	return { player, game, seat, request };
+}
+
 export const invitation = query({
 	args: { token: v.string() },
 	returns: v.object({
@@ -134,23 +157,8 @@ export const invitation = query({
 		gameId: v.union(v.id('games'), v.null())
 	}),
 	handler: async (ctx, { token }) => {
-		const player = await requirePlayer(ctx);
-		const invitation = await ctx.db
-			.query('invitations')
-			.withIndex('by_token', (q) => q.eq('token', token))
-			.unique();
-		const game = invitation && (await ctx.db.get('games', invitation.gameId));
-		if (!game) throw new ConvexError('Invitation unavailable');
-		const seat = await ctx.db
-			.query('seats')
-			.withIndex('by_gameId_and_userId', (q) => q.eq('gameId', game._id).eq('userId', player.id))
-			.unique();
+		const { game, seat, request } = await invitationContext(ctx, token);
 		if (seat) return { name: game.name, status: 'approved' as const, gameId: game._id };
-		if (game.status !== 'lobby') throw new ConvexError('Lobby closed');
-		const request = await ctx.db
-			.query('seatRequests')
-			.withIndex('by_gameId_and_userId', (q) => q.eq('gameId', game._id).eq('userId', player.id))
-			.unique();
 		return { name: game.name, status: request?.status ?? ('invited' as const), gameId: null };
 	}
 });
@@ -158,24 +166,8 @@ export const requestSeat = mutation({
 	args: { token: v.string() },
 	returns: v.null(),
 	handler: async (ctx, { token }) => {
-		const player = await requirePlayer(ctx);
-		const invitation = await ctx.db
-			.query('invitations')
-			.withIndex('by_token', (q) => q.eq('token', token))
-			.unique();
-		const game = invitation && (await ctx.db.get('games', invitation.gameId));
-		if (!game) throw new ConvexError('Invitation unavailable');
-		const seat = await ctx.db
-			.query('seats')
-			.withIndex('by_gameId_and_userId', (q) => q.eq('gameId', game._id).eq('userId', player.id))
-			.unique();
-		if (seat) return null;
-		if (game.status !== 'lobby') throw new ConvexError('Lobby closed');
-		const request = await ctx.db
-			.query('seatRequests')
-			.withIndex('by_gameId_and_userId', (q) => q.eq('gameId', game._id).eq('userId', player.id))
-			.unique();
-		if (request) return null;
+		const { player, game, seat, request } = await invitationContext(ctx, token);
+		if (seat || request) return null;
 		const requests = await ctx.db
 			.query('seatRequests')
 			.withIndex('by_gameId', (q) => q.eq('gameId', game._id))

@@ -3,26 +3,14 @@ import { convexTest } from 'convex-test';
 import { afterEach, expect, test, vi } from 'vite-plus/test';
 import { api } from './_generated/api';
 import schema from './schema';
+import { createPlayer } from '../../tests/fixtures/convex-player';
 
 const modules = import.meta.glob(['./**/*.{ts,js}', '!./**/*.test.ts', '!./**/*.d.ts']);
 afterEach(() => vi.restoreAllMocks());
 
 async function table(count = 2, handSize = 5, openingEffects = true) {
 	const t = convexTest(schema, modules);
-	async function player(index: number) {
-		const subject = await t.run(async (ctx) => {
-			const userId = await ctx.db.insert('users', {
-				email: `player${index}@example.com`,
-				emailVerificationTime: 1
-			});
-			const sessionId = await ctx.db.insert('authSessions', {
-				userId,
-				expirationTime: Date.now() + 100000
-			});
-			return `${userId}|${sessionId}`;
-		});
-		return t.withIdentity({ subject });
-	}
+	const player = (index: number) => createPlayer(t, `player${index}@example.com`);
 	const players = await Promise.all(Array.from({ length: count }, (_, index) => player(index)));
 	const host = players[0];
 	const gameId = await host.mutation(api.games.create, { name: 'Opening table' });
@@ -41,17 +29,24 @@ async function table(count = 2, handSize = 5, openingEffects = true) {
 	game = await host.query(api.games.view, { gameId });
 	for (const player of players)
 		await player.mutation(api.gameRules.ready, { gameId, expectedVersion: game.version });
-	return { t, players, host, gameId, game, player };
+	return { t, players, host, gameId, game, player, token };
 }
 
 test('the Host opens one durable private deal and freezes the reviewed rules', async () => {
-	const { t, host, players, gameId, game, player } = await table();
+	const { t, host, players, gameId, game, player, token } = await table();
 	// A draw near one leaves a Fisher-Yates deck in its canonical order and selects the last Seat.
 	vi.spyOn(Math, 'random').mockReturnValue(0.999999);
 	await host.mutation(api.rounds.start, { gameId, expectedGameVersion: game.version });
 	const guest = players[1];
 	const hostView = await host.query(api.rounds.view, { gameId });
 	const guestView = await guest.query(api.rounds.view, { gameId });
+	expect(await guest.query(api.games.invitation, { token })).toEqual({
+		name: 'Opening table',
+		status: 'approved',
+		gameId
+	});
+	await guest.mutation(api.games.requestSeat, { token });
+	expect(await guest.query(api.rounds.view, { gameId })).toEqual(guestView);
 	expect(hostView).toMatchObject({
 		starterSeatId: game.seats[1].id,
 		topCard: { rank: 'A', suit: 'clubs' },
@@ -94,6 +89,8 @@ test('the Host opens one durable private deal and freezes the reviewed rules', a
 	).rejects.toThrow('Round already started');
 	await expect(t.query(api.rounds.view, { gameId })).rejects.toThrow('Sign in');
 	const outsider = await player(9);
+	await expect(outsider.query(api.games.invitation, { token })).rejects.toThrow('Lobby closed');
+	await expect(outsider.mutation(api.games.requestSeat, { token })).rejects.toThrow('Lobby closed');
 	await expect(outsider.query(api.rounds.view, { gameId })).rejects.toThrow('Game unavailable');
 	await expect(
 		outsider.mutation(api.rounds.start, { gameId, expectedGameVersion: game.version })
