@@ -95,3 +95,54 @@ test('a player creates multiple games and reopens the same seat after reload', a
 	await expect(page.getByRole('heading', { name: 'Evening table' })).toBeVisible();
 	expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
+
+test('invitation waits for approval and an approved player returns without another request', async ({
+	page,
+	backend
+}) => {
+	async function signIn(email: string) {
+		await page.getByLabel('Email address').fill(email);
+		await page.getByRole('button', { name: 'Send code', exact: true }).click();
+		await expect(page.getByLabel('Sign-in code')).toBeVisible();
+		await page.getByLabel('Sign-in code').fill(backend.code);
+		await page.getByRole('button', { name: 'Continue', exact: true }).click();
+		await expect(page.getByRole('button', { name: 'Sign out', exact: true })).toBeVisible();
+	}
+	async function signOut() {
+		await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+		await expect(page.getByLabel('Email address')).toBeVisible();
+	}
+	await page.setViewportSize({ width: 390, height: 844 });
+	await page.goto('/');
+	await signIn('host@example.com');
+	await page.getByLabel('Game name').fill('Private invitation table');
+	await page.getByRole('button', { name: 'Create private game' }).click();
+	await page.getByRole('button', { name: 'Get invitation link' }).click();
+	const invitation = await page.getByLabel('Invitation link', { exact: true }).inputValue();
+	const gameURL = page.url();
+	await signOut();
+	await page.goto(invitation);
+	await signIn('guest@example.com');
+	await expect(page.getByRole('button', { name: 'Request a seat', exact: true })).toBeVisible();
+	await expect(page.getByText('Score cutoff', { exact: true })).toHaveCount(0);
+	await page.getByRole('button', { name: 'Request a seat', exact: true }).click();
+	await expect(
+		page.getByRole('status').filter({ hasText: 'waiting for host approval' })
+	).toBeVisible();
+	await signOut();
+	await page.goto(gameURL);
+	await signIn('host@example.com');
+	await expect(page.getByText('guest@example.com', { exact: true })).toBeVisible();
+	await page.screenshot({ path: test.info().outputPath('seat-approval.png') });
+	expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+	await page.getByRole('button', { name: 'Approve', exact: true }).click();
+	await expect(page.getByText('2 of 4 seats occupied', { exact: true })).toBeVisible();
+	await signOut();
+	await page.goto(invitation);
+	await signIn('guest@example.com');
+	await expect(page.getByText('Your seat is saved.', { exact: true })).toBeVisible();
+	await expect(page.getByText('2 of 4 seats occupied', { exact: true })).toBeVisible();
+	await page.reload();
+	await expect(page.getByText('Your seat is saved.', { exact: true })).toBeVisible();
+	await expect(page.getByRole('button', { name: 'Request a seat', exact: true })).toHaveCount(0);
+});

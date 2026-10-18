@@ -35,5 +35,22 @@
 	"games_create": "Create private game",
 	"games_create_error": "Could not create the game. Check your connection and try again.",
 	"games_list_error": "Could not load your games. Check your connection.",
-	"games_empty": "No unfinished games yet. Create your first table."
+	"games_empty": "No unfinished games yet. Create your first table.",
+	"invite_title": "Invite players",
+	"invite_create": "Get invitation link",
+	"invite_link": "Invitation link",
+	"invite_link_hint": "Share this link. You approve each new seat before they can see the game.",
+	"invite_intro": "Request a seat. The host must approve you before you can enter the game.",
+	"invite_request": "Request a seat",
+	"invite_pending": "Your seat request is waiting for host approval.",
+	"invite_rejected": "The host declined your seat request.",
+	"invite_unavailable": "This invitation is unavailable. Ask the host for a link.",
+	"invite_error": "Could not complete that request. The table may be full. Try again.",
+	"invite_no_requests": "No seat requests waiting.",
+	"invite_approve": "Approve",
+	"invite_reject": "Reject",
+	"invite_seat_count": "{count} of 4 seats occupied",
+	"invite_seat": "Seat {number}",
+	"invite_you": "You",
+	"invite_host": "Host"
 }
