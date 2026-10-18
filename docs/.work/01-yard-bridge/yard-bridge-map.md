@@ -16,6 +16,11 @@ Planning status: approved on 28 September 2026. The user confirmed the shared sp
 
 ## Decisions-so-far
 
+- Use one reusable owner-controlled domain across side projects, with a dedicated
+  Yard Bridge sending subdomain and scoped Resend key. Provision near release;
+  [ticket 19](tasks/19-reusable-sender-domain.md) blocks ticket 18. Domain purchase
+  and channel changes require the owner's explicit authorization.
+
 - Email-code sign-in passed automated integration checks and owner verification of real email delivery, session persistence, invalid/expired codes, target phone browsers, and installed PWA mode on 18 October 2026. [Ticket 02](tasks/02-email-code-sign-in.md) is resolved. Resend's account-only test sender is sufficient for this check; a verified sender domain is still required before other players can receive codes.
 
 - Foundation verification on 10 October 2026 passed in a temporary clean checkout; GitHub CI passed, and the owner confirmed Railway and phone PWA operation. The early Railway URL uses the development Convex backend. [Ticket 01](tasks/01-project-foundation.md) records the evidence; [the README](../../../README.md) records setup and environment boundaries.
@@ -88,6 +93,7 @@ Planning status: approved on 28 September 2026. The user confirmed the shared sp
 16. [Make the PWA installable and useful offline](tasks/16-installable-offline-pwa.md)
 17. [Complete English and Ukrainian UI](tasks/17-complete-english-and-ukrainian-ui.md)
 18. [Release the private Game](tasks/18-release-private-game.md)
+19. [Set up a reusable domain for sign-in emails](tasks/19-reusable-sender-domain.md) — blocks release ticket 18; schedule before inviting other players.
 
 ## Fog
 
