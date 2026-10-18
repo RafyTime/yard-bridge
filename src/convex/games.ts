@@ -17,6 +17,7 @@ const gameView = gameSummary.extend({
 	version: v.number(),
 	isHost: v.boolean(),
 	viewerSeatId: v.id('seats'),
+	canStart: v.boolean(),
 	seats: v.array(seatView)
 });
 
@@ -82,6 +83,11 @@ export const view = query({
 			version: game.version,
 			isHost: game.hostId === player.id,
 			viewerSeatId: seat._id,
+			canStart:
+				game.status === 'lobby' &&
+				seats.length >= 2 &&
+				seats.length <= 4 &&
+				seats.every((item) => item.ready),
 			seats: seats.map((item) => ({
 				id: item._id,
 				isHost: item.userId === game.hostId,

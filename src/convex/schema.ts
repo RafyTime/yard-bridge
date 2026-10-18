@@ -17,6 +17,11 @@ export default defineSchema({
 		rules: rulesValidator,
 		version: v.number()
 	}),
+	savedRules: defineTable({
+		ownerId: v.id('users'),
+		name: v.string(),
+		rules: rulesValidator
+	}).index('by_ownerId', ['ownerId']),
 	seats: defineTable({
 		gameId: v.id('games'),
 		userId: v.id('users'),

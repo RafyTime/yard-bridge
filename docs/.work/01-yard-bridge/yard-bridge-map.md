@@ -16,6 +16,8 @@ Planning status: approved on 28 September 2026. The user confirmed the shared sp
 
 ## Decisions-so-far
 
+- [Ticket 05](tasks/05-configure-rules-and-ready.md) keeps Rules configurations as Game values and private saved snapshots. Host edits atomically clear readiness; version-checked reviews acknowledge the current rules, and two to four ready Seats make the table ready to start. All approved players can inspect defaults, deviations, and the base rules before reviewing.
+
 - [Ticket 04](tasks/04-invite-and-approve-seats.md) separates invitation previews from approved Game access. The Host approves each identity once, with four Seats maximum and stable recovery across sessions. Public command-and-view and local phone-browser checks cover the approval boundary.
 
 - [Ticket 03](tasks/03-create-and-resume-game.md) stores private named Games with a Host Seat and default Rules configuration. Authenticated command-and-view checks and local browser tests cover creation, multiple unfinished Games, session recovery, and private access.

@@ -1,4 +1,4 @@
-import { v } from 'convex/values';
+import { v, type Infer } from 'convex/values';
 
 export const rulesValidator = v.object({
 	scoreCutoff: v.number(),
@@ -14,6 +14,8 @@ export const rulesValidator = v.object({
 		v.literal('random')
 	)
 });
+
+export type RulesConfiguration = Infer<typeof rulesValidator>;
 
 export const defaultRules = {
 	scoreCutoff: 200,

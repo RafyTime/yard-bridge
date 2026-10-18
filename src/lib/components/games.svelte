@@ -9,6 +9,7 @@
 	import * as Field from '#lib/components/ui/field/index.js';
 	import * as m from '#lib/paraglide/messages.js';
 	import Invitations from './invitations.svelte';
+	import GameRules from './game-rules.svelte';
 	const invitationToken = $derived(page.url.searchParams.get('invite'));
 	const client = useConvexClient();
 	const games = useQuery(api.games.list, {});
@@ -49,12 +50,6 @@
 			<h2 id="games-heading" class="text-2xl font-semibold break-words">{game.data.name}</h2>
 			<p>{game.data.isHost ? m.games_host() : m.games_seated()}</p>
 			<p class="text-muted-foreground">{m.games_lobby()}</p>
-			<dl class="grid grid-cols-2 gap-3">
-				<dt>{m.games_cutoff()}</dt>
-				<dd>{game.data.rules.scoreCutoff}</dd>
-				<dt>{m.games_hand_size()}</dt>
-				<dd>{game.data.rules.handSize}</dd>
-			</dl>
 			<p>{m.games_saved()}</p>
 			<p>{m.invite_seat_count({ count: game.data.seats.length })}</p>
 			<ul class="flex flex-col gap-2">
@@ -63,10 +58,12 @@
 						{m.invite_seat({ number: index + 1 })}{seat.isHost
 							? ` · ${m.invite_host()}`
 							: ''}{seat.id === game.data.viewerSeatId ? ` · ${m.invite_you()}` : ''}
+						· {seat.ready ? m.rules_seat_ready() : m.rules_seat_waiting()}
 					</li>
 				{/each}
 			</ul>
 			{#if game.data.isHost && game.data.status === 'lobby'}<Invitations {gameId} />{/if}
+			{#key `${game.data.id}:${game.data.version}`}<GameRules game={game.data} />{/key}
 		{:else}<p role="status">{m.games_loading()}</p>{/if}
 	{:else}
 		<h2 id="games-heading" class="text-2xl font-semibold">{m.games_title()}</h2>
