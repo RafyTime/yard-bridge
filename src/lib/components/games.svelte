@@ -1,0 +1,89 @@
+<script lang="ts">
+	import { page } from '$app/state';
+	import { goto } from '$app/navigation';
+	import { useConvexClient, useQuery } from 'convex-svelte';
+	import { api } from '../../convex/_generated/api';
+	import type { Id } from '../../convex/_generated/dataModel';
+	import { Button } from '#lib/components/ui/button/index.js';
+	import { Input } from '#lib/components/ui/input/index.js';
+	import * as Field from '#lib/components/ui/field/index.js';
+	import * as m from '#lib/paraglide/messages.js';
+	const client = useConvexClient();
+	const games = useQuery(api.games.list, {});
+	const gameId = $derived(page.url.searchParams.get('game') as Id<'games'> | null);
+	const game = useQuery(api.games.view, () => (gameId ? { gameId } : 'skip'));
+	let name = $state('');
+	let pending = $state(false);
+	let error = $state(false);
+	async function create(event: SubmitEvent) {
+		event.preventDefault();
+		if (pending) return;
+		pending = true;
+		error = false;
+		try {
+			const id = await client.mutation(api.games.create, { name });
+			name = '';
+			await goto(`?game=${id}`);
+		} catch {
+			error = true;
+		} finally {
+			pending = false;
+		}
+	}
+</script>
+
+<section class="flex flex-col gap-5" aria-labelledby="games-heading">
+	{#if gameId}
+		<Button variant="outline" onclick={() => goto(page.url.pathname)}>{m.games_back()}</Button>
+		{#if game.error}<p role="alert">{m.games_unavailable()}</p>
+		{:else if game.data}
+			<h2 id="games-heading" class="text-2xl font-semibold break-words">{game.data.name}</h2>
+			<p>{game.data.isHost ? m.games_host() : m.games_seated()}</p>
+			<p class="text-muted-foreground">{m.games_lobby()}</p>
+			<dl class="grid grid-cols-2 gap-3">
+				<dt>{m.games_cutoff()}</dt>
+				<dd>{game.data.rules.scoreCutoff}</dd>
+				<dt>{m.games_hand_size()}</dt>
+				<dd>{game.data.rules.handSize}</dd>
+			</dl>
+			<p>{m.games_saved()}</p>
+		{:else}<p role="status">{m.games_loading()}</p>{/if}
+	{:else}
+		<h2 id="games-heading" class="text-2xl font-semibold">{m.games_title()}</h2>
+		<form onsubmit={create} aria-busy={pending}>
+			<Field.FieldGroup>
+				<Field.Field data-invalid={error}>
+					<Field.FieldLabel for="game-name">{m.games_name()}</Field.FieldLabel>
+					<Input
+						id="game-name"
+						bind:value={name}
+						maxlength={80}
+						required
+						disabled={pending}
+						aria-invalid={error}
+						aria-describedby="game-error"
+					/>
+				</Field.Field>
+				<Button type="submit" disabled={pending || !name.trim()}
+					>{pending ? m.auth_working() : m.games_create()}</Button
+				>
+			</Field.FieldGroup>
+		</form>
+		{#if error}<p id="game-error" role="alert">{m.games_create_error()}</p>{/if}
+		{#if games.error}<p role="alert">{m.games_list_error()}</p>
+		{:else if games.data}
+			{#if games.data.length === 0}<p class="text-muted-foreground">{m.games_empty()}</p>{/if}
+			<ul class="flex flex-col gap-3">
+				{#each games.data as item (item.id)}
+					<li>
+						<Button
+							variant="outline"
+							class="w-full min-w-0 justify-start break-words whitespace-normal"
+							onclick={() => goto(`?game=${item.id}`)}>{item.name}</Button
+						>
+					</li>
+				{/each}
+			</ul>
+		{:else}<p role="status">{m.games_loading()}</p>{/if}
+	{/if}
+</section>

@@ -16,6 +16,8 @@ Planning status: approved on 28 September 2026. The user confirmed the shared sp
 
 ## Decisions-so-far
 
+- [Ticket 03](tasks/03-create-and-resume-game.md) stores private named Games with a Host Seat and default Rules configuration. Authenticated command-and-view checks and local browser tests cover creation, multiple unfinished Games, session recovery, and private access.
+
 - Use one reusable owner-controlled domain across side projects, with a dedicated
   Yard Bridge sending subdomain and scoped Resend key. Provision near release;
   [ticket 19](tasks/19-reusable-sender-domain.md) blocks ticket 18. Domain purchase

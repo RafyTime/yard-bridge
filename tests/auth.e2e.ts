@@ -67,3 +67,31 @@ test('delivery failure stays on the email form and Ukrainian fits a narrow phone
 	await expect(page.getByLabel('Електронна пошта')).toBeVisible();
 	expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
+
+test('a player creates multiple games and reopens the same seat after reload', async ({
+	page,
+	backend
+}) => {
+	await page.setViewportSize({ width: 390, height: 844 });
+	await page.goto('/');
+	await page.getByLabel('Email address').fill('leo@example.com');
+	await page.getByRole('button', { name: 'Send code', exact: true }).click();
+	await expect(page.getByLabel('Sign-in code')).toBeVisible();
+	await page.getByLabel('Sign-in code').fill(backend.code);
+	await page.getByRole('button', { name: 'Continue', exact: true }).click();
+	await page.getByLabel('Game name').fill('Evening table');
+	await page.getByRole('button', { name: 'Create private game' }).click();
+	await expect(page.getByRole('heading', { name: 'Evening table' })).toBeVisible();
+	await expect(page.getByText('You are the host.', { exact: true })).toBeVisible();
+	await page.reload();
+	await expect(page.getByRole('heading', { name: 'Evening table' })).toBeVisible();
+	await page.getByRole('button', { name: 'All games' }).click();
+	await page.getByLabel('Game name').fill('Weekend table');
+	await page.getByRole('button', { name: 'Create private game' }).click();
+	await expect(page.getByRole('heading', { name: 'Weekend table' })).toBeVisible();
+	await page.getByRole('button', { name: 'All games' }).click();
+	await expect(page.getByRole('button', { name: 'Weekend table' })).toBeVisible();
+	await page.getByRole('button', { name: 'Evening table' }).click();
+	await expect(page.getByRole('heading', { name: 'Evening table' })).toBeVisible();
+	expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});

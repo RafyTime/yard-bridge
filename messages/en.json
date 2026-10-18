@@ -20,5 +20,20 @@
 	"auth_return_hint": "You can close the app and return while your session remains valid.",
 	"auth_sign_out": "Sign out",
 	"auth_sign_out_error": "Could not sign out. Please try again.",
-	"auth_identity_error": "Could not verify your session. Check your connection, or sign out and try again."
+	"auth_identity_error": "Could not verify your session. Check your connection, or sign out and try again.",
+	"games_back": "All games",
+	"games_unavailable": "This game is unavailable. Sign in with the email that holds your seat.",
+	"games_host": "You are the host.",
+	"games_seated": "Your seat is saved.",
+	"games_lobby": "Waiting for players",
+	"games_cutoff": "Score cutoff",
+	"games_hand_size": "Cards per hand",
+	"games_saved": "Your game and seat are saved. Return from any device with the same email.",
+	"games_loading": "Loading games…",
+	"games_title": "Your unfinished games",
+	"games_name": "Game name",
+	"games_create": "Create private game",
+	"games_create_error": "Could not create the game. Check your connection and try again.",
+	"games_list_error": "Could not load your games. Check your connection.",
+	"games_empty": "No unfinished games yet. Create your first table."
 }
