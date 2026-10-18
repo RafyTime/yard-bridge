@@ -170,7 +170,7 @@ and those backend functions through an in-memory transport, with real signed JWT
 It checks code entry, resend, delivery failure, refresh/reopen persistence and
 sign-out in Chromium, Pixel emulation, Firefox and iPhone WebKit emulation.
 These checks do not prove hosted JWT configuration, DNS, real email delivery,
-physical-device behavior, or Seat recovery.
+or physical-device behavior. Game and Seat recovery checks are described below.
 
 ```sh
 bun run test:unit --project convex src/convex/auth.test.ts
@@ -180,10 +180,42 @@ bunx playwright test tests/auth.e2e.ts
 
 The adapter's peer ranges do not include the current SvelteKit 3, Convex Auth,
 or convex-svelte versions. Keep it pinned and rerun the auth browser checks when
-upgrading. The client-only integration passes locally; the hosted check is still
-required. Setup follows the [Convex Auth manual setup](https://labs.convex.dev/auth/setup/manual),
+upgrading. The owner verified hosted email delivery and session return in
+[ticket 02](docs/.work/01-yard-bridge/tasks/02-email-code-sign-in.md).
+Setup follows the [Convex Auth manual setup](https://labs.convex.dev/auth/setup/manual),
 [email OTP guide](https://labs.convex.dev/auth/config/otps), and the
 [adapter's client-only guide](https://github.com/mmailaender/convex-auth-svelte/blob/main/src/lib/svelte/README.md).
+
+## Private games, lobbies, and opening rounds
+
+After signing in, create a named private Game or reopen one from your unfinished
+Games. A `?game=...` URL opens the same approved Seat for that account on another
+device. Hosts obtain an invitation link from the lobby. An invitee can see the
+Game name and request a Seat, but only the Host can approve or reject the request.
+Approval persists for that account, and a table holds at most four Seats.
+
+The Host can edit the core rules, expand detailed settings, or save a private
+Rules configuration for another Game. Applying a configuration copies its values;
+it does not change the source Game. The rules review shows current values,
+defaults, and deviations. Every approved player must review the current rules;
+Host edits clear everyone's readiness. Hand sizes range from two to nine cards
+so the same 36-card deck supports four players.
+
+Once two to four players are ready, the Host can start the first Round. The server
+shuffles, chooses a starter, deals, and freezes the rules in one mutation. The
+starter's final dealt card becomes the opening card. Each player sees only their
+own hand, shared card counts, top card, and opening state. Reconnecting reads the
+same persisted deal. Opening effects remain pending for the later turn-play
+tickets; card play and effect-resolution commands are not implemented yet.
+
+`src/convex/games.test.ts`, `invitations.test.ts`, `gameRules.test.ts`, and
+`rounds.test.ts` exercise authenticated public commands and authorized views.
+`tests/auth.e2e.ts` drives sign-in through approval, rules review, Round start,
+and reload using the real client adapter with an in-memory backend. It also
+checks English and Ukrainian phone layouts. These isolated checks do not sync
+the shared Convex deployment or change Railway. Hosted verification of the new
+Game functions requires a separately authorized backend sync to the intended
+test deployment.
 
 ## Quality checks and CI
 
