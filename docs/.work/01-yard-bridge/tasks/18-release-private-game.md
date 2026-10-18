@@ -2,7 +2,7 @@
 
 Type: task
 Status: ready-for-agent
-Blocked by: 15 (Export and restore Games), 17 (Complete English and Ukrainian UI)
+Blocked by: 15 (Export and restore Games), 17 (Complete English and Ukrainian UI), 19 (Set up a reusable domain for sign-in emails)
 Spec: [Approved Yard Bridge spec](../spec.md)
 
 ## What to build

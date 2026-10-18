@@ -1,7 +1,7 @@
 # 02: Sign in with an email code
 
 Type: task
-Status: ready-for-human
+Status: resolved
 Blocked by: 01 (Establish the project foundation)
 Spec: [Approved Yard Bridge spec](../yard-bridge-spec.md)
 
@@ -11,16 +11,17 @@ A player can request an email code, sign in, and return to a signed-in mobile vi
 
 ## Acceptance criteria
 
-- [ ] A player can request and enter a code, sign out, and return after closing or refreshing the app without signing in again while the session remains valid.
+- [x] A player can request and enter a code, sign out, and return after closing or refreshing the app without signing in again while the session remains valid.
 - [x] Invalid or expired codes fail clearly without granting an authenticated view.
 - [x] A signed-in view reads the player's identity through the authenticated backend boundary; an unsigned player cannot read it.
-- [ ] The flow is usable in the target phone browsers and has an automated command-and-view check. Record the integration result before extending auth to Seats.
+- [x] The flow is usable in the target phone browsers and has an automated command-and-view check. Record the integration result before extending auth to Seats.
 
 ## Integration result
 
 Implemented locally on 18 October 2026. Convex Auth 0.0.96 and the client-only
 Svelte adapter 0.1.4 work with the static SvelteKit 3 build in isolated tests.
-The adapter has outdated peer ranges; it stays pinned pending hosted verification.
+The adapter has outdated peer ranges; it stays pinned. Owner verification below
+confirms hosted operation.
 
 - The public auth command and protected identity query tests verify signed JWTs,
   separate players, unsigned access rejection, wrong/expired/replaced/reused codes,
@@ -39,23 +40,33 @@ The adapter has outdated peer ranges; it stays pinned pending hosted verificatio
   counter check was skipped. Auth key-generation output format was also verified
   without displaying or persisting its private key.
 
-## Remaining owner verification
+## Owner verification
 
-The owner is provisioning Resend. [README setup](../../../../README.md#email-code-sign-in)
-lists the backend variables and key-generation command. The first acceptance item
-has automated local evidence but remains open until real email delivery works.
-The final item remains open for hosted and physical-phone verification.
+On 18 October 2026, the owner confirmed all remaining checks passed:
 
-1. Configure the verified sender and Resend key, signing keys, and `SITE_URL` on the
-   intended test backend. Secrets belong in Convex, not public frontend variables.
-2. Authorize the backend sync explicitly. The current development deployment is
-   shared with Railway, so it was not synced during implementation. Only read-only
-   Convex code generation was used to refresh the local bindings.
-3. Request a real email and verify sign-in, invalid/expired code handling, app
-   closing/reopening, refresh, and sign-out on the target Pixel and iPhone browsers,
-   including installed PWA mode. Record the result here before extending auth to Seats.
+- Configured Resend delivery, signing keys, and `SITE_URL` on the development
+  Convex deployment and synced the backend.
+- Received a real sign-in code and signed in. An initial request failure was
+  resolved by adding the missing URL scheme to `SITE_URL`.
+- Verified session persistence after refresh and closing/reopening, sign-out
+  persistence, and rejection of incorrect and expired codes.
+- Verified the hosted flow in the target Pixel and iPhone browsers, including
+  installed PWA mode.
+
+These are owner-reported results, supplementing the automated checks above.
+Resend currently uses `onboarding@resend.dev` and delivers only to the account
+email. A verified sender domain remains deferred until other players need codes;
+it is a release provisioning requirement, not an open integration check here.
+
+## Answer
+
+The SvelteKit, Convex Auth, and Resend email-code integration is verified and this
+task is resolved. Authentication can now be used by the Game and Seat tasks.
 
 ## Comments
 
 - The user authorized implementation while independently setting up Resend.
-- No production or shared testing-channel deployment, commit, push, or PR was made.
+- During implementation, no production or shared testing-channel deployment,
+  commit, push, or PR was made. The owner subsequently synced the development
+  backend and verified the hosted app.
+- The owner confirmed all verification passed and requested closure on 18 October 2026.
