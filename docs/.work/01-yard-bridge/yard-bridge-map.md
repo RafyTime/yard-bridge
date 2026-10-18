@@ -16,6 +16,8 @@ Planning status: approved on 28 September 2026. The user confirmed the shared sp
 
 ## Decisions-so-far
 
+- [Ticket 06](tasks/06-open-round-with-private-hands.md) starts one durable Round from a ready table, with a server-shuffled 36-card deck, random starter, frozen rules, and separate private hands. Authorized views expose only the viewer's hand and shared table counts and opening state. Pending opening obligations and effects remain recorded for later turn commands.
+
 - [Ticket 05](tasks/05-configure-rules-and-ready.md) keeps Rules configurations as Game values and private saved snapshots. Host edits atomically clear readiness; version-checked reviews acknowledge the current rules, and two to four ready Seats make the table ready to start. All approved players can inspect defaults, deviations, and the base rules before reviewing.
 
 - [Ticket 04](tasks/04-invite-and-approve-seats.md) separates invitation previews from approved Game access. The Host approves each identity once, with four Seats maximum and stable recovery across sessions. Public command-and-view and local phone-browser checks cover the approval boundary.

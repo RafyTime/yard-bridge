@@ -15,6 +15,7 @@ import type * as games from "../games.js";
 import type * as gameRules from "../gameRules.js";
 import type * as health from "../health.js";
 import type * as http from "../http.js";
+import type * as rounds from "../rounds.js";
 import type * as players from "../players.js";
 
 import type {
@@ -32,6 +33,7 @@ declare const fullApi: ApiFromModules<{
   health: typeof health;
   http: typeof http;
   players: typeof players;
+  rounds: typeof rounds;
 }>;
 
 /**

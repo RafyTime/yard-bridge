@@ -2,6 +2,7 @@ import { defineSchema, defineTable } from 'convex/server';
 import { v } from 'convex/values';
 import { authTables } from '@convex-dev/auth/server';
 import { rulesValidator } from './rules';
+import { cardValidator, openingValidator, suitValidator } from './cards';
 
 export default defineSchema({
 	...authTables,
@@ -17,6 +18,23 @@ export default defineSchema({
 		rules: rulesValidator,
 		version: v.number()
 	}),
+	rounds: defineTable({
+		gameId: v.id('games'),
+		number: v.number(),
+		rules: rulesValidator,
+		drawPile: v.array(cardValidator),
+		playedPile: v.array(cardValidator),
+		starterSeatId: v.id('seats'),
+		currentSeatId: v.id('seats'),
+		activeSuit: v.union(suitValidator, v.null()),
+		opening: openingValidator,
+		handCounts: v.array(v.object({ seatId: v.id('seats'), cardCount: v.number() }))
+	}).index('by_gameId', ['gameId']),
+	roundHands: defineTable({
+		roundId: v.id('rounds'),
+		seatId: v.id('seats'),
+		cards: v.array(cardValidator)
+	}).index('by_roundId_and_seatId', ['roundId', 'seatId']),
 	savedRules: defineTable({
 		ownerId: v.id('users'),
 		name: v.string(),

@@ -163,6 +163,36 @@ test('invitation waits for approval and an approved player returns without anoth
 		page.getByRole('button', { name: 'I have reviewed these rules', exact: true })
 	).toBeVisible();
 	await expect(page.getByText('Review needed', { exact: false })).toHaveCount(2);
+	await page.getByRole('button', { name: 'I have reviewed these rules', exact: true }).click();
+	await signOut();
+	await page.goto(invitation);
+	await signIn('guest@example.com');
+	await page.getByRole('button', { name: 'I have reviewed these rules', exact: true }).click();
+	await signOut();
+	await page.goto(gameURL);
+	await signIn('host@example.com');
+	await page.getByRole('button', { name: 'Start first round', exact: true }).click();
+	await expect(page.getByRole('heading', { name: 'Round 1', exact: true })).toBeVisible();
+	const hand = page.getByRole('list', { name: 'Your hand', exact: true });
+	const cards = await hand.getByRole('listitem').allTextContents();
+	expect(await hand.getByRole('listitem').count()).toBeGreaterThanOrEqual(4);
+	await page.reload();
+	await expect(page.getByRole('heading', { name: 'Round 1', exact: true })).toBeVisible();
+	await expect(hand.getByRole('listitem')).toHaveText(cards);
+	await expect(page.getByRole('button', { name: 'Apply rules', exact: true })).toHaveCount(0);
+	expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+	await page.screenshot({
+		path: test.info().outputPath('opening-round-phone.png'),
+		fullPage: true
+	});
+	await page.goto(`/uk${new URL(page.url()).search}`);
+	await page.setViewportSize({ width: 320, height: 640 });
+	await expect(page.getByRole('heading', { name: 'Раунд 1', exact: true })).toBeVisible();
+	expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+	await page.screenshot({
+		path: test.info().outputPath('opening-round-uk-phone.png'),
+		fullPage: true
+	});
 });
 
 test('Host edits advanced rules and copies a saved configuration into a later Game on phones', async ({

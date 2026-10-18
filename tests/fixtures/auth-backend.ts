@@ -26,7 +26,8 @@ export async function authBackend(context: BrowserContext) {
 		'./auth.ts': () => import('../../src/convex/auth'),
 		'./players.ts': () => import('../../src/convex/players'),
 		'./games.ts': () => import('../../src/convex/games'),
-		'./gameRules.ts': () => import('../../src/convex/gameRules')
+		'./gameRules.ts': () => import('../../src/convex/gameRules'),
+		'./rounds.ts': () => import('../../src/convex/rounds')
 	});
 	let code = '';
 	let deliveryFails = false;

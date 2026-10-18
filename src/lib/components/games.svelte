@@ -10,6 +10,7 @@
 	import * as m from '#lib/paraglide/messages.js';
 	import Invitations from './invitations.svelte';
 	import GameRules from './game-rules.svelte';
+	import GameRound from './game-round.svelte';
 	const invitationToken = $derived(page.url.searchParams.get('invite'));
 	const client = useConvexClient();
 	const games = useQuery(api.games.list, {});
@@ -49,19 +50,23 @@
 		{:else if game.data}
 			<h2 id="games-heading" class="text-2xl font-semibold break-words">{game.data.name}</h2>
 			<p>{game.data.isHost ? m.games_host() : m.games_seated()}</p>
-			<p class="text-muted-foreground">{m.games_lobby()}</p>
+			{#if game.data.status === 'lobby'}<p class="text-muted-foreground">{m.games_lobby()}</p>{/if}
 			<p>{m.games_saved()}</p>
-			<p>{m.invite_seat_count({ count: game.data.seats.length })}</p>
-			<ul class="flex flex-col gap-2">
-				{#each game.data.seats as seat, index (seat.id)}
-					<li>
-						{m.invite_seat({ number: index + 1 })}{seat.isHost
-							? ` · ${m.invite_host()}`
-							: ''}{seat.id === game.data.viewerSeatId ? ` · ${m.invite_you()}` : ''}
-						· {seat.ready ? m.rules_seat_ready() : m.rules_seat_waiting()}
-					</li>
-				{/each}
-			</ul>
+			<GameRound game={game.data} />
+			{#if game.data.status === 'lobby'}<p>
+					{m.invite_seat_count({ count: game.data.seats.length })}
+				</p>
+				<ul class="flex flex-col gap-2">
+					{#each game.data.seats as seat, index (seat.id)}
+						<li>
+							{m.invite_seat({ number: index + 1 })}{seat.isHost
+								? ` · ${m.invite_host()}`
+								: ''}{seat.id === game.data.viewerSeatId ? ` · ${m.invite_you()}` : ''}
+							· {seat.ready ? m.rules_seat_ready() : m.rules_seat_waiting()}
+						</li>
+					{/each}
+				</ul>
+			{/if}
 			{#if game.data.isHost && game.data.status === 'lobby'}<Invitations {gameId} />{/if}
 			{#key `${game.data.id}:${game.data.version}`}<GameRules game={game.data} />{/key}
 		{:else}<p role="status">{m.games_loading()}</p>{/if}
@@ -73,6 +78,7 @@
 					<Field.FieldLabel for="game-name">{m.games_name()}</Field.FieldLabel>
 					<Input
 						id="game-name"
+						class="min-h-11"
 						bind:value={name}
 						maxlength={80}
 						required
@@ -81,7 +87,7 @@
 						aria-describedby="game-error"
 					/>
 				</Field.Field>
-				<Button type="submit" disabled={pending || !name.trim()}
+				<Button class="min-h-11" type="submit" disabled={pending || !name.trim()}
 					>{pending ? m.auth_working() : m.games_create()}</Button
 				>
 			</Field.FieldGroup>
@@ -95,7 +101,7 @@
 					<li>
 						<Button
 							variant="outline"
-							class="w-full min-w-0 justify-start break-words whitespace-normal"
+							class="min-h-11 w-full min-w-0 justify-start break-words whitespace-normal"
 							onclick={() => goto(`?game=${item.id}`)}>{item.name}</Button
 						>
 					</li>
