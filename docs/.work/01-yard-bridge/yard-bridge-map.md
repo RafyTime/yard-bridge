@@ -8,13 +8,21 @@ Planning status: approved on 28 September 2026. The user confirmed the shared sp
 - [Current stack research](stack-research.md)
 - [Current spec](yard-bridge-spec.md)
 - [Convex decision](../../adr/0001-convex-game-backend.md)
-- [Ticket 01: project foundation](tasks/01-project-foundation.md) is implemented and verified, pending the owner's documentation review. [Ticket 02: email-code sign-in](tasks/02-email-code-sign-in.md) is resolved. Tickets 03–18 are ready for agents after their blockers clear.
+- [Ticket 01: project foundation](tasks/01-project-foundation.md) is implemented and verified, pending the owner's documentation review. [Ticket 02: email-code sign-in](tasks/02-email-code-sign-in.md) is resolved. Tickets 03–06 are resolved. Tickets 07–18 are ready for agents after their blockers clear.
 - The game is the couple's Odessa yard Bridge variant, not contract bridge.
 - [A Ukrainian account](https://sovet.kidstaff.com.ua/question-184470) says the first player past the score limit loses; it does not settle how to rank a group. The group ranking and continuation rules below are this project's extension.
 - [Odessa players](https://forumodua.com/showthread.php?t=16194) disagree on whether a Bridge declarer scores cards left in hand. Counting those cards also avoids a strategy one player identified: draw a large hand, collect four of a rank, then declare Bridge without a penalty.
 - The accounts above use limits of 125 or 150 points. They do not establish a single correct limit for this couple's rules, so the project's editable default of 200 reflects the user's memory and choice.
 
 ## Decisions-so-far
+
+- [Ticket 06](tasks/06-open-round-with-private-hands.md) starts one durable Round from a ready table, with a server-shuffled 36-card deck, random starter, frozen rules, and separate private hands. Authorized views expose only the viewer's hand and shared table counts and opening state. Pending opening obligations and effects remain recorded for later turn commands.
+
+- [Ticket 05](tasks/05-configure-rules-and-ready.md) keeps Rules configurations as Game values and private saved snapshots. Host edits atomically clear readiness; version-checked reviews acknowledge the current rules, and two to four ready Seats make the table ready to start. All approved players can inspect defaults, deviations, and the base rules before reviewing.
+
+- [Ticket 04](tasks/04-invite-and-approve-seats.md) separates invitation previews from approved Game access. The Host approves each identity once, with four Seats maximum and stable recovery across sessions. Public command-and-view and local phone-browser checks cover the approval boundary.
+
+- [Ticket 03](tasks/03-create-and-resume-game.md) stores private named Games with a Host Seat and default Rules configuration. Authenticated command-and-view checks and local browser tests cover creation, multiple unfinished Games, session recovery, and private access.
 
 - Use one reusable owner-controlled domain across side projects, with a dedicated
   Yard Bridge sending subdomain and scoped Resend key. Provision near release;

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Games from '#lib/components/games.svelte';
 	import { useAuth } from '@mmailaender/convex-auth-svelte/svelte';
 	import { useQuery } from 'convex-svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
@@ -92,7 +93,7 @@
 			{:else if viewer.data}
 				<h2 class="text-xl font-medium">{m.auth_signed_in()}</h2>
 				<p class="break-all">{viewer.data.email}</p>
-				<p class="text-muted-foreground">{m.auth_return_hint()}</p>
+				<Games />
 			{:else}
 				<p role="status">{m.auth_loading()}</p>
 			{/if}

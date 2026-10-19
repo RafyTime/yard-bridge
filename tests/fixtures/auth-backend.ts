@@ -24,7 +24,10 @@ export async function authBackend(context: BrowserContext) {
 	const backend = convexTest(schema, {
 		'./_generated/server.js': () => import('../../src/convex/_generated/server.js'),
 		'./auth.ts': () => import('../../src/convex/auth'),
-		'./players.ts': () => import('../../src/convex/players')
+		'./players.ts': () => import('../../src/convex/players'),
+		'./games.ts': () => import('../../src/convex/games'),
+		'./gameRules.ts': () => import('../../src/convex/gameRules'),
+		'./rounds.ts': () => import('../../src/convex/rounds')
 	});
 	let code = '';
 	let deliveryFails = false;
@@ -37,17 +40,18 @@ export async function authBackend(context: BrowserContext) {
 		return Response.json({ id: 'test-email' });
 	};
 
+	const refreshPeers = new Set<() => void>();
 	await context.routeWebSocket(/\/api\/.*\/sync/, (socket) => {
 		let identity: { subject: string; issuer: string } | null = null;
 		let version = { querySet: 0, identity: 0, ts: 'AAAAAAAAAAA=' };
 		let clock = 0n;
-		const queries = new Map<number, string>();
+		const queries = new Map<number, { path: string; args: Record<string, Value> }>();
 		const session = () => (identity ? backend.withIdentity(identity) : backend);
 		async function transition(querySet = version.querySet, identityVersion = version.identity) {
 			const modifications = await Promise.all(
-				[...queries].map(async ([queryId, path]) => {
+				[...queries].map(async ([queryId, { path, args }]) => {
 					try {
-						const value = await session().query(makeFunctionReference<'query'>(path), {});
+						const value = await session().query(makeFunctionReference<'query'>(path), args);
 						return { type: 'QueryUpdated', queryId, value, logLines: [], journal: null };
 					} catch {
 						return {
@@ -71,6 +75,11 @@ export async function authBackend(context: BrowserContext) {
 		}
 		// Serialize messages so auth acknowledgment and query versions retain wire order.
 		let work = Promise.resolve();
+		const refresh = () => {
+			work = work.then(() => transition()).catch(() => {});
+		};
+		refreshPeers.add(refresh);
+		socket.onClose(() => refreshPeers.delete(refresh));
 		socket.onMessage((raw) => {
 			work = work
 				.then(async () => {
@@ -88,10 +97,43 @@ export async function authBackend(context: BrowserContext) {
 					} else if (message.type === 'ModifyQuerySet') {
 						for (const modification of message.modifications) {
 							if (modification.type === 'Add')
-								queries.set(modification.queryId, modification.udfPath);
+								queries.set(modification.queryId, {
+									path: modification.udfPath,
+									args: modification.args[0]
+								});
 							else queries.delete(modification.queryId);
 						}
 						await transition(message.newVersion);
+					} else if (message.type === 'Mutation') {
+						try {
+							const result = await session().mutation(
+								makeFunctionReference<'mutation'>(message.udfPath),
+								message.args[0]
+							);
+							await transition();
+							socket.send(
+								JSON.stringify({
+									type: 'MutationResponse',
+									requestId: message.requestId,
+									success: true,
+									result,
+									ts: version.ts,
+									logLines: []
+								})
+							);
+							await transition();
+							for (const peer of refreshPeers) if (peer !== refresh) peer();
+						} catch (error) {
+							socket.send(
+								JSON.stringify({
+									type: 'MutationResponse',
+									requestId: message.requestId,
+									success: false,
+									result: String(error),
+									logLines: []
+								})
+							);
+						}
 					} else if (message.type === 'Action') {
 						try {
 							const result = await session().action(
@@ -148,7 +190,13 @@ type ClientMessage =
 			type: 'ModifyQuerySet';
 			newVersion: number;
 			modifications: Array<
-				{ type: 'Add'; queryId: number; udfPath: string } | { type: 'Remove'; queryId: number }
+				| { type: 'Add'; queryId: number; udfPath: string; args: [Record<string, Value>] }
+				| { type: 'Remove'; queryId: number }
 			>;
 	  }
-	| { type: 'Action'; requestId: number; udfPath: string; args: [Record<string, Value>] };
+	| {
+			type: 'Action' | 'Mutation';
+			requestId: number;
+			udfPath: string;
+			args: [Record<string, Value>];
+	  };
