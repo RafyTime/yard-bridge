@@ -108,14 +108,22 @@ target-browser matrix remain release checks.
 
 ## Remaining provisioning
 
-Foundation infrastructure is ready. Email sign-in still needs the sender and
-backend configuration below, isolated preview and production
-backends, and private off-site backups with a restore check. Production backend
+Foundation infrastructure and real email-code sign-in are working on the shared
+development deployment. Remaining provisioning includes isolated preview and
+production backends, and private off-site backups with a restore check. Production backend
 deployment automation will be added with that environment; the current CI and
 Railway integration cover the frontend only. Remove the development counter before
 the private production release.
 
 ## Email-code sign-in
+
+The hosted app is at `https://yard-bridge.rafy.dev`. Resend sends through the
+verified `mail.rafy.dev` subdomain of the Porkbun-registered `rafy.dev` domain.
+The owner configured the existing Convex development deployment's sender and key
+and confirmed real email-code sign-in works on 29 October 2026. See
+[task 19](docs/.work/01-yard-bridge/tasks/19-reusable-sender-domain.md) for the
+remaining account-recovery and key-permission confirmations and future-project
+reuse guidance.
 
 The homepage uses Convex Auth 0.0.96 and the client-only Svelte adapter 0.1.4,
 which fits the static Railway build. Resend delivers eight-digit codes that expire
