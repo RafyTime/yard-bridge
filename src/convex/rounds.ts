@@ -1,9 +1,9 @@
 import { ConvexError, v } from 'convex/values';
-import type { Infer } from 'convex/values';
 import { mutation, query } from './_generated/server';
 import { requirePlayer } from './access';
 import { cardValidator, openingValidator, ranks, suits, suitValidator } from './cards';
 import type { Card } from './cards';
+import { initializeRound } from './round-initialization';
 
 export const start = mutation({
 	args: { gameId: v.id('games'), expectedGameVersion: v.number() },
@@ -28,45 +28,14 @@ export const start = mutation({
 			[deck[index], deck[other]] = [deck[other], deck[index]];
 		}
 		const starterIndex = Math.floor(Math.random() * seats.length);
-		const starter = seats[starterIndex];
-		const next = seats[(starterIndex + 1) % seats.length];
-		const hands = seats.map<Card[]>(() => []);
-		let dealt = 0;
-		for (let card = 0; card < game.rules.handSize; card++) {
-			for (let offset = 0; offset < seats.length; offset++)
-				hands[(starterIndex + offset) % seats.length].push(deck[dealt++]);
-		}
-		const topCard = hands[starterIndex].pop()!;
-		let opening: Infer<typeof openingValidator> = { kind: 'none' };
-		if (game.rules.openingEffects) {
-			if (topCard.rank === 'J') opening = { kind: 'choose-suit', seatId: starter._id };
-			else if (topCard.rank === '6') opening = { kind: 'cover-six', seatId: starter._id };
-			else if (topCard.rank === '7')
-				opening = { kind: 'effect', targetSeatId: next._id, drawCount: 1, skip: false };
-			else if (topCard.rank === '8')
-				opening = { kind: 'effect', targetSeatId: next._id, drawCount: 2, skip: true };
-			else if (topCard.rank === 'A')
-				opening = { kind: 'effect', targetSeatId: next._id, drawCount: 0, skip: true };
-			else if (topCard.rank === 'Q' && topCard.suit === 'spades')
-				opening = { kind: 'effect', targetSeatId: next._id, drawCount: 5, skip: false };
-			else if (topCard.rank === 'K' && topCard.suit === 'spades' && game.rules.kingOfSpades)
-				opening = { kind: 'effect', targetSeatId: next._id, drawCount: 7, skip: false };
-		}
-		const roundId = await ctx.db.insert('rounds', {
-			gameId,
-			number: 1,
-			rules: game.rules,
-			drawPile: deck.slice(dealt),
-			playedPile: [topCard],
-			starterSeatId: starter._id,
-			currentSeatId:
-				opening.kind === 'choose-suit' || opening.kind === 'cover-six' ? starter._id : next._id,
-			activeSuit: opening.kind === 'choose-suit' ? null : topCard.suit,
-			opening,
-			handCounts: seats.map((seat, index) => ({ seatId: seat._id, cardCount: hands[index].length }))
+		const { hands, ...round } = initializeRound({
+			deck,
+			seats,
+			starterSeatId: seats[starterIndex]._id,
+			rules: game.rules
 		});
-		for (let index = 0; index < seats.length; index++)
-			await ctx.db.insert('roundHands', { roundId, seatId: seats[index]._id, cards: hands[index] });
+		const roundId = await ctx.db.insert('rounds', { gameId, number: 1, ...round });
+		for (const hand of hands) await ctx.db.insert('roundHands', { roundId, ...hand });
 		await ctx.db.patch('games', gameId, { status: 'active', version: game.version + 1 });
 		return null;
 	}
