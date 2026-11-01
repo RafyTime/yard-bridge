@@ -23,10 +23,15 @@
   and rules. Production retains server randomness and atomic writes; fixed-card
   tests replace shuffle-coupled scenarios while authenticated command/view
   coverage continues to verify private hands, authorization, and durability.
+- Final Standards and Spec reviews against `d5123159` each reported zero findings.
+- Ticket worktrees were removed after their commits were integrated.
 
 ## Fog
 
-- Both ticket quality runs passed static checks, unit tests, builds, and browser
-  tests on Chromium, Pixel, and Firefox. iPhone/WebKit cases could not launch
-  because the host lacks ICU 74 and JPEG 8 libraries. Integrated verification and
-  the final two-axis review are pending.
+- Integrated verification used
+  `PUBLIC_CONVEX_URL=https://ci.invalid RUN_CONVEX_SMOKE=0 bun run quality`.
+  Formatting, linting, all three TypeScript checks, 35 unit tests, the build, and
+  20 browser tests on Chromium, Pixel, and Firefox passed. The live smoke test was
+  skipped. The command exited with failure because six iPhone/WebKit cases could
+  not launch: the Fedora host lacks ICU 74 and JPEG 8 libraries. Their application
+  assertions remain unverified on WebKit; no deployment or live data was touched.
