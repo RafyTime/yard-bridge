@@ -8,7 +8,7 @@
 ## Decisions-so-far
 
 - Leo approved two implementation tickets on 1 November 2026. Both are
-  `ready-for-agent` and have no blocking dependencies.
+  resolved and integrated on `refactor/private-game-setup`.
 - [01: Keep unfinished Rules configuration edits safe](tasks/01-preserve-rules-configuration-drafts.md)
   is the first priority, including visible browser verification.
 - [02: Make Round initialization tests deterministic](tasks/02-test-deterministic-round-initialization.md)
@@ -18,7 +18,15 @@
   only Apply changes applied rules. Browser behavior is verified through the
   existing authenticated in-memory backend flows.
 - Existing Convex atomicity and private views remain in effect.
+- Ticket 02 is implemented: one internal deterministic module produces the
+  complete deal and opening state from ordered cards, a chosen starter, Seats,
+  and rules. Production retains server randomness and atomic writes; fixed-card
+  tests replace shuffle-coupled scenarios while authenticated command/view
+  coverage continues to verify private hands, authorization, and durability.
 
 ## Fog
 
-- None for the approved scope.
+- Both ticket quality runs passed static checks, unit tests, builds, and browser
+  tests on Chromium, Pixel, and Firefox. iPhone/WebKit cases could not launch
+  because the host lacks ICU 74 and JPEG 8 libraries. Integrated verification and
+  the final two-axis review are pending.
