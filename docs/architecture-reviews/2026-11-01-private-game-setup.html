@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Yard Bridge · Architecture review</title>
+		<script src="https://cdn.tailwindcss.com"></script>
+		<script type="module">
+			import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+			mermaid.initialize({ startOnLoad: true, theme: 'neutral', securityLevel: 'strict' });
+		</script>
+		<style>
+			* {
+				box-sizing: border-box;
+			}
+			body {
+				margin: 0;
+				background: #fafaf7;
+				color: #172c29;
+				font-family: system-ui, sans-serif;
+				line-height: 1.6;
+			}
+			main {
+				max-width: 1120px;
+				margin: auto;
+				padding: 52px 28px;
+			}
+			h1,
+			h2,
+			h3,
+			p {
+				margin-top: 0;
+			}
+			h1 {
+				font-family: Georgia, serif;
+				font-size: 46px !important;
+				line-height: 1.1;
+				letter-spacing: -1.5px;
+			}
+			h2 {
+				font-family: Georgia, serif;
+				font-size: 29px !important;
+				line-height: 1.25;
+			}
+			h3 {
+				font-size: 16px !important;
+				font-weight: 650 !important;
+			}
+			header {
+				border-bottom: 1px solid #cbd5d1;
+				padding-bottom: 24px;
+				margin-bottom: 36px;
+			}
+			.eyebrow,
+			.label {
+				font-size: 11px;
+				letter-spacing: 1.7px;
+				text-transform: uppercase;
+				color: #52635d;
+			}
+			.badge {
+				display: inline-block;
+				padding: 4px 10px;
+				border-radius: 4px;
+				font-size: 12px;
+				font-weight: 600;
+				background: #e8edea;
+			}
+			.strong {
+				background: #d8f0e3;
+				color: #126043;
+			}
+			.worth {
+				background: #f5ebd0;
+				color: #6d511b;
+			}
+			article {
+				padding: 32px 0 38px;
+				border-bottom: 1px solid #cbd5d1;
+				margin-bottom: 30px;
+			}
+			.grid {
+				display: grid;
+				grid-template-columns: 1fr 1fr;
+				gap: 20px;
+			}
+			.diagram {
+				background: white;
+				border: 1px solid #d7dfda;
+				padding: 20px;
+				min-height: 270px;
+			}
+			.box {
+				border: 1px solid #97aaa0;
+				padding: 10px 14px;
+				background: #f6f8f6;
+				text-align: center;
+				font-size: 13px;
+			}
+			.deep {
+				background: #183d32;
+				color: white;
+				border: 3px solid #183d32;
+				padding: 20px;
+			}
+			.deep .box {
+				color: #e1eee7;
+				background: #254a3f;
+				border-color: #6a8a7b;
+			}
+			.arrow {
+				text-align: center;
+				color: #9a3b34;
+				font-size: 20px;
+				line-height: 1.2;
+			}
+			.seam {
+				border-top: 2px dashed #6a8a7b;
+				margin: 14px 0;
+			}
+			.files {
+				font-family: monospace;
+				font-size: 12px;
+				color: #52635d;
+				margin: 18px 0;
+				overflow-wrap: anywhere;
+			}
+			.files a {
+				color: inherit;
+			}
+			dl {
+				display: grid;
+				grid-template-columns: 95px 1fr;
+				gap: 8px 16px;
+				margin-top: 22px;
+				font-size: 14px;
+			}
+			dt {
+				font-weight: 650;
+			}
+			dd {
+				margin: 0;
+			}
+			.wins {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 10px 25px;
+				padding-left: 18px;
+				font-size: 13px;
+			}
+			.note {
+				font-size: 13px;
+				color: #52635d;
+				border-left: 3px solid #9cac9f;
+				padding-left: 14px;
+				margin: 18px 0;
+			}
+			.recommend {
+				padding: 28px;
+				background: #e7efe9;
+				margin-top: 32px;
+			}
+			a {
+				color: #176c51;
+			}
+			footer {
+				margin-top: 26px;
+				font-size: 12px;
+				color: #52635d;
+			}
+			.mermaid {
+				font-size: 13px;
+				margin: 8px 0;
+			}
+			.number {
+				color: #6f8379;
+				font-size: 13px;
+				margin-bottom: 8px;
+			}
+			@media (max-width: 720px) {
+				.grid {
+					grid-template-columns: 1fr;
+				}
+				h1 {
+					font-size: 34px !important;
+				}
+				dl {
+					grid-template-columns: 1fr;
+					gap: 3px;
+				}
+				dd {
+					margin-bottom: 12px;
+				}
+			}
+		</style>
+	</head>
+	<body>
+		<main>
+			<header>
+				<div class="eyebrow">01 November 2026 · 35 recent commits · local source review</div>
+				<h1>Yard Bridge<br />Small seams, useful depth.</h1>
+				<div class="flex flex-wrap gap-3">
+					<span class="badge">2 candidates</span>
+					<span class="badge">Focus: private Game setup → first Round</span>
+					<span class="badge">No repository edits</span>
+				</div>
+				<p style="margin: 18px 0 0; font-size: 12px">
+					Legend: outlined box = module · dashed line = seam · red arrow = leaked knowledge · dark
+					box = deep module
+				</p>
+			</header>
+			<section aria-label="Candidates">
+				<article id="rules">
+					<div class="number">01 / First choice</div>
+					<h2>Let Rules configuration editing own its draft lifetime</h2>
+					<span class="badge strong">Strong</span> <span class="badge">in-process</span>
+					<div class="files">
+						src/lib/components/games.svelte:71 · src/lib/components/game-rules.svelte:18–24<br />src/convex/games.ts:201–226
+						· tests/auth.e2e.ts:99,198
+					</div>
+					<div class="grid">
+						<div class="diagram">
+							<div class="label">Before · hidden caller obligation</div>
+							<div class="box">Host approves a Seat → Game version changes</div>
+							<div class="arrow">↓</div>
+							<div class="box">Game screen knows the remount key</div>
+							<div class="seam"></div>
+							<div class="arrow">↓ resets everything</div>
+							<div class="box">
+								Rules editor snapshots once on mount<br /><small
+									>Draft + configuration name disappear</small
+								>
+							</div>
+						</div>
+						<div class="diagram">
+							<div class="label">After · lifetime behind the seam</div>
+							<div class="box">Game screen passes current Game</div>
+							<div class="seam"></div>
+							<div class="deep">
+								<strong>Rules configuration editing module</strong>
+								<div class="box" style="margin-top: 12px">
+									Draft lifetime · updates · reset policy
+								</div>
+								<p style="font-size: 12px; margin: 12px 0 0">
+									One place decides how edits react to Game changes.
+								</p>
+							</div>
+						</div>
+					</div>
+					<dl>
+						<dt>Problem</dt>
+						<dd>
+							The editor’s interface is shallow around draft lifetime: its caller must know to
+							remount it, and Seat approval triggers that reset too.
+						</dd>
+						<dt>Solution</dt>
+						<dd>
+							Move draft reconciliation into the editing module’s implementation; choose the
+							preservation/reset policy before changing behavior.
+						</dd>
+						<dt>Evidence</dt>
+						<dd>
+							The parent keys on Game id and version; the editor snapshots rules with
+							<code>untrack</code>; approving a Seat increments that version. This consequence
+							follows from the code and was not separately reproduced in a browser.
+						</dd>
+						<dt>Deletion test</dt>
+						<dd>
+							Delete the parent’s reset knowledge only after concentrating that responsibility
+							inside the editor; removing the key alone leaves a stale draft.
+						</dd>
+						<dt>Seam / adapter</dt>
+						<dd>
+							Keep the existing Svelte prop seam and Convex adapter; no new adapter framework or
+							stored revision is justified.
+						</dd>
+						<dt>Tests</dt>
+						<dd>
+							Exercise editing during Seat approval, incoming rules changes, and switching Games
+							through the editor’s interface. Keep server version checks and existing
+							command-and-view tests.
+						</dd>
+					</dl>
+					<ul class="wins">
+						<li>locality: one draft lifetime</li>
+						<li>leverage: callers pass current state</li>
+						<li>depth: reset knowledge becomes internal</li>
+					</ul>
+					<div class="note">
+						No ADR conflict. The server remains authoritative. Preserving a draft is a decision to
+						discuss, not an assumed requirement.
+					</div>
+				</article>
+				<article id="round">
+					<div class="number">02 / When opening rules evolve</div>
+					<h2>Make Round initialization testable without shuffle choreography</h2>
+					<span class="badge worth">Worth exploring</span> <span class="badge">in-process</span>
+					<div class="files">
+						src/convex/rounds.ts:24–69 · src/convex/rounds.test.ts:124–145<br />src/convex/cards.ts
+						· docs/.work/01-yard-bridge/tasks/06-open-round-with-private-hands.md
+					</div>
+					<div class="grid">
+						<div class="diagram">
+							<div class="label">Before · tests know implementation order</div>
+							<pre class="mermaid">
+flowchart TD
+ T[Opening-card scenario] --> R[Count random calls / target shuffle position]
+ R --> M[Start Round: deal and opening state]
+ linkStyle 0,1 stroke:#a23e34,stroke-width:2px
+</pre>
+						</div>
+						<div class="diagram">
+							<div class="label">After · deterministic rules seam</div>
+							<div class="box">Scenario with controlled card order</div>
+							<div class="seam"></div>
+							<div class="deep">
+								<strong>Round initialization module</strong>
+								<div class="box" style="margin-top: 12px">
+									Deal · opening effects · card conservation
+								</div>
+							</div>
+							<div style="font-size: 12px; margin-top: 14px">
+								Start Round retains atomic access checks and persistence.
+							</div>
+						</div>
+					</div>
+					<dl>
+						<dt>Problem</dt>
+						<dd>
+							The start module already has depth, but opening-effect tests cross its interface by
+							counting <code>Math.random</code> calls and targeting Fisher–Yates positions.
+						</dd>
+						<dt>Solution</dt>
+						<dd>
+							Concentrate the complete deal and opening-state implementation behind an internal
+							deterministic seam, while retaining atomic start behavior.
+						</dd>
+						<dt>Deletion test</dt>
+						<dd>
+							Moving only the rank switch creates a shallow module; the change earns leverage only
+							if tests stop knowing shuffle positions and the module owns the complete
+							initialization responsibility.
+						</dd>
+						<dt>Seam / adapter</dt>
+						<dd>
+							Prefer controlled initialization state over a generic random adapter; introduce an
+							adapter only if two real implementations justify it.
+						</dd>
+						<dt>Tests</dt>
+						<dd>
+							Rules scenarios use the initialization interface; retain command-and-view tests for
+							private hands, frozen rules, rejected starts, reconnection, and durable writes.
+						</dd>
+					</dl>
+					<ul class="wins">
+						<li>locality: opening invariants stay together</li>
+						<li>leverage: scenarios ignore shuffle mechanics</li>
+						<li>depth: one complete initialization responsibility</li>
+					</ul>
+					<div class="note">
+						No ADR conflict. Internal organization only; avoid a general game engine until turn
+						behavior needs one.
+					</div>
+				</article>
+			</section>
+			<section>
+				<h3>Keep the useful depth</h3>
+				<p style="font-size: 14px">
+					<code>requirePlayer</code> already hides verified identity and durable-session checks.
+					<code>invitationContext</code> concentrates shared invitation interpretation. The player
+					fixture supports testing real commands and views. Repeated Seat lookups are modest; a
+					generic persistence abstraction would add more interface than leverage today.
+				</p>
+			</section>
+			<section class="recommend" id="top-recommendation">
+				<div class="label">Top recommendation</div>
+				<h2 style="margin: 8px 0 10px"><a href="#rules">Rules configuration draft lifetime</a></h2>
+				<p style="margin: 0">
+					It has a concrete cross-module interaction, a small scope, and a useful behavior decision
+					to settle before any refactor.
+				</p>
+			</section>
+			<footer>
+				Sources: local source, recent history, CONTEXT.md, accepted ADR-0001, and resolved tasks
+				05–06. Independent read-only exploration corroborated both candidates. No interfaces
+				designed yet.<br /><span id="verification"
+					>Verification: formatting, lint, frontend/backend/worker checks and build passed; 20 unit
+					tests and 12 browser tests passed. Ten Firefox/WebKit cases could not launch because their
+					browser binaries are missing; one live smoke test was deliberately skipped. Test stages
+					were rerun outside the sandbox after local-server restrictions. Report inspected in
+					Chromium, including mobile overflow.</span
+				><br />Tailwind and Mermaid load from CDNs; core content and custom diagrams remain readable
+				offline.
+			</footer>
+		</main>
+	</body>
+</html>
