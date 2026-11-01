@@ -2,8 +2,8 @@
 
 A private, phone-friendly card game built with SvelteKit, TypeScript, Bun, and Convex.
 
-Architecture review reports and their naming conventions live in
-[docs/architecture-reviews/](docs/architecture-reviews/README.md).
+Architecture reports live in [docs/architecture-reviews/](docs/architecture-reviews/).
+See the [review conventions](docs/agents/domain.md#architecture-reviews).
 
 ## Creating a project
 
