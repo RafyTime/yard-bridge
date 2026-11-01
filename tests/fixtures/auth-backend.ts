@@ -31,6 +31,7 @@ export async function authBackend(context: BrowserContext) {
 	});
 	let code = '';
 	let deliveryFails = false;
+	let rulesUpdatePause: Promise<void> | undefined;
 	const originalFetch = globalThis.fetch;
 	globalThis.fetch = async (input, init) => {
 		if (String(input) !== 'https://api.resend.com/emails') return originalFetch(input, init);
@@ -106,6 +107,11 @@ export async function authBackend(context: BrowserContext) {
 						await transition(message.newVersion);
 					} else if (message.type === 'Mutation') {
 						try {
+							if (message.udfPath === 'gameRules:update' && rulesUpdatePause) {
+								const pause = rulesUpdatePause;
+								rulesUpdatePause = undefined;
+								await pause;
+							}
 							const result = await session().mutation(
 								makeFunctionReference<'mutation'>(message.udfPath),
 								message.args[0]
@@ -168,6 +174,13 @@ export async function authBackend(context: BrowserContext) {
 	return {
 		get code() {
 			return code;
+		},
+		pauseNextRulesUpdate() {
+			let resume = () => {};
+			rulesUpdatePause = new Promise<void>((resolve) => {
+				resume = resolve;
+			});
+			return () => resume();
 		},
 		failDelivery() {
 			deliveryFails = true;

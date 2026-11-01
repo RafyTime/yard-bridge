@@ -13,7 +13,11 @@
   is the first priority, including visible browser verification.
 - [02: Make Round initialization tests deterministic](tasks/02-test-deterministic-round-initialization.md)
   is independently verifiable. Doing 01 first is a preference, not a blocking edge.
-- Implementation has not started. Existing Convex atomicity and private views remain in effect.
+- Ticket 01 is implemented: the editor owns draft lifetime, synchronization, and
+  explicit conflict reload. Defaults and saved configurations fill the draft;
+  only Apply changes applied rules. Browser behavior is verified through the
+  existing authenticated in-memory backend flows.
+- Existing Convex atomicity and private views remain in effect.
 
 ## Fog
 

@@ -120,5 +120,7 @@
 	"round_clubs": "clubs",
 	"round_diamonds": "diamonds",
 	"round_hearts": "hearts",
-	"round_spades": "spades"
+	"round_spades": "spades",
+	"rules_conflict": "Applied rules changed elsewhere. Your edits are preserved. Load the latest rules before applying changes.",
+	"rules_load_latest": "Load latest rules"
 }
