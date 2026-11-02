@@ -135,7 +135,20 @@ test('invitation waits for approval and an approved player returns without anoth
 	await expect(page.getByText('guest@example.com', { exact: true })).toBeVisible();
 	await page.screenshot({ path: test.info().outputPath('seat-approval.png') });
 	expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+	await page.getByLabel('Score cutoff', { exact: true }).fill('350');
+	await page.getByText('Saved configurations', { exact: true }).click();
+	await page.getByLabel('Configuration name', { exact: true }).fill('Unfinished table');
 	await page.getByRole('button', { name: 'Approve', exact: true }).click();
+	await expect(page.getByLabel('Score cutoff', { exact: true })).toHaveValue('350');
+	await expect(page.getByLabel('Configuration name', { exact: true })).toHaveValue(
+		'Unfinished table'
+	);
+	await expect(
+		page.getByRole('button', { name: 'Save current rules', exact: true })
+	).toBeDisabled();
+	await expect(
+		page.getByRole('region', { name: 'Table rules', exact: true }).getByRole('alert')
+	).toHaveCount(0);
 	await expect(page.getByText('2 of 4 seats occupied', { exact: true })).toBeVisible();
 	await signOut();
 	await page.goto(invitation);
@@ -228,7 +241,42 @@ test('Host edits advanced rules and copies a saved configuration into a later Ga
 	await page.getByLabel('Game name').fill('Next table');
 	await page.getByRole('button', { name: 'Create private game' }).click();
 	await page.getByText('Saved configurations', { exact: true }).click();
+	await page.getByRole('button', { name: 'I have reviewed these rules', exact: true }).click();
 	await page.getByRole('button', { name: 'Use Weekend rules', exact: true }).click();
+	await expect(page.getByLabel('Score cutoff', { exact: true })).toHaveValue('300');
+	await expect(page.getByText('All settings use the defaults.', { exact: true })).toBeVisible();
+	await expect(
+		page.getByText('You have reviewed the current rules.', { exact: true })
+	).toBeVisible();
+	await page.getByLabel('Configuration name', { exact: true }).fill('Next rules');
+	await expect(
+		page.getByRole('button', { name: 'Save current rules', exact: true })
+	).toBeDisabled();
+	await page.getByRole('button', { name: 'Apply rules', exact: true }).click();
+	await expect(page.getByRole('button', { name: 'Save current rules', exact: true })).toBeEnabled();
+	await expect(
+		page.getByRole('region', { name: 'Table rules', exact: true }).getByRole('alert')
+	).toHaveCount(0);
+	await page.getByRole('button', { name: 'I have reviewed these rules', exact: true }).click();
+	await page.getByRole('button', { name: 'Use defaults', exact: true }).click();
+	await expect(page.getByLabel('Score cutoff', { exact: true })).toHaveValue('200');
+	await expect(
+		page.getByText('You have reviewed the current rules.', { exact: true })
+	).toBeVisible();
+	await expect(page.getByText('Score cutoff: 300.', { exact: false })).toBeVisible();
+	await expect(
+		page.getByRole('button', { name: 'Save current rules', exact: true })
+	).toBeDisabled();
+	await page.reload();
+	await expect(page.getByLabel('Score cutoff', { exact: true })).toHaveValue('300');
+	await page.getByText('Saved configurations', { exact: true }).click();
+	await expect(page.getByLabel('Configuration name', { exact: true })).toHaveValue('');
+	await page.getByLabel('Score cutoff', { exact: true }).fill('500');
+	await page.getByRole('button', { name: 'All games', exact: true }).click();
+	await page.getByRole('button', { name: 'Our rules', exact: true }).click();
+	await expect(page.getByLabel('Score cutoff', { exact: true })).toHaveValue('300');
+	await page.getByRole('button', { name: 'All games', exact: true }).click();
+	await page.getByRole('button', { name: 'Next table', exact: true }).click();
 	await expect(page.getByLabel('Score cutoff', { exact: true })).toHaveValue('300');
 	await expect(
 		page.getByRole('switch', { name: 'Special King of Spades', exact: true })
@@ -244,4 +292,76 @@ test('Host edits advanced rules and copies a saved configuration into a later Ga
 	await expect(page.getByRole('heading', { name: 'Правила столу', exact: true })).toBeVisible();
 	expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 	await page.screenshot({ path: test.info().outputPath('rules-uk-phone.png'), fullPage: true });
+});
+
+test('Rules drafts follow clean updates, require explicit conflict reload, and survive stale Apply', async ({
+	page,
+	context,
+	backend
+}) => {
+	await page.goto('/');
+	await page.getByLabel('Email address').fill('host@example.com');
+	await page.getByRole('button', { name: 'Send code', exact: true }).click();
+	await expect(page.getByLabel('Sign-in code')).toBeVisible();
+	await page.getByLabel('Sign-in code').fill(backend.code);
+	await page.getByRole('button', { name: 'Continue', exact: true }).click();
+	await page.getByLabel('Game name').fill('Shared table');
+	await page.getByRole('button', { name: 'Create private game' }).click();
+	await expect(page.getByRole('heading', { name: 'Shared table', exact: true })).toBeVisible();
+	const other = await context.newPage();
+	await other.goto(page.url());
+	await other.getByLabel('Score cutoff', { exact: true }).fill('250');
+	await other.getByRole('button', { name: 'Apply rules', exact: true }).click();
+	await expect(page.getByLabel('Score cutoff', { exact: true })).toHaveValue('250');
+	await expect(
+		other.getByRole('region', { name: 'Table rules', exact: true }).getByRole('alert')
+	).toHaveCount(0);
+	await page.getByLabel('Score cutoff', { exact: true }).fill('300');
+	await page.getByText('Saved configurations', { exact: true }).click();
+	await page.getByLabel('Configuration name', { exact: true }).fill('My draft');
+	await other.getByLabel('Score cutoff', { exact: true }).fill('275');
+	await other.getByRole('button', { name: 'Apply rules', exact: true }).click();
+	await expect(
+		page.getByRole('region', { name: 'Table rules', exact: true }).getByRole('alert')
+	).toContainText('Applied rules changed elsewhere');
+	await expect(page.getByLabel('Score cutoff', { exact: true })).toHaveValue('300');
+	await expect(page.getByLabel('Configuration name', { exact: true })).toHaveValue('My draft');
+	await expect(page.getByRole('button', { name: 'Apply rules', exact: true })).toBeDisabled();
+	await expect(
+		page.getByRole('button', { name: 'Save current rules', exact: true })
+	).toBeDisabled();
+	await page.getByRole('button', { name: 'Load latest rules', exact: true }).click();
+	await expect(page.getByLabel('Score cutoff', { exact: true })).toHaveValue('275');
+	await expect(
+		page.getByRole('region', { name: 'Table rules', exact: true }).getByRole('alert')
+	).toHaveCount(0);
+	await expect(page.getByRole('button', { name: 'Save current rules', exact: true })).toBeEnabled();
+	await page.getByLabel('Score cutoff', { exact: true }).fill('350');
+	const resume = backend.pauseNextRulesUpdate();
+	await page.getByRole('button', { name: 'Apply rules', exact: true }).click();
+	await expect(page.getByLabel('Score cutoff', { exact: true })).toBeDisabled();
+	await other.getByLabel('Score cutoff', { exact: true }).fill('400');
+	await other.getByRole('button', { name: 'Apply rules', exact: true }).click();
+	await expect(other.getByText('Score cutoff: 400.', { exact: false })).toBeVisible();
+	resume();
+	await expect(
+		page
+			.getByRole('region', { name: 'Table rules', exact: true })
+			.getByRole('alert')
+			.filter({ hasText: 'Could not complete' })
+	).toBeVisible();
+	await expect(
+		page
+			.getByRole('region', { name: 'Table rules', exact: true })
+			.getByRole('alert')
+			.filter({ hasText: 'Applied rules changed elsewhere' })
+	).toBeVisible();
+	await expect(page.getByLabel('Score cutoff', { exact: true })).toHaveValue('350');
+	await expect(page.getByLabel('Configuration name', { exact: true })).toHaveValue('My draft');
+	await expect(page.getByRole('button', { name: 'Apply rules', exact: true })).toBeDisabled();
+	await page.reload();
+	await expect(page.getByLabel('Score cutoff', { exact: true })).toHaveValue('400');
+	await expect(
+		page.getByRole('region', { name: 'Table rules', exact: true }).getByRole('alert')
+	).toHaveCount(0);
 });

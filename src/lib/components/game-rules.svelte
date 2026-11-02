@@ -16,6 +16,32 @@
 	const isHost = $derived(game.isHost);
 	const configurations = useQuery(api.gameRules.saved, () => (isHost ? {} : 'skip'));
 	let draft = $state<RulesConfiguration>(untrack(() => ({ ...game.rules })));
+	let baseline = $state<RulesConfiguration>(untrack(() => ({ ...game.rules })));
+	let conflicted = $state(false);
+	let applying = $state(false);
+	const equalRules = (left: RulesConfiguration, right: RulesConfiguration) =>
+		Object.keys(defaultRules).every(
+			(key) => left[key as keyof RulesConfiguration] === right[key as keyof RulesConfiguration]
+		);
+	const dirty = $derived(!equalRules(draft, baseline));
+	// Only applied-rule changes affect the draft; Seat updates retain all editor input.
+	$effect(() => {
+		const incoming = game.rules;
+		if (applying) return;
+		untrack(() => {
+			if (equalRules(incoming, baseline)) return;
+			if (!dirty && !conflicted) {
+				baseline = { ...incoming };
+				draft = { ...incoming };
+			} else conflicted = true;
+		});
+	});
+	function loadLatest() {
+		baseline = { ...game.rules };
+		draft = { ...game.rules };
+		conflicted = false;
+		error = false;
+	}
 	let name = $state('');
 	let pending = $state(false);
 	let error = $state(false);
@@ -102,12 +128,22 @@
 			pending = false;
 		}
 	}
-	async function apply(rules: RulesConfiguration) {
-		await client.mutation(api.gameRules.update, {
-			gameId: game.id,
-			expectedVersion: game.version,
-			rules
-		});
+	async function apply() {
+		if (conflicted || !valid) return;
+		const rules = { ...draft };
+		applying = true;
+		try {
+			await client.mutation(api.gameRules.update, {
+				gameId: game.id,
+				expectedVersion: game.version,
+				rules
+			});
+			baseline = rules;
+			draft = { ...rules };
+			conflicted = false;
+		} finally {
+			applying = false;
+		}
 	}
 </script>
 
@@ -126,10 +162,16 @@
 <section class="flex min-w-0 flex-col gap-5" aria-labelledby="rules-heading">
 	<h3 id="rules-heading" class="text-lg font-medium">{m.rules_title()}</h3>
 	{#if editable}
+		{#if conflicted}
+			<p role="alert">{m.rules_conflict()}</p>
+			<Button variant="outline" disabled={pending} onclick={loadLatest}
+				>{m.rules_load_latest()}</Button
+			>
+		{/if}
 		<form
 			onsubmit={(event) => {
 				event.preventDefault();
-				void act(() => apply(draft));
+				if (!conflicted) void act(apply);
 			}}
 			aria-busy={pending}
 		>
@@ -269,14 +311,17 @@
 						</Field.FieldSet>
 					</Field.FieldGroup>
 				</details>
-				<Button class="min-h-11" type="submit" disabled={pending || !valid}
+				<Button class="min-h-11" type="submit" disabled={pending || !valid || conflicted}
 					>{m.rules_apply()}</Button
 				>
 				<Button
 					class="min-h-11"
 					variant="outline"
 					disabled={pending}
-					onclick={() => act(() => apply(defaultRules))}>{m.rules_reset()}</Button
+					onclick={() => {
+						draft = { ...defaultRules };
+						saved = false;
+					}}>{m.rules_reset()}</Button
 				>
 				<Field.FieldDescription>{m.rules_edit_hint()}</Field.FieldDescription>
 			</Field.FieldGroup>
@@ -344,6 +389,7 @@
 			<form
 				onsubmit={(event) => {
 					event.preventDefault();
+					if (dirty || conflicted) return;
 					void act(async () => {
 						await client.mutation(api.gameRules.save, {
 							gameId: game.id,
@@ -366,8 +412,10 @@
 							disabled={pending}
 						/></Field.Field
 					>
-					<Button class="min-h-11" type="submit" disabled={pending || !name.trim()}
-						>{m.rules_save()}</Button
+					<Button
+						class="min-h-11"
+						type="submit"
+						disabled={pending || !name.trim() || dirty || conflicted}>{m.rules_save()}</Button
 					>
 				</Field.FieldGroup>
 			</form>
@@ -381,8 +429,10 @@
 								class="min-h-11 max-w-full break-all whitespace-normal"
 								variant="outline"
 								disabled={pending}
-								onclick={() => act(() => apply(configuration.rules))}
-								>{m.rules_use({ name: configuration.name })}</Button
+								onclick={() => {
+									draft = { ...configuration.rules };
+									saved = false;
+								}}>{m.rules_use({ name: configuration.name })}</Button
 							>
 						</li>{/each}
 				</ul>

@@ -1,6 +1,6 @@
 # Private Game setup architecture cleanup
 
-Status: ready-for-agent
+Status: resolved
 Source: [Approved architecture review](../../architecture-reviews/2026-11-01-private-game-setup.html)
 
 ## Problem Statement
@@ -70,5 +70,7 @@ new turn rules, a general game engine, and deployment or live-data changes.
 
 ## Further Notes
 
-Both review candidates and the rules-editor behavior were approved on 1 November 2026. Implement the rules editor first. This spec prepares the work; implementation
-has not started. The existing Convex architecture decision remains in effect.
+Both review candidates and the rules-editor behavior were approved on 1 November 2026. The rules editor was implemented first, followed by deterministic Round
+initialization. Both tickets are resolved on `refactor/private-game-setup`; see
+the [implementation map](map.md) for verification and review status. The existing
+Convex architecture decision remains in effect.

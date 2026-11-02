@@ -20,5 +20,7 @@
 	"auth_return_hint": "Puedes cerrar la aplicación y volver mientras tu sesión siga siendo válida.",
 	"auth_sign_out": "Cerrar sesión",
 	"auth_sign_out_error": "No se pudo cerrar la sesión. Inténtalo de nuevo.",
-	"auth_identity_error": "No se pudo verificar tu sesión. Comprueba tu conexión o cierra la sesión e inténtalo de nuevo."
+	"auth_identity_error": "No se pudo verificar tu sesión. Comprueba tu conexión o cierra la sesión e inténtalo de nuevo.",
+	"rules_conflict": "Las reglas aplicadas cambiaron en otra pestaña. Tus cambios se conservan. Carga las reglas más recientes antes de aplicar cambios.",
+	"rules_load_latest": "Cargar reglas más recientes"
 }

@@ -68,7 +68,7 @@
 				</ul>
 			{/if}
 			{#if game.data.isHost && game.data.status === 'lobby'}<Invitations {gameId} />{/if}
-			{#key `${game.data.id}:${game.data.version}`}<GameRules game={game.data} />{/key}
+			{#key game.data.id}<GameRules game={game.data} />{/key}
 		{:else}<p role="status">{m.games_loading()}</p>{/if}
 	{:else}
 		<h2 id="games-heading" class="text-2xl font-semibold">{m.games_title()}</h2>
