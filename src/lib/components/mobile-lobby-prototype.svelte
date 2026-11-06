@@ -1,14 +1,11 @@
 <script lang="ts">
-	// Throwaway: compare three mobile lobby flows on /?prototype&variant=A.
+	// Throwaway B lobby: compare help with /?prototype&help=tooltip|inline|drawer.
 	// All actions and generated identities exist only in memory.
 	import { onMount } from 'svelte';
 	import { HugeiconsIcon } from '@hugeicons/svelte';
 	import {
 		Add01Icon,
 		ArrowLeft01Icon,
-		ArrowRight01Icon,
-		Settings02Icon,
-		PlayIcon,
 		CheckmarkCircle02Icon,
 		UserIcon,
 		Cancel01Icon
@@ -17,6 +14,10 @@
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import PrototypeInvite from './prototype-invite.svelte';
 	import PrototypeRoundReview from './prototype-round-review.svelte';
+	import PrototypeRuleList from './prototype-rule-list.svelte';
+	import PrototypeRulesEditor from './prototype-rules-editor.svelte';
+	import HelpSwitcher from './prototype-help-switcher.svelte';
+	import { prototypeDefaults, type PrototypeRules, type HelpMode } from './prototype-rules';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { Button } from '#lib/components/ui/button/index.js';
@@ -26,17 +27,13 @@
 	import { Separator } from '#lib/components/ui/separator/index.js';
 	import { cn } from '#lib/utils.js';
 
-	const variants = ['A', 'B', 'C'];
-	const variant = $derived(
-		variants.includes(page.url.searchParams.get('variant') ?? '')
-			? page.url.searchParams.get('variant')!
-			: 'A'
+	const helpMode: HelpMode = $derived(
+		page.url.searchParams.get('help') === 'tooltip'
+			? 'tooltip'
+			: page.url.searchParams.get('help') === 'drawer'
+				? 'drawer'
+				: 'inline'
 	);
-	const names: Record<string, string> = {
-		A: 'Lobby overview',
-		B: 'Separate views',
-		C: 'Guided setup'
-	};
 	let screen = $state('games');
 	let panel = $state('players');
 	let name = $state('Friday evening');
@@ -70,33 +67,18 @@
 		const offset = Math.floor(Math.random() * adjectives.length);
 		identities = [identity(0, offset), identity(1, offset), identity(2, offset)];
 	});
-	let cutoff = $state('200');
-	let step = $state(0);
-	const steps = ['Invite players', 'Review rules', 'Get ready'];
-	const canStart = $derived(ready && request !== 'pending');
-
-	function switchVariant(direction: number) {
+	let rules = $state<PrototypeRules>({ ...prototypeDefaults });
+	function changeHelp(mode: HelpMode) {
 		const url = new URL(page.url.href);
-		url.searchParams.set(
-			'variant',
-			variants[(variants.indexOf(variant) + direction + variants.length) % variants.length]
-		);
-		void goto(url, { replace: true });
+		url.searchParams.delete('variant');
+		url.searchParams.set('help', mode);
+		void goto(url, { replace: true, reset: false });
 	}
-	function keyboard(event: KeyboardEvent) {
-		if (
-			!(event.target instanceof HTMLElement) ||
-			event.target.closest('input, textarea, select, button, [contenteditable], [role="group"]')
-		)
-			return;
-		if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
-			event.preventDefault();
-			switchVariant(event.key === 'ArrowRight' ? 1 : -1);
-		}
+	function saveRules(updated: PrototypeRules) {
+		if (JSON.stringify(updated) !== JSON.stringify(rules)) ready = false;
+		rules = updated;
 	}
 </script>
-
-<svelte:window onkeydown={keyboard} />
 
 {#snippet players()}
 	<section aria-labelledby="players-title" class="flex flex-col gap-4">
@@ -183,55 +165,9 @@
 	</section>
 {/snippet}
 
-{#snippet rules()}
-	<section aria-labelledby="rules-title" class="flex flex-col gap-4">
-		<div class="flex items-center justify-between">
-			<h2 id="rules-title" class="text-lg font-semibold">Table rules</h2>
-			<Button variant="ghost" class="min-h-11" onclick={() => (screen = 'rules')}
-				><HugeiconsIcon icon={Settings02Icon} data-icon="inline-start" aria-hidden="true" />Edit
-				rules</Button
-			>
-		</div>
-		<dl class="grid grid-cols-2 gap-3 text-sm">
-			<dt class="text-muted-foreground">Score cutoff</dt>
-			<dd class="text-right">{cutoff} points</dd>
-			<dt class="text-muted-foreground">Cards per hand</dt>
-			<dd class="text-right">5 cards</dd>
-			<dt class="text-muted-foreground">Bridge declaration</dt>
-			<dd class="text-right">On</dd>
-		</dl>
-		<p class="text-sm text-muted-foreground">
-			Every player reviews the rules before the round starts. Changing a rule clears readiness.
-		</p>
-	</section>
-{/snippet}
-
-{#snippet start()}
-	<div class="flex flex-col gap-3">
-		{#if !ready}<Button class="min-h-12 w-full" variant="outline" onclick={() => (screen = 'rules')}
-				>Review rules to get ready</Button
-			>{/if}
-		<Button class="min-h-12 w-full" disabled={!canStart} onclick={() => (screen = 'started')}
-			><HugeiconsIcon icon={PlayIcon} data-icon="inline-start" aria-hidden="true" />Start round</Button
-		>
-		<p class="text-center text-sm text-muted-foreground" role="status">
-			{request === 'pending'
-				? 'Approve or decline the seat request first.'
-				: !ready
-					? 'Review the rules and mark yourself ready.'
-					: 'Everyone is ready. You can start.'}
-		</p>
-	</div>
-{/snippet}
-
-<div
-	class={cn(
-		'mx-auto min-h-svh max-w-lg px-5 pt-5 pb-36',
-		variant === 'B' && screen === 'lobby' && 'pb-64'
-	)}
->
+<div class={cn('mx-auto min-h-svh max-w-lg px-5 pt-5 pb-36', screen === 'lobby' && 'pb-64')}>
 	<header class="mb-7 flex min-h-11 items-center justify-between border-b pb-4">
-		<a href="?prototype&variant={variant}" class="font-semibold tracking-tight">Yard Bridge</a><span
+		<a href="?prototype&help={helpMode}" class="font-semibold tracking-tight">Yard Bridge</a><span
 			class="text-xs text-muted-foreground">Mobile prototype</span
 		>
 	</header>
@@ -289,42 +225,6 @@
 				>
 			</form>
 		</main>
-	{:else if screen === 'rules'}
-		<main class="flex flex-col gap-6">
-			<Button variant="ghost" class="min-h-11 self-start" onclick={() => (screen = 'lobby')}
-				>Back to lobby</Button
-			>
-			<h1 class="text-2xl font-semibold">
-				{variant === 'B' ? 'Edit table rules' : 'Review table rules'}
-			</h1>
-			<p class="text-muted-foreground">These rules apply to everyone at the table.</p>
-			<Field.FieldGroup
-				><Field.Field
-					><Field.FieldLabel for="cutoff">Score cutoff</Field.FieldLabel><Input
-						id="cutoff"
-						type="number"
-						min="1"
-						bind:value={cutoff}
-						oninput={() => (ready = false)}
-						class="min-h-12"
-					/><Field.FieldDescription
-						>Changing this clears your ready status in this demo.</Field.FieldDescription
-					></Field.Field
-				></Field.FieldGroup
-			>
-			<p>5 cards per hand. Bridge declaration is on.</p>
-			<p class="text-sm text-muted-foreground">
-				Prototype summary. The complete rule controls and game instructions will belong here.
-			</p>
-			<Button
-				class="min-h-12"
-				onclick={() => {
-					ready = variant !== 'B';
-					screen = 'lobby';
-					step = 2;
-				}}>{variant === 'B' ? 'Save rules' : 'Accept rules and get ready'}</Button
-			>
-		</main>
 	{:else if screen === 'started' || screen === 'declined'}
 		<main class="flex flex-col gap-6">
 			<h1 class="text-2xl font-semibold">
@@ -343,46 +243,29 @@
 				<h1 class="text-3xl font-semibold tracking-tight break-words">{name}</h1>
 				<p class="mt-2 text-muted-foreground">Waiting for players. You're the host.</p>
 			</div>
-			{#if variant === 'A'}
-				{@render players()}<Separator />{@render rules()}<Separator />{@render start()}
-			{:else if variant === 'B'}
-				<ToggleGroup.Root
-					type="single"
-					bind:value={panel}
-					variant="outline"
-					aria-label="Lobby view"
-					class="w-full"
-					><ToggleGroup.Item class="min-h-12 flex-1" value="players">Players</ToggleGroup.Item
-					><ToggleGroup.Item class="min-h-12 flex-1" value="rules">Rules</ToggleGroup.Item
-					></ToggleGroup.Root
-				>
-				{#if panel === 'rules'}{@render rules()}{:else}{@render players()}{/if}
-			{:else}
-				<nav aria-label="Game setup">
-					<ol class="flex gap-2">
-						{#each steps as label, index (label)}<li class="flex-1">
-								<button
-									class="flex min-h-14 w-full flex-col gap-1 border-b-2 py-2 text-left text-xs"
-									class:border-primary={step === index}
-									aria-current={step === index ? 'step' : undefined}
-									onclick={() => (step = index)}
-									><span class="text-muted-foreground">Step {index + 1}</span><span>{label}</span
-									></button
-								>
-							</li>{/each}
-					</ol>
-				</nav>
-				{#if step === 0}{@render players()}<Button class="min-h-12" onclick={() => (step = 1)}
-						>Continue to rules</Button
-					>{:else if step === 1}{@render rules()}<Button
-						class="min-h-12"
-						onclick={() => (screen = 'rules')}>Review and accept rules</Button
-					>{:else}{@render start()}<Button
-						class="min-h-11"
-						variant="ghost"
-						onclick={() => (step = 0)}>Check players</Button
-					>{/if}
-			{/if}
+			<ToggleGroup.Root
+				type="single"
+				value={panel}
+				onValueChange={(value) => {
+					if (value === 'players' || value === 'rules') panel = value;
+				}}
+				variant="outline"
+				aria-label="Lobby view"
+				class="w-full"
+				><ToggleGroup.Item class="min-h-12 flex-1" value="players">Players</ToggleGroup.Item
+				><ToggleGroup.Item class="min-h-12 flex-1" value="rules">Rules</ToggleGroup.Item
+				></ToggleGroup.Root
+			>
+			{#if panel === 'rules'}
+				<PrototypeRulesEditor {rules} {helpMode} onchangehelp={changeHelp} onsave={saveRules} />
+				<section aria-labelledby="rules-title" class="flex flex-col gap-4">
+					<div class="flex items-center justify-between">
+						<h2 id="rules-title" class="text-lg font-semibold">Table rules</h2>
+						<span class="text-sm text-muted-foreground">Read only</span>
+					</div>
+					<PrototypeRuleList {rules} {helpMode} />
+				</section>
+			{:else}{@render players()}{/if}
 		</main>
 	{/if}
 </div>
@@ -391,10 +274,9 @@
 	aria-label="Prototype controls"
 	class="fixed inset-x-0 bottom-0 border-t bg-background px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
 >
-	{#if variant === 'B' && screen === 'lobby'}
-		<div aria-label="Round actions" class="mx-auto max-w-lg py-3">
+	{#if screen === 'lobby'}<div aria-label="Round actions" class="mx-auto max-w-lg py-3">
 			<PrototypeRoundReview
-				{cutoff}
+				{rules}
 				pendingRequest={request === 'pending'}
 				onstart={() => {
 					ready = true;
@@ -402,39 +284,18 @@
 				}}
 			/>
 		</div>
-		<Separator />
-	{/if}
+		<Separator />{/if}
 	<div class="mx-auto flex max-w-lg flex-col gap-2 pt-3">
-		<div class="flex items-center justify-between gap-2">
-			<Button
-				class="min-h-11 min-w-11"
-				variant="outline"
-				aria-label="Previous layout"
-				onclick={() => switchVariant(-1)}
-				><HugeiconsIcon icon={ArrowLeft01Icon} aria-hidden="true" /></Button
-			>
-			<div class="text-center">
-				<p class="text-sm font-medium">{variant} · {names[variant]}</p>
-				<p class="text-xs text-muted-foreground">Sample data. Nothing is saved.</p>
-			</div>
-			<Button
-				class="min-h-11 min-w-11"
-				variant="outline"
-				aria-label="Next layout"
-				onclick={() => switchVariant(1)}
-				><HugeiconsIcon icon={ArrowRight01Icon} aria-hidden="true" /></Button
-			>
-		</div>
+		<HelpSwitcher value={helpMode} onchange={changeHelp} />
 		<div class="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-			<span>View: {screen} · Ready: {ready ? 'yes' : 'no'} · Request: {request}</span><Button
+			<span>B · Help: {helpMode} · Ready: {ready ? 'yes' : 'no'}</span><Button
 				variant="ghost"
 				class="min-h-11"
 				onclick={() => {
 					screen = 'games';
 					ready = false;
 					request = 'pending';
-					step = 0;
-					cutoff = '200';
+					rules = { ...prototypeDefaults };
 					name = 'Friday evening';
 				}}>Reset</Button
 			>
