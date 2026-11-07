@@ -19,7 +19,6 @@ export const prototypeDefaults: PrototypeRules = {
 	recycleMultiplier: 2,
 	starterPolicy: 'highest-score'
 };
-export type HelpMode = 'tooltip' | 'inline' | 'drawer';
 export const ruleDefinitions = [
 	{
 		key: 'scoreCutoff',

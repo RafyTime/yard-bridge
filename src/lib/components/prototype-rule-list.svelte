@@ -6,19 +6,18 @@
 		ruleDefinitions,
 		ruleGroups,
 		ruleValue,
-		type HelpMode,
 		type PrototypeRules
 	} from './prototype-rules';
-	let { rules, helpMode }: { rules: PrototypeRules; helpMode: HelpMode } = $props();
+	let { rules }: { rules: PrototypeRules } = $props();
 </script>
 
 <div class="flex flex-col gap-6">
 	{#each ruleGroups as group (group)}
 		<section aria-label={group} class="flex flex-col gap-2">
-			<h3 class="text-sm font-medium text-muted-foreground">{group}</h3>
+			<h3 class="text-lg font-semibold">{group}</h3>
 			<dl class="divide-y">
 				{#each ruleDefinitions.filter((rule) => rule.group === group) as definition (definition.key)}
-					<RuleHelp {definition} mode={helpMode}>
+					<RuleHelp {definition}>
 						{#snippet children(info)}
 							<div class="flex min-h-16 items-center justify-between gap-3 py-3">
 								<dt class="flex min-w-0 items-center">

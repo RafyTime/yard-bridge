@@ -11,24 +11,18 @@
 	import * as Dialog from '#lib/components/ui/dialog/index.js';
 	import { cn } from '#lib/utils.js';
 	import RuleHelp from './prototype-rule-help.svelte';
-	import HelpSwitcher from './prototype-help-switcher.svelte';
 	import {
 		prototypeDefaults,
 		ruleDefinitions,
 		ruleGroups,
-		type HelpMode,
 		type PrototypeRules
 	} from './prototype-rules';
 
 	let {
 		rules,
-		helpMode,
-		onchangehelp,
 		onsave
 	}: {
 		rules: PrototypeRules;
-		helpMode: HelpMode;
-		onchangehelp: (mode: HelpMode) => void;
 		onsave: (rules: PrototypeRules) => void;
 	} = $props();
 	let open = $state(false);
@@ -62,7 +56,7 @@
 			<Field.FieldSet
 				><Field.FieldLegend>{group}</Field.FieldLegend><Field.FieldGroup class="gap-0 divide-y">
 					{#each ruleDefinitions.filter((rule) => rule.group === group) as definition (definition.key)}
-						<RuleHelp {definition} mode={helpMode} nested={!desktop.current}>
+						<RuleHelp {definition}>
 							{#snippet children(info)}
 								<Field.Field
 									class="py-4"
@@ -208,7 +202,6 @@
 				></Dialog.Header
 			>
 			<div class="min-h-0 flex-1 overflow-y-auto pr-2">
-				<div class="mb-5"><HelpSwitcher value={helpMode} onchange={onchangehelp} /></div>
 				{@render fields()}
 			</div>
 			<Dialog.Footer class="shrink-0">{@render actions()}</Dialog.Footer>
@@ -229,7 +222,6 @@
 				></Drawer.Header
 			>
 			<div class="min-h-0 flex-1 overflow-y-auto px-4">
-				<div class="mb-5"><HelpSwitcher value={helpMode} onchange={onchangehelp} /></div>
 				{@render fields()}
 			</div>
 			<Drawer.Footer class="shrink-0 pb-[max(1rem,env(safe-area-inset-bottom))]"

@@ -1,5 +1,5 @@
 <script lang="ts">
-	// Throwaway B lobby: compare help with /?prototype&help=tooltip|inline|drawer.
+	// Throwaway B lobby with inline rule explanations on /?prototype.
 	// All actions and generated identities exist only in memory.
 	import { onMount } from 'svelte';
 	import { HugeiconsIcon } from '@hugeicons/svelte';
@@ -16,10 +16,7 @@
 	import PrototypeRoundReview from './prototype-round-review.svelte';
 	import PrototypeRuleList from './prototype-rule-list.svelte';
 	import PrototypeRulesEditor from './prototype-rules-editor.svelte';
-	import HelpSwitcher from './prototype-help-switcher.svelte';
-	import { prototypeDefaults, type PrototypeRules, type HelpMode } from './prototype-rules';
-	import { page } from '$app/state';
-	import { goto } from '$app/navigation';
+	import { prototypeDefaults, type PrototypeRules } from './prototype-rules';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import * as Field from '#lib/components/ui/field/index.js';
@@ -27,13 +24,6 @@
 	import { Separator } from '#lib/components/ui/separator/index.js';
 	import { cn } from '#lib/utils.js';
 
-	const helpMode: HelpMode = $derived(
-		page.url.searchParams.get('help') === 'tooltip'
-			? 'tooltip'
-			: page.url.searchParams.get('help') === 'drawer'
-				? 'drawer'
-				: 'inline'
-	);
 	let screen = $state('games');
 	let panel = $state('players');
 	let name = $state('Friday evening');
@@ -68,12 +58,6 @@
 		identities = [identity(0, offset), identity(1, offset), identity(2, offset)];
 	});
 	let rules = $state<PrototypeRules>({ ...prototypeDefaults });
-	function changeHelp(mode: HelpMode) {
-		const url = new URL(page.url.href);
-		url.searchParams.delete('variant');
-		url.searchParams.set('help', mode);
-		void goto(url, { replace: true, reset: false });
-	}
 	function saveRules(updated: PrototypeRules) {
 		if (JSON.stringify(updated) !== JSON.stringify(rules)) ready = false;
 		rules = updated;
@@ -165,9 +149,9 @@
 	</section>
 {/snippet}
 
-<div class={cn('mx-auto min-h-svh max-w-lg px-5 pt-5 pb-36', screen === 'lobby' && 'pb-64')}>
+<div class={cn('mx-auto min-h-svh max-w-lg px-5 pt-5 pb-24', screen === 'lobby' && 'pb-48')}>
 	<header class="mb-7 flex min-h-11 items-center justify-between border-b pb-4">
-		<a href="?prototype&help={helpMode}" class="font-semibold tracking-tight">Yard Bridge</a><span
+		<a href="?prototype" class="font-semibold tracking-tight">Yard Bridge</a><span
 			class="text-xs text-muted-foreground">Mobile prototype</span
 		>
 	</header>
@@ -257,13 +241,12 @@
 				></ToggleGroup.Root
 			>
 			{#if panel === 'rules'}
-				<PrototypeRulesEditor {rules} {helpMode} onchangehelp={changeHelp} onsave={saveRules} />
+				<PrototypeRulesEditor {rules} onsave={saveRules} />
 				<section aria-labelledby="rules-title" class="flex flex-col gap-4">
 					<div class="flex items-center justify-between">
 						<h2 id="rules-title" class="text-lg font-semibold">Table rules</h2>
-						<span class="text-sm text-muted-foreground">Read only</span>
 					</div>
-					<PrototypeRuleList {rules} {helpMode} />
+					<PrototypeRuleList {rules} />
 				</section>
 			{:else}{@render players()}{/if}
 		</main>
@@ -286,9 +269,8 @@
 		</div>
 		<Separator />{/if}
 	<div class="mx-auto flex max-w-lg flex-col gap-2 pt-3">
-		<HelpSwitcher value={helpMode} onchange={changeHelp} />
 		<div class="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-			<span>B · Help: {helpMode} · Ready: {ready ? 'yes' : 'no'}</span><Button
+			<span>Prototype B · Ready: {ready ? 'yes' : 'no'}</span><Button
 				variant="ghost"
 				class="min-h-11"
 				onclick={() => {
