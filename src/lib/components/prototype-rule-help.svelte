@@ -2,18 +2,18 @@
 	import type { Snippet } from 'svelte';
 	import { HugeiconsIcon } from '@hugeicons/svelte';
 	import { InformationCircleIcon } from '@hugeicons/core-free-icons';
-	import { buttonVariants } from '#lib/components/ui/button/index.js';
 	import * as Collapsible from '#lib/components/ui/collapsible/index.js';
-	import { cn } from '#lib/utils.js';
 	import type { RuleDefinition } from './prototype-rules';
 	let { definition, children: row }: { definition: RuleDefinition; children: Snippet<[Snippet]> } =
 		$props();
-	const triggerClass = cn(buttonVariants({ variant: 'ghost', size: 'icon' }), 'size-11 shrink-0');
 </script>
 
 {#snippet info()}
-	<Collapsible.Trigger class={triggerClass} aria-label="About {definition.label}">
-		<HugeiconsIcon icon={InformationCircleIcon} aria-hidden="true" />
+	<Collapsible.Trigger
+		class="inline-flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+		aria-label="About {definition.label}"
+	>
+		<HugeiconsIcon icon={InformationCircleIcon} size={14} aria-hidden="true" />
 	</Collapsible.Trigger>
 {/snippet}
 

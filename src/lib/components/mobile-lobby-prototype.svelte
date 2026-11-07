@@ -14,9 +14,8 @@
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import PrototypeInvite from './prototype-invite.svelte';
 	import PrototypeRoundReview from './prototype-round-review.svelte';
-	import PrototypeRuleList from './prototype-rule-list.svelte';
 	import PrototypeRulesEditor from './prototype-rules-editor.svelte';
-	import { prototypeDefaults, type PrototypeRules } from './prototype-rules';
+	import { prototypeDefaults, ruleDefinitions, type PrototypeRules } from './prototype-rules';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import * as Field from '#lib/components/ui/field/index.js';
@@ -58,9 +57,28 @@
 		identities = [identity(0, offset), identity(1, offset), identity(2, offset)];
 	});
 	let rules = $state<PrototypeRules>({ ...prototypeDefaults });
-	function saveRules(updated: PrototypeRules) {
-		if (JSON.stringify(updated) !== JSON.stringify(rules)) ready = false;
-		rules = updated;
+	// Keep the draft in the lobby so switching tabs never loses unsaved edits.
+	let draft = $state<PrototypeRules>({ ...prototypeDefaults });
+	let rulesNotice = $state('');
+	const changedRules = $derived(
+		ruleDefinitions.filter(({ key }) => draft[key] !== rules[key]).length
+	);
+	const validRules = $derived(
+		Number.isSafeInteger(draft.scoreCutoff) &&
+			draft.scoreCutoff > 0 &&
+			Number.isInteger(draft.handSize) &&
+			draft.handSize >= 2 &&
+			draft.handSize <= 9
+	);
+	function saveRules() {
+		if (!validRules || !changedRules) return;
+		ready = false;
+		rules = { ...draft };
+		rulesNotice = 'Rules saved';
+	}
+	function cancelRules() {
+		draft = { ...rules };
+		rulesNotice = 'Changes discarded';
 	}
 </script>
 
@@ -241,12 +259,14 @@
 				></ToggleGroup.Root
 			>
 			{#if panel === 'rules'}
-				<PrototypeRulesEditor {rules} onsave={saveRules} />
 				<section aria-labelledby="rules-title" class="flex flex-col gap-4">
-					<div class="flex items-center justify-between">
+					<div class="flex flex-col gap-1">
 						<h2 id="rules-title" class="text-lg font-semibold">Table rules</h2>
+						<p class="text-sm text-muted-foreground">
+							Choose the rules for your table. Save when you're done.
+						</p>
 					</div>
-					<PrototypeRuleList {rules} />
+					<PrototypeRulesEditor bind:draft />
 				</section>
 			{:else}{@render players()}{/if}
 		</main>
@@ -258,14 +278,33 @@
 	class="fixed inset-x-0 bottom-0 border-t bg-background px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
 >
 	{#if screen === 'lobby'}<div aria-label="Round actions" class="mx-auto max-w-lg py-3">
-			<PrototypeRoundReview
-				{rules}
-				pendingRequest={request === 'pending'}
-				onstart={() => {
-					ready = true;
-					screen = 'started';
-				}}
-			/>
+			<p role="status" class="mb-2 text-sm text-muted-foreground">
+				{#if changedRules}{changedRules} unsaved {changedRules === 1
+						? 'change'
+						: 'changes'}{#if !validRules}
+						· Check the highlighted rules{/if}{:else}{rulesNotice}{/if}
+			</p>
+			{#if changedRules}
+				<div class="flex gap-3">
+					<Button variant="outline" class="min-h-12 flex-1" onclick={cancelRules}>Cancel</Button>
+					<Button class="min-h-12 flex-1" disabled={!validRules} onclick={saveRules}>
+						<HugeiconsIcon
+							icon={CheckmarkCircle02Icon}
+							data-icon="inline-start"
+							aria-hidden="true"
+						/>Save rules
+					</Button>
+				</div>
+			{:else}
+				<PrototypeRoundReview
+					{rules}
+					pendingRequest={request === 'pending'}
+					onstart={() => {
+						ready = true;
+						screen = 'started';
+					}}
+				/>
+			{/if}
 		</div>
 		<Separator />{/if}
 	<div class="mx-auto flex max-w-lg flex-col gap-2 pt-3">
@@ -278,6 +317,8 @@
 					ready = false;
 					request = 'pending';
 					rules = { ...prototypeDefaults };
+					draft = { ...prototypeDefaults };
+					rulesNotice = '';
 					name = 'Friday evening';
 				}}>Reset</Button
 			>
