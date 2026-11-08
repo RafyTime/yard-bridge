@@ -1,5 +1,15 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
+	import type { Snippet } from 'svelte';
+	import * as Dialog from '#lib/components/ui/dialog/index.js';
+	import GameRound from './game-round.svelte';
+	import RuleHelp from './rule-help.svelte';
+	import { HugeiconsIcon } from '@hugeicons/svelte';
+	import {
+		Cards01Icon,
+		MagicWand01Icon,
+		ArrowReloadHorizontalIcon
+	} from '@hugeicons/core-free-icons';
 	import type { FunctionReturnType } from 'convex/server';
 	import { useConvexClient, useQuery } from 'convex-svelte';
 	import { api } from '../../convex/_generated/api';
@@ -11,7 +21,21 @@
 	import * as Field from '#lib/components/ui/field/index.js';
 	import * as m from '#lib/paraglide/messages.js';
 
-	let { game }: { game: FunctionReturnType<typeof api.games.view> } = $props();
+	let {
+		game,
+		panel = 'rules',
+		players
+	}: {
+		game: FunctionReturnType<typeof api.games.view>;
+		panel?: 'players' | 'rules';
+		players?: Snippet;
+	} = $props();
+	let reviewOpen = $state(false);
+	const changedCount = $derived(
+		Object.keys(defaultRules).filter(
+			(key) => draft[key as keyof RulesConfiguration] !== baseline[key as keyof RulesConfiguration]
+		).length
+	);
 	const client = useConvexClient();
 	const isHost = $derived(game.isHost);
 	const configurations = useQuery(api.gameRules.saved, () => (isHost ? {} : 'skip'));
@@ -67,48 +91,56 @@
 	const settings = $derived([
 		{
 			key: 'scoreCutoff',
+			help: m.rules_help_scoreCutoff(),
 			label: m.games_cutoff(),
 			value: String(game.rules.scoreCutoff),
 			base: String(defaultRules.scoreCutoff)
 		},
 		{
 			key: 'kingOfSpades',
+			help: m.rules_help_kingOfSpades(),
 			label: m.rules_king(),
 			value: onOff(game.rules.kingOfSpades),
 			base: onOff(defaultRules.kingOfSpades)
 		},
 		{
 			key: 'handSize',
+			help: m.rules_help_handSize(),
 			label: m.games_hand_size(),
 			value: String(game.rules.handSize),
 			base: String(defaultRules.handSize)
 		},
 		{
 			key: 'openingEffects',
+			help: m.rules_help_openingEffects(),
 			label: m.rules_opening(),
 			value: onOff(game.rules.openingEffects),
 			base: onOff(defaultRules.openingEffects)
 		},
 		{
 			key: 'bridgeDeclaration',
+			help: m.rules_help_bridgeDeclaration(),
 			label: m.rules_bridge(),
 			value: onOff(game.rules.bridgeDeclaration),
 			base: onOff(defaultRules.bridgeDeclaration)
 		},
 		{
 			key: 'aceBehavior',
+			help: m.rules_help_aceBehavior(),
 			label: m.rules_ace(),
 			value: ace(game.rules.aceBehavior),
 			base: ace(defaultRules.aceBehavior)
 		},
 		{
 			key: 'recycleMultiplier',
+			help: m.rules_help_recycleMultiplier(),
 			label: m.rules_recycle(),
 			value: String(game.rules.recycleMultiplier),
 			base: String(defaultRules.recycleMultiplier)
 		},
 		{
 			key: 'starterPolicy',
+			help: m.rules_help_starterPolicy(),
 			label: m.rules_starter(),
 			value: starter(game.rules.starterPolicy),
 			base: starter(defaultRules.starterPolicy)
@@ -147,297 +179,437 @@
 	}
 </script>
 
-{#snippet booleanField(key: 'kingOfSpades' | 'openingEffects' | 'bridgeDeclaration', label: string)}
-	<Field.Field orientation="horizontal" data-disabled={pending}>
-		<Field.FieldContent>
-			<Field.FieldLabel for={`rule-${key}`}>{label}</Field.FieldLabel>
-			<Field.FieldDescription
-				>{m.rules_default({ value: onOff(defaultRules[key]) })}</Field.FieldDescription
-			>
-		</Field.FieldContent>
-		<Switch id={`rule-${key}`} bind:checked={draft[key]} disabled={pending} />
-	</Field.Field>
+{#snippet readyAction()}
+	{#if reviewed}{#if game.isHost}<p class="text-sm text-muted-foreground">
+				{m.rules_reviewed()}
+			</p>{/if}
+	{:else}<Button
+			class="min-h-12 w-full whitespace-normal"
+			disabled={pending || dirty || conflicted}
+			onclick={() =>
+				act(() =>
+					client.mutation(api.gameRules.ready, { gameId: game.id, expectedVersion: game.version })
+				)}>{m.rules_ready()}</Button
+		>{/if}
 {/snippet}
 
-<section class="flex min-w-0 flex-col gap-5" aria-labelledby="rules-heading">
-	<h3 id="rules-heading" class="text-lg font-medium">{m.rules_title()}</h3>
-	{#if editable}
-		{#if conflicted}
-			<p role="alert">{m.rules_conflict()}</p>
+{#if panel === 'players' && players}{@render players()}{/if}
+<div hidden={panel !== 'rules'}>
+	<section class="flex min-w-0 flex-col gap-6" aria-labelledby="rules-heading">
+		<div>
+			<h3 id="rules-heading" class="text-lg font-semibold">{m.rules_title()}</h3>
+			<p class="mt-1 text-sm text-muted-foreground">
+				{editable ? m.rules_edit_hint() : m.rules_locked()}
+			</p>
+		</div>
+		{#if conflicted}<p role="alert">{m.rules_conflict()}</p>
 			<Button variant="outline" disabled={pending} onclick={loadLatest}
 				>{m.rules_load_latest()}</Button
-			>
-		{/if}
-		<form
-			onsubmit={(event) => {
-				event.preventDefault();
-				if (!conflicted) void act(apply);
-			}}
-			aria-busy={pending}
-		>
-			<Field.FieldGroup>
-				<Field.Field
-					data-invalid={!Number.isSafeInteger(draft.scoreCutoff) || draft.scoreCutoff < 1}
-				>
-					<Field.FieldLabel for="rule-cutoff">{m.games_cutoff()}</Field.FieldLabel>
-					<Input
-						class="min-h-11"
-						id="rule-cutoff"
-						type="number"
-						min={1}
-						step={1}
-						required
-						bind:value={draft.scoreCutoff}
-						disabled={pending}
-						aria-invalid={!Number.isSafeInteger(draft.scoreCutoff) || draft.scoreCutoff < 1}
-					/>
-					<Field.FieldDescription
-						>{m.rules_default({ value: String(defaultRules.scoreCutoff) })}</Field.FieldDescription
-					>
-				</Field.Field>
-				{@render booleanField('kingOfSpades', m.rules_king())}
-				<Field.Field
-					data-invalid={!Number.isInteger(draft.handSize) ||
-						draft.handSize < 2 ||
-						draft.handSize > 9}
-				>
-					<Field.FieldLabel for="rule-hand">{m.games_hand_size()}</Field.FieldLabel>
-					<Input
-						class="min-h-11"
-						id="rule-hand"
-						type="number"
-						min={2}
-						max={9}
-						step={1}
-						required
-						bind:value={draft.handSize}
-						disabled={pending}
-						aria-invalid={!Number.isInteger(draft.handSize) ||
-							draft.handSize < 2 ||
-							draft.handSize > 9}
-						aria-describedby="rule-hand-hint"
-					/>
-					<Field.FieldDescription id="rule-hand-hint"
-						>{m.rules_hand_hint()}
-						{m.rules_default({ value: String(defaultRules.handSize) })}</Field.FieldDescription
-					>
-				</Field.Field>
-				<details>
-					<summary class="min-h-11 cursor-pointer py-3">{m.rules_advanced()}</summary>
-					<Field.FieldGroup>
-						{@render booleanField('openingEffects', m.rules_opening())}
-						{@render booleanField('bridgeDeclaration', m.rules_bridge())}
-						<Field.FieldSet>
-							<Field.FieldLegend>{m.rules_ace()}</Field.FieldLegend>
-							<ToggleGroup.Root
-								type="single"
-								variant="outline"
-								value={draft.aceBehavior}
-								disabled={pending}
-								onValueChange={(value) => {
-									if (value === 'skip' || value === 'cancel') draft.aceBehavior = value;
-								}}
-								orientation="vertical"
-								aria-label={m.rules_ace()}
-							>
-								<ToggleGroup.Item value="skip" class="min-h-11 whitespace-normal"
-									>{m.rules_skip()}</ToggleGroup.Item
-								>
-								<ToggleGroup.Item value="cancel" class="min-h-11 whitespace-normal"
-									>{m.rules_cancel()}</ToggleGroup.Item
-								>
-							</ToggleGroup.Root>
-							<Field.FieldDescription
-								>{m.rules_default({ value: ace(defaultRules.aceBehavior) })}</Field.FieldDescription
-							>
-						</Field.FieldSet>
-						<Field.FieldSet>
-							<Field.FieldLegend>{m.rules_recycle()}</Field.FieldLegend>
-							<ToggleGroup.Root
-								type="single"
-								variant="outline"
-								value={String(draft.recycleMultiplier)}
-								disabled={pending}
-								onValueChange={(value) => {
-									if (value === '1' || value === '2' || value === '3')
-										draft.recycleMultiplier = value === '1' ? 1 : value === '2' ? 2 : 3;
-								}}
-								aria-label={m.rules_recycle()}
-							>
-								{#each [1, 2, 3] as value (value)}<ToggleGroup.Item
-										value={String(value)}
-										class="min-h-11 min-w-11">{value}</ToggleGroup.Item
-									>{/each}
-							</ToggleGroup.Root>
-							<Field.FieldDescription
-								>{m.rules_default({
-									value: String(defaultRules.recycleMultiplier)
-								})}</Field.FieldDescription
-							>
-						</Field.FieldSet>
-						<Field.FieldSet>
-							<Field.FieldLegend>{m.rules_starter()}</Field.FieldLegend>
-							<ToggleGroup.Root
-								type="single"
-								variant="outline"
-								value={draft.starterPolicy}
-								disabled={pending}
-								onValueChange={(value) => {
-									if (
-										value === 'highest-score' ||
-										value === 'previous-starter' ||
-										value === 'random'
-									)
-										draft.starterPolicy = value;
-								}}
-								orientation="vertical"
-								aria-label={m.rules_starter()}
-							>
-								<ToggleGroup.Item value="highest-score" class="min-h-11 whitespace-normal"
-									>{m.rules_highest()}</ToggleGroup.Item
-								>
-								<ToggleGroup.Item value="previous-starter" class="min-h-11 whitespace-normal"
-									>{m.rules_previous()}</ToggleGroup.Item
-								>
-								<ToggleGroup.Item value="random" class="min-h-11 whitespace-normal"
-									>{m.rules_random()}</ToggleGroup.Item
-								>
-							</ToggleGroup.Root>
-							<Field.FieldDescription
-								>{m.rules_default({
-									value: starter(defaultRules.starterPolicy)
-								})}</Field.FieldDescription
-							>
-						</Field.FieldSet>
-					</Field.FieldGroup>
-				</details>
-				<Button class="min-h-11" type="submit" disabled={pending || !valid || conflicted}
-					>{m.rules_apply()}</Button
-				>
-				<Button
-					class="min-h-11"
-					variant="outline"
-					disabled={pending}
-					onclick={() => {
-						draft = { ...defaultRules };
-						saved = false;
-					}}>{m.rules_reset()}</Button
-				>
-				<Field.FieldDescription>{m.rules_edit_hint()}</Field.FieldDescription>
-			</Field.FieldGroup>
-		</form>
-	{/if}
-	<h4 class="font-medium">{m.rules_current()}</h4>
-	<dl class="flex flex-col gap-3">
-		{#each settings.slice(0, 3) as setting (setting.key)}
-			<div>
-				<dt>{setting.label}</dt>
-				<dd>
-					{setting.value}
-					<span class="text-muted-foreground">({m.rules_default({ value: setting.base })})</span>
-				</dd>
-			</div>
-		{/each}
-	</dl>
-	<h4 class="font-medium">{m.rules_changes()}</h4>
-	{#if changes.length === 0}<p class="text-muted-foreground">{m.rules_no_changes()}</p>
-	{:else}<ul class="flex flex-col gap-2">
-			{#each changes as setting (setting.key)}<li>
-					{setting.label}: {setting.value}. {m.rules_default({ value: setting.base })}
-				</li>{/each}
-		</ul>{/if}
-	<details>
-		<summary class="min-h-11 cursor-pointer py-3">{m.rules_advanced()}</summary>
-		<dl class="flex flex-col gap-3">
-			{#each settings.slice(3) as setting (setting.key)}<div>
-					<dt>{setting.label}</dt>
-					<dd>{setting.value}. {m.rules_default({ value: setting.base })}</dd>
-				</div>{/each}
-		</dl>
-	</details>
-	<details>
-		<summary class="min-h-11 cursor-pointer py-3">{m.rules_base_title()}</summary>
-		<ul class="flex flex-col gap-3">
-			<li>{m.rules_base_match()}</li>
-			<li>{m.rules_base_draw()}</li>
-			<li>{m.rules_base_ace()}</li>
-			<li>{m.rules_base_score()}</li>
-			<li>{m.rules_base_start()}</li>
-		</ul>
-	</details>
-	{#if game.status === 'lobby'}
-		{#if reviewed}<p role="status">{m.rules_reviewed()}</p>
-		{:else}<Button
-				class="min-h-11 whitespace-normal"
-				disabled={pending}
-				onclick={() =>
-					act(() =>
-						client.mutation(api.gameRules.ready, { gameId: game.id, expectedVersion: game.version })
-					)}>{m.rules_ready()}</Button
 			>{/if}
-		<p role="status">
-			{game.canStart
-				? m.rules_table_ready()
-				: game.seats.length < 2
-					? m.rules_need_players()
-					: m.rules_waiting()}
-		</p>
-	{:else}<p>{m.rules_locked()}</p>{/if}
-	{#if editable}
-		<details>
-			<summary class="min-h-11 cursor-pointer py-3">{m.rules_saved_title()}</summary>
+		{#if editable}
 			<form
+				id="rules-form"
 				onsubmit={(event) => {
 					event.preventDefault();
-					if (dirty || conflicted) return;
-					void act(async () => {
-						await client.mutation(api.gameRules.save, {
-							gameId: game.id,
-							expectedVersion: game.version,
-							name
-						});
-						saved = true;
-						name = '';
-					});
+					if (!conflicted) void act(apply);
 				}}
+				aria-busy={pending}
 			>
 				<Field.FieldGroup>
-					<Field.Field
-						><Field.FieldLabel for="rules-name">{m.rules_preset_name()}</Field.FieldLabel><Input
-							id="rules-name"
-							class="min-h-11"
-							bind:value={name}
-							required
-							maxlength={80}
-							disabled={pending}
-						/></Field.Field
-					>
+					<section class="flex flex-col gap-2">
+						<h4 class="mb-2 flex items-center gap-2.5 text-lg font-semibold">
+							<HugeiconsIcon
+								icon={Cards01Icon}
+								size={20}
+								aria-hidden="true"
+							/>{m.rules_group_dealing()}
+						</h4>
+						<RuleHelp label={m.games_cutoff()} description={m.rules_help_scoreCutoff()}
+							>{#snippet children(info)}
+								<Field.Field
+									data-invalid={!Number.isSafeInteger(draft.scoreCutoff) || draft.scoreCutoff < 1}
+									><div class="flex items-center justify-between gap-3">
+										<div class="flex min-w-0 items-center">
+											<Field.FieldLabel for="rule-scoreCutoff" class="text-sm"
+												>{m.games_cutoff()}</Field.FieldLabel
+											>{@render info()}
+										</div>
+										<Input
+											id="rule-scoreCutoff"
+											class="min-h-11 w-24 shrink-0"
+											type="number"
+											min={1}
+											step={1}
+											required
+											bind:value={draft.scoreCutoff}
+											disabled={pending}
+											aria-invalid={!Number.isSafeInteger(draft.scoreCutoff) ||
+												draft.scoreCutoff < 1}
+											aria-describedby="error-scoreCutoff"
+										/>
+									</div>
+									{#if !Number.isSafeInteger(draft.scoreCutoff) || draft.scoreCutoff < 1}<p
+											id="error-scoreCutoff"
+											class="text-sm text-destructive"
+										>
+											{m.rules_invalid_scoreCutoff()}
+										</p>{/if}</Field.Field
+								>
+							{/snippet}</RuleHelp
+						>
+						<RuleHelp label={m.games_hand_size()} description={m.rules_help_handSize()}
+							>{#snippet children(info)}
+								<Field.Field
+									data-invalid={!Number.isInteger(draft.handSize) ||
+										draft.handSize < 2 ||
+										draft.handSize > 9}
+									><div class="flex items-center justify-between gap-3">
+										<div class="flex min-w-0 items-center">
+											<Field.FieldLabel for="rule-handSize" class="text-sm"
+												>{m.games_hand_size()}</Field.FieldLabel
+											>{@render info()}
+										</div>
+										<Input
+											id="rule-handSize"
+											class="min-h-11 w-24 shrink-0"
+											type="number"
+											min={2}
+											max={9}
+											step={1}
+											required
+											bind:value={draft.handSize}
+											disabled={pending}
+											aria-invalid={!Number.isInteger(draft.handSize) ||
+												draft.handSize < 2 ||
+												draft.handSize > 9}
+											aria-describedby="error-handSize"
+										/>
+									</div>
+									{#if !Number.isInteger(draft.handSize) || draft.handSize < 2 || draft.handSize > 9}<p
+											id="error-handSize"
+											class="text-sm text-destructive"
+										>
+											{m.rules_invalid_handSize()}
+										</p>{/if}</Field.Field
+								>
+							{/snippet}</RuleHelp
+						>
+						<RuleHelp label={m.rules_recycle()} description={m.rules_help_recycleMultiplier()}
+							>{#snippet children(info)}
+								<Field.FieldSet
+									><div class="flex items-center">
+										<Field.FieldLegend class="mb-0 text-sm">{m.rules_recycle()}</Field.FieldLegend
+										>{@render info()}
+									</div>
+									<ToggleGroup.Root
+										type="single"
+										variant="outline"
+										value={String(draft.recycleMultiplier)}
+										disabled={pending}
+										onValueChange={(value) => {
+											if (value === '1' || value === '2' || value === '3')
+												draft.recycleMultiplier = value === '1' ? 1 : value === '2' ? 2 : 3;
+										}}
+										aria-label={m.rules_recycle()}
+										class="w-full"
+										><ToggleGroup.Item value="1" class="min-h-11 flex-1 whitespace-normal"
+											>×1</ToggleGroup.Item
+										><ToggleGroup.Item value="2" class="min-h-11 flex-1 whitespace-normal"
+											>×2</ToggleGroup.Item
+										><ToggleGroup.Item value="3" class="min-h-11 flex-1 whitespace-normal"
+											>×3</ToggleGroup.Item
+										></ToggleGroup.Root
+									></Field.FieldSet
+								>
+							{/snippet}</RuleHelp
+						>
+					</section>
+					<section class="flex flex-col gap-2">
+						<h4 class="mb-2 flex items-center gap-2.5 text-lg font-semibold">
+							<HugeiconsIcon
+								icon={MagicWand01Icon}
+								size={20}
+								aria-hidden="true"
+							/>{m.rules_group_effects()}
+						</h4>
+						<RuleHelp label={m.rules_king()} description={m.rules_help_kingOfSpades()}
+							>{#snippet children(info)}
+								<Field.Field orientation="horizontal"
+									><div class="flex flex-1 items-center">
+										<Field.FieldLabel for="rule-kingOfSpades" class="text-sm"
+											>{m.rules_king()}</Field.FieldLabel
+										>{@render info()}
+									</div>
+									<Switch
+										id="rule-kingOfSpades"
+										bind:checked={draft.kingOfSpades}
+										disabled={pending}
+									/></Field.Field
+								>
+							{/snippet}</RuleHelp
+						>
+						<RuleHelp label={m.rules_opening()} description={m.rules_help_openingEffects()}
+							>{#snippet children(info)}
+								<Field.Field orientation="horizontal"
+									><div class="flex flex-1 items-center">
+										<Field.FieldLabel for="rule-openingEffects" class="text-sm"
+											>{m.rules_opening()}</Field.FieldLabel
+										>{@render info()}
+									</div>
+									<Switch
+										id="rule-openingEffects"
+										bind:checked={draft.openingEffects}
+										disabled={pending}
+									/></Field.Field
+								>
+							{/snippet}</RuleHelp
+						>
+						<RuleHelp label={m.rules_ace()} description={m.rules_help_aceBehavior()}
+							>{#snippet children(info)}
+								<Field.FieldSet
+									><div class="flex items-center">
+										<Field.FieldLegend class="mb-0 text-sm">{m.rules_ace()}</Field.FieldLegend
+										>{@render info()}
+									</div>
+									<ToggleGroup.Root
+										type="single"
+										variant="outline"
+										value={draft.aceBehavior}
+										disabled={pending}
+										onValueChange={(value) => {
+											if (value === 'skip' || value === 'cancel') draft.aceBehavior = value;
+										}}
+										aria-label={m.rules_ace()}
+										class="w-full"
+										orientation="vertical"
+										><ToggleGroup.Item value="skip" class="min-h-11 flex-1 whitespace-normal"
+											>{m.rules_skip()}</ToggleGroup.Item
+										><ToggleGroup.Item value="cancel" class="min-h-11 flex-1 whitespace-normal"
+											>{m.rules_cancel()}</ToggleGroup.Item
+										></ToggleGroup.Root
+									></Field.FieldSet
+								>
+							{/snippet}</RuleHelp
+						>
+					</section>
+					<section class="flex flex-col gap-2">
+						<h4 class="mb-2 flex items-center gap-2.5 text-lg font-semibold">
+							<HugeiconsIcon
+								icon={ArrowReloadHorizontalIcon}
+								size={20}
+								aria-hidden="true"
+							/>{m.rules_group_rounds()}
+						</h4>
+						<RuleHelp label={m.rules_bridge()} description={m.rules_help_bridgeDeclaration()}
+							>{#snippet children(info)}
+								<Field.Field orientation="horizontal"
+									><div class="flex flex-1 items-center">
+										<Field.FieldLabel for="rule-bridgeDeclaration" class="text-sm"
+											>{m.rules_bridge()}</Field.FieldLabel
+										>{@render info()}
+									</div>
+									<Switch
+										id="rule-bridgeDeclaration"
+										bind:checked={draft.bridgeDeclaration}
+										disabled={pending}
+									/></Field.Field
+								>
+							{/snippet}</RuleHelp
+						>
+						<RuleHelp label={m.rules_starter()} description={m.rules_help_starterPolicy()}
+							>{#snippet children(info)}
+								<Field.FieldSet
+									><div class="flex items-center">
+										<Field.FieldLegend class="mb-0 text-sm">{m.rules_starter()}</Field.FieldLegend
+										>{@render info()}
+									</div>
+									<ToggleGroup.Root
+										type="single"
+										variant="outline"
+										value={draft.starterPolicy}
+										disabled={pending}
+										onValueChange={(value) => {
+											if (
+												value === 'highest-score' ||
+												value === 'previous-starter' ||
+												value === 'random'
+											)
+												draft.starterPolicy = value;
+										}}
+										aria-label={m.rules_starter()}
+										class="w-full"
+										orientation="vertical"
+										><ToggleGroup.Item
+											value="highest-score"
+											class="min-h-11 flex-1 whitespace-normal"
+											>{m.rules_highest()}</ToggleGroup.Item
+										><ToggleGroup.Item
+											value="previous-starter"
+											class="min-h-11 flex-1 whitespace-normal"
+											>{m.rules_previous()}</ToggleGroup.Item
+										><ToggleGroup.Item value="random" class="min-h-11 flex-1 whitespace-normal"
+											>{m.rules_random()}</ToggleGroup.Item
+										></ToggleGroup.Root
+									></Field.FieldSet
+								>
+							{/snippet}</RuleHelp
+						>
+					</section>
 					<Button
+						variant="outline"
 						class="min-h-11"
-						type="submit"
-						disabled={pending || !name.trim() || dirty || conflicted}>{m.rules_save()}</Button
+						disabled={pending}
+						onclick={() => {
+							draft = { ...defaultRules };
+							saved = false;
+						}}>{m.rules_reset()}</Button
 					>
 				</Field.FieldGroup>
 			</form>
-			{#if saved}<p role="status">{m.rules_saved()}</p>{/if}
-			{#if configurations.error}<p role="alert">{m.rules_error()}</p>
-			{:else if configurations.data}
-				{#if configurations.data.length === 0}<p>{m.rules_saved_empty()}</p>{/if}
-				<ul class="mt-3 flex flex-col gap-3">
-					{#each configurations.data as configuration (configuration.id)}<li>
-							<Button
-								class="min-h-11 max-w-full break-all whitespace-normal"
-								variant="outline"
-								disabled={pending}
-								onclick={() => {
-									draft = { ...configuration.rules };
-									saved = false;
-								}}>{m.rules_use({ name: configuration.name })}</Button
-							>
-						</li>{/each}
-				</ul>
-			{/if}
+		{:else}
+			<ul class="flex flex-col divide-y">
+				{#each settings as setting (setting.key)}<li>
+						<RuleHelp label={setting.label} description={setting.help}
+							>{#snippet children(info)}<div class="flex items-center justify-between gap-3 py-2">
+									<div class="flex min-w-0 items-center">
+										<span class="text-sm font-medium">{setting.label}</span>{@render info()}
+									</div>
+									<div class="text-right text-sm text-muted-foreground">
+										{setting.value}{#if setting.value !== setting.base}<span class="block text-xs"
+												>{m.rules_default({ value: setting.base })}</span
+											>{/if}
+									</div>
+								</div>{/snippet}</RuleHelp
+						>
+					</li>{/each}
+			</ul>
+		{/if}
+		<details>
+			<summary class="min-h-11 cursor-pointer py-3">{m.rules_base_title()}</summary>
+			<ul class="flex flex-col gap-3 text-sm text-muted-foreground">
+				<li>{m.rules_base_match()}</li>
+				<li>{m.rules_base_draw()}</li>
+				<li>{m.rules_base_ace()}</li>
+				<li>{m.rules_base_score()}</li>
+				<li>{m.rules_base_start()}</li>
+			</ul>
 		</details>
-	{/if}
-	{#if error}<p role="alert">{m.rules_error()}</p>{/if}
-</section>
+		{#if editable}
+			<details>
+				<summary class="min-h-11 cursor-pointer py-3">{m.rules_saved_title()}</summary>
+				<form
+					onsubmit={(event) => {
+						event.preventDefault();
+						if (dirty || conflicted) return;
+						void act(async () => {
+							await client.mutation(api.gameRules.save, {
+								gameId: game.id,
+								expectedVersion: game.version,
+								name
+							});
+							saved = true;
+							name = '';
+						});
+					}}
+				>
+					<Field.FieldGroup>
+						<Field.Field
+							><Field.FieldLabel for="rules-name">{m.rules_preset_name()}</Field.FieldLabel><Input
+								id="rules-name"
+								class="min-h-11"
+								bind:value={name}
+								required
+								maxlength={80}
+								disabled={pending}
+							/></Field.Field
+						>
+						<Button
+							class="min-h-11"
+							type="submit"
+							disabled={pending || !name.trim() || dirty || conflicted}>{m.rules_save()}</Button
+						>
+					</Field.FieldGroup>
+				</form>
+				{#if saved}<p role="status">{m.rules_saved()}</p>{/if}
+				{#if configurations.error}<p role="alert">{m.rules_error()}</p>
+				{:else if configurations.data}
+					{#if configurations.data.length === 0}<p>{m.rules_saved_empty()}</p>{/if}
+					<ul class="mt-3 flex flex-col gap-3">
+						{#each configurations.data as configuration (configuration.id)}<li>
+								<Button
+									class="min-h-11 max-w-full break-all whitespace-normal"
+									variant="outline"
+									disabled={pending}
+									onclick={() => {
+										draft = { ...configuration.rules };
+										saved = false;
+									}}>{m.rules_use({ name: configuration.name })}</Button
+								>
+							</li>{/each}
+					</ul>
+				{/if}
+			</details>
+		{/if}
+	</section>
+</div>
+{#if game.status === 'lobby'}
+	<aside
+		class="fixed inset-x-0 bottom-0 border-t bg-background px-5 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]"
+		aria-label={m.lobby_actions()}
+	>
+		<div class="mx-auto flex max-w-lg flex-col gap-3">
+			{#if reviewed}<p class="text-sm text-muted-foreground">{m.rules_reviewed()}</p>{/if}
+			{#if error}<p role="alert" class="text-sm text-destructive">{m.rules_error()}</p>{/if}
+			{#if dirty || conflicted}
+				<p role="status" class="text-sm text-muted-foreground">
+					{m.rules_unsaved({ count: changedCount })}
+				</p>
+				<div class="flex gap-3">
+					<Button variant="outline" class="min-h-12 flex-1" disabled={pending} onclick={loadLatest}
+						>{m.ui_cancel()}</Button
+					><Button
+						class="min-h-12 flex-1"
+						disabled={pending || !valid || conflicted}
+						onclick={() => act(apply)}>{pending ? m.auth_working() : m.rules_apply()}</Button
+					>
+				</div>
+			{:else}
+				<p role="status" class="text-sm text-muted-foreground">
+					{game.canStart
+						? m.rules_table_ready()
+						: game.seats.length < 2
+							? m.rules_need_players()
+							: m.rules_waiting()}
+				</p>
+				{#if game.isHost}<Button class="min-h-12 w-full" onclick={() => (reviewOpen = true)}
+						>{m.rules_review_start()}</Button
+					>{:else}{@render readyAction()}{/if}
+			{/if}
+		</div>
+	</aside>
+	<Dialog.Root bind:open={reviewOpen}
+		><Dialog.Content class="max-h-[85svh] overflow-y-auto"
+			><Dialog.Header
+				><Dialog.Title>{m.rules_current()}</Dialog.Title><Dialog.Description
+					>{m.rules_review_description()}</Dialog.Description
+				></Dialog.Header
+			>
+			<dl class="flex flex-col divide-y">
+				{#each settings as setting (setting.key)}<div class="flex justify-between gap-4 py-3">
+						<dt>
+							{setting.label}{#if setting.value !== setting.base}<span
+									class="block text-xs text-muted-foreground"
+									>{m.rules_default({ value: setting.base })}</span
+								>{/if}
+						</dt>
+						<dd class="text-right font-medium">{setting.value}</dd>
+					</div>{/each}
+			</dl>
+			<p class="text-sm text-muted-foreground">
+				{changes.length ? m.rules_changes() : m.rules_no_changes()}
+			</p>
+			{#if error}<p role="alert" class="text-sm text-destructive">{m.rules_error()}</p>{/if}
+			{@render readyAction()}<GameRound {game} />
+		</Dialog.Content></Dialog.Root
+	>
+{:else if error}<p role="alert">{m.rules_error()}</p>{/if}

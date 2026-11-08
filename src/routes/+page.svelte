@@ -84,11 +84,21 @@
 {#if import.meta.env.DEV && page.url.searchParams.has('prototype')}
 	<MobileLobbyPrototype />
 {:else}
-	<main class="flex min-h-svh items-center justify-center px-5 py-10">
-		<section class="flex w-full max-w-sm flex-col gap-6" aria-labelledby="welcome-heading">
+	<main class="flex min-h-svh justify-center px-5 py-6">
+		<section
+			class="flex w-full max-w-lg flex-col gap-6"
+			class:pb-52={auth.isAuthenticated && page.url.searchParams.has('game')}
+			aria-labelledby="welcome-heading"
+		>
 			<header class="flex flex-col gap-2">
 				<p class="text-sm font-medium text-muted-foreground">Yard Bridge</p>
-				<h1 id="welcome-heading" class="text-3xl font-semibold">{m.auth_welcome()}</h1>
+				<h1
+					id="welcome-heading"
+					class="text-3xl font-semibold"
+					class:sr-only={auth.isAuthenticated}
+				>
+					{m.auth_welcome()}
+				</h1>
 			</header>
 			{#if auth.isLoading}
 				<p role="status">{m.auth_loading()}</p>
@@ -96,8 +106,8 @@
 				{#if viewer.error}
 					<p role="alert">{m.auth_identity_error()}</p>
 				{:else if viewer.data}
-					<h2 class="text-xl font-medium">{m.auth_signed_in()}</h2>
-					<p class="break-all">{viewer.data.email}</p>
+					<h2 class="sr-only">{m.auth_signed_in()}</h2>
+					<p class="text-sm break-all text-muted-foreground">{viewer.data.email}</p>
 					<Games />
 				{:else}
 					<p role="status">{m.auth_loading()}</p>

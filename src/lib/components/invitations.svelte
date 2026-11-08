@@ -1,12 +1,35 @@
 <script lang="ts">
-	import { SvelteURL } from 'svelte/reactivity';
+	import { SvelteURL, MediaQuery } from 'svelte/reactivity';
+	import * as Dialog from '#lib/components/ui/dialog/index.js';
+	import * as Drawer from '#lib/components/ui/drawer/index.js';
+	import * as InputGroup from '#lib/components/ui/input-group/index.js';
+	import { HugeiconsIcon } from '@hugeicons/svelte';
+	import { Copy01Icon } from '@hugeicons/core-free-icons';
+	const desktop = new MediaQuery('(min-width: 768px)');
+	let open = $state(false);
+	let feedback = $state('');
+	async function copy() {
+		try {
+			await navigator.clipboard.writeText(link);
+			feedback = m.invite_copied();
+		} catch {
+			feedback = m.invite_copy_error();
+		}
+	}
+	async function share() {
+		try {
+			await navigator.share({ url: link });
+		} catch (error) {
+			if (!(error instanceof DOMException && error.name === 'AbortError'))
+				feedback = m.invite_share_error();
+		}
+	}
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { useConvexClient, useQuery } from 'convex-svelte';
 	import { api } from '../../convex/_generated/api';
 	import type { Id } from '../../convex/_generated/dataModel';
-	import { Button } from '#lib/components/ui/button/index.js';
-	import { Input } from '#lib/components/ui/input/index.js';
+	import { Button, buttonVariants } from '#lib/components/ui/button/index.js';
 	import * as Field from '#lib/components/ui/field/index.js';
 	import * as m from '#lib/paraglide/messages.js';
 	let { gameId = null, token = null }: { gameId?: Id<'games'> | null; token?: string | null } =
@@ -68,23 +91,40 @@
 		{:else}<p role="status">{m.games_loading()}</p>{/if}
 	{:else if gameId}
 		<h3 id="invitation-heading" class="text-lg font-medium">{m.invite_title()}</h3>
-		<Button class="min-h-11" variant="outline" disabled={pending} onclick={() => act(invite)}
-			>{m.invite_create()}</Button
-		>
-		{#if link}
-			<Field.FieldGroup
-				><Field.Field>
-					<Field.FieldLabel for="invitation-link">{m.invite_link()}</Field.FieldLabel>
-					<Input
-						id="invitation-link"
-						value={link}
-						readonly
-						onclick={(event) => event.currentTarget.select()}
-					/>
-					<Field.FieldDescription>{m.invite_link_hint()}</Field.FieldDescription>
-				</Field.Field></Field.FieldGroup
+
+		{#if desktop.current}<Dialog.Root bind:open
+				><Dialog.Trigger
+					class={buttonVariants({ variant: 'outline', class: 'min-h-12 w-full' })}
+					onclick={() => {
+						feedback = '';
+						if (!link) void act(invite);
+					}}>{m.invite_create()}</Dialog.Trigger
+				><Dialog.Content
+					><Dialog.Header
+						><Dialog.Title>{m.invite_title()}</Dialog.Title><Dialog.Description
+							>{m.invite_link_hint()}</Dialog.Description
+						></Dialog.Header
+					>{@render invitationContents()}</Dialog.Content
+				></Dialog.Root
 			>
-		{/if}
+		{:else}<Drawer.Root bind:open
+				><Drawer.Trigger
+					class={buttonVariants({ variant: 'outline', class: 'min-h-12 w-full' })}
+					onclick={() => {
+						feedback = '';
+						if (!link) void act(invite);
+					}}>{m.invite_create()}</Drawer.Trigger
+				><Drawer.Content
+					><Drawer.Header
+						><Drawer.Title>{m.invite_title()}</Drawer.Title><Drawer.Description
+							>{m.invite_link_hint()}</Drawer.Description
+						></Drawer.Header
+					>
+					<div class="px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+						{@render invitationContents()}
+					</div></Drawer.Content
+				></Drawer.Root
+			>{/if}
 		{#if requests.error}<p role="alert">{m.invite_error()}</p>
 		{:else if requests.data}
 			{#if requests.data.length === 0}<p class="text-muted-foreground">
@@ -92,7 +132,7 @@
 				</p>{/if}
 			<ul class="flex flex-col gap-4">
 				{#each requests.data as request (request.id)}
-					<li class="flex min-w-0 flex-col gap-2">
+					<li class="flex min-w-0 flex-col gap-3 rounded-xl border p-4">
 						<p class="break-all">{request.email}</p>
 						<div class="flex gap-2">
 							<Button
@@ -120,3 +160,41 @@
 	{/if}
 	{#if error}<p role="alert">{m.invite_error()}</p>{/if}
 </section>
+
+{#snippet invitationContents()}
+	<div class="flex flex-col gap-3">
+		{#if link}<Field.FieldGroup
+				><Field.Field
+					><Field.FieldLabel for="invitation-link">{m.invite_link()}</Field.FieldLabel
+					><InputGroup.Root class="min-h-12"
+						><InputGroup.Input
+							id="invitation-link"
+							value={link}
+							readonly
+							onclick={(event) => event.currentTarget.select()}
+						/><InputGroup.Addon align="inline-end"
+							><Button
+								variant="ghost"
+								size="icon"
+								class="size-11"
+								aria-label={m.invite_copy()}
+								onclick={copy}><HugeiconsIcon icon={Copy01Icon} aria-hidden="true" /></Button
+							></InputGroup.Addon
+						></InputGroup.Root
+					></Field.Field
+				></Field.FieldGroup
+			>
+			{#if typeof navigator !== 'undefined' && typeof navigator.share === 'function'}<Button
+					variant="outline"
+					class="min-h-12"
+					onclick={share}>{m.invite_share()}</Button
+				>{/if}
+		{:else if pending}<p role="status">{m.auth_working()}</p>{/if}
+		{#if error}<p role="alert">{m.invite_error()}</p>
+			<Button variant="outline" disabled={pending} onclick={() => act(invite)}
+				>{m.invite_create()}</Button
+			>{/if}
+		<p role="status" class="text-sm text-muted-foreground">{feedback}</p>
+		<Button variant="ghost" class="min-h-11" onclick={() => (open = false)}>{m.ui_done()}</Button>
+	</div>
+{/snippet}
