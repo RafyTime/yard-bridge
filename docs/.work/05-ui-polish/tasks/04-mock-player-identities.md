@@ -1,7 +1,7 @@
 # 04: Mock player names and avatars
 
 Type: task
-Status: claimed
+Status: resolved
 Blocked by: None (can start immediately)
 Spec: [UI polish spec](../spec.md)
 
@@ -21,3 +21,7 @@ comes later.
 - [ ] Avatars have empty alt text or an accessible label that doesn't duplicate the name.
 - [ ] No backend, schema, or persisted nickname changes.
 - [ ] Invitation and approval browser tests still pass.
+
+## Answer
+
+Done in `5d7a2cd`. `src/lib/mocks/players.ts` exports `mockIdentity(seatId)`, a deterministic adjective + animal name with a local SVG avatar. The Players tab shows it next to the Seat number, the Host and You badges, and readiness. No backend change.
