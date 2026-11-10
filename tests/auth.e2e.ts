@@ -55,6 +55,21 @@ async function signInAs(page: Page, backend: Backend, email: string) {
 	await expect(page.getByRole('heading', { name: 'You are signed in', exact: true })).toBeVisible();
 }
 
+// Hands the browser to another account at `url`, as a second player on the same device would.
+async function switchAccount(page: Page, backend: Backend, url: string, email: string) {
+	await signOut(page);
+	await page.goto(url);
+	await signInAs(page, backend, email);
+}
+
+// Opens the current Game's invitation sheet and returns its link.
+async function invitationLink(page: Page) {
+	await page.getByRole('button', { name: 'Get invitation link' }).click();
+	const link = await page.getByLabel('Invitation link', { exact: true }).inputValue();
+	await page.getByRole('button', { name: 'Done', exact: true }).click();
+	return link;
+}
+
 test('email code signs in, returns after reload and reopening, then signs out', async ({
 	page,
 	context,
@@ -143,6 +158,7 @@ test('language and appearance apply immediately and survive a reload', async ({
 	page,
 	backend
 }) => {
+	// Requesting the fixture installs the mock backend; the test never signs in.
 	void backend;
 	await page.emulateMedia({ colorScheme: 'light' });
 	await page.setViewportSize({ width: 320, height: 640 });
@@ -223,29 +239,22 @@ test('invitation waits for approval and an approved player returns without anoth
 }) => {
 	// Eight sign-ins across three accounts; Firefox needs more than the default budget.
 	test.slow();
-	const signIn = (email: string) => signInAs(page, backend, email);
 	await page.setViewportSize({ width: 390, height: 844 });
 	await page.goto('/');
-	await signIn('host@example.com');
+	await signInAs(page, backend, 'host@example.com');
 	await page.getByRole('button', { name: 'New game', exact: true }).click();
 	await page.getByLabel('Game name').fill('Private invitation table');
 	await page.getByRole('button', { name: 'Create private game' }).click();
-	await page.getByRole('button', { name: 'Get invitation link' }).click();
-	const invitation = await page.getByLabel('Invitation link', { exact: true }).inputValue();
-	await page.getByRole('button', { name: 'Done', exact: true }).click();
+	const invitation = await invitationLink(page);
 	const gameURL = page.url();
-	await signOut(page);
-	await page.goto(invitation);
-	await signIn('guest@example.com');
+	await switchAccount(page, backend, invitation, 'guest@example.com');
 	await expect(page.getByRole('button', { name: 'Request a seat', exact: true })).toBeVisible();
 	await expect(page.getByText('Score cutoff', { exact: true })).toHaveCount(0);
 	await page.getByRole('button', { name: 'Request a seat', exact: true }).click();
 	await expect(
 		page.getByRole('status').filter({ hasText: 'waiting for host approval' })
 	).toBeVisible();
-	await signOut(page);
-	await page.goto(gameURL);
-	await signIn('host@example.com');
+	await switchAccount(page, backend, gameURL, 'host@example.com');
 	await expect(page.getByText('guest@example.com', { exact: true })).toBeVisible();
 	await page.screenshot({ path: test.info().outputPath('seat-approval.png') });
 	expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -275,9 +284,7 @@ test('invitation waits for approval and an approved player returns without anoth
 	await expect(seatIdentity(page, 'Host')).toHaveText(hostName!);
 	const guestName = await seatIdentity(page, 'Seat 2').textContent();
 	expect(guestName).toMatch(/^[A-Z][a-z]+ [A-Z][a-z]+$/);
-	await signOut(page);
-	await page.goto(invitation);
-	await signIn('guest@example.com');
+	await switchAccount(page, backend, invitation, 'guest@example.com');
 	await expect(page.getByText('Your seat is saved.', { exact: true })).toBeVisible();
 	await page.getByRole('radio', { name: 'Players', exact: true }).click();
 	await expect(page.getByText('2 of 4 seats occupied', { exact: true })).toBeVisible();
@@ -294,9 +301,7 @@ test('invitation waits for approval and an approved player returns without anoth
 	await page.getByRole('radio', { name: 'Table rules', exact: true }).click();
 	await expect(page.getByRole('button', { name: 'How to play', exact: true })).toBeVisible();
 	await expect(page.getByRole('heading', { name: 'Saved configurations' })).toHaveCount(0);
-	await signOut(page);
-	await page.goto(gameURL);
-	await signIn('host@example.com');
+	await switchAccount(page, backend, gameURL, 'host@example.com');
 	await reviewRules(page);
 	await expect(
 		page.getByText('Everyone has reviewed the rules. The table is ready to start.', { exact: true })
@@ -309,13 +314,9 @@ test('invitation waits for approval and an approved player returns without anoth
 	await expect(page.getByText('Review needed', { exact: false })).toHaveCount(2);
 	await expect(seatIdentity(page, 'Host')).toHaveText(hostName!);
 	await reviewRules(page);
-	await signOut(page);
-	await page.goto(invitation);
-	await signIn('guest@example.com');
+	await switchAccount(page, backend, invitation, 'guest@example.com');
 	await reviewRules(page);
-	await signOut(page);
-	await page.goto(gameURL);
-	await signIn('host@example.com');
+	await switchAccount(page, backend, gameURL, 'host@example.com');
 	await page.getByRole('button', { name: 'Review and start', exact: true }).click();
 	await page.getByRole('button', { name: 'Start first round', exact: true }).click();
 	await expect(page.getByRole('heading', { name: 'Round 1', exact: true })).toBeVisible();
@@ -345,6 +346,8 @@ test('Host reviews changed rules in a phone drawer and starts the Round', async 
 	page,
 	backend
 }) => {
+	// Five sign-ins across two accounts; Firefox needs more than the default budget.
+	test.slow();
 	await page.setViewportSize({ width: 360, height: 640 });
 	await page.goto('/');
 	await signInAs(page, backend, 'host@example.com');
@@ -355,26 +358,16 @@ test('Host reviews changed rules in a phone drawer and starts the Round', async 
 	await page.getByLabel('Score cutoff', { exact: true }).fill('300');
 	await page.getByRole('button', { name: 'Apply rules', exact: true }).click();
 	await page.getByRole('radio', { name: 'Players', exact: true }).click();
-	await page.getByRole('button', { name: 'Get invitation link' }).click();
-	const invitation = await page.getByLabel('Invitation link', { exact: true }).inputValue();
-	await page.getByRole('button', { name: 'Done', exact: true }).click();
+	const invitation = await invitationLink(page);
 	const gameURL = page.url();
-	await signOut(page);
-	await page.goto(invitation);
-	await signInAs(page, backend, 'guest@example.com');
+	await switchAccount(page, backend, invitation, 'guest@example.com');
 	await page.getByRole('button', { name: 'Request a seat', exact: true }).click();
-	await signOut(page);
-	await page.goto(gameURL);
-	await signInAs(page, backend, 'host@example.com');
+	await switchAccount(page, backend, gameURL, 'host@example.com');
 	await page.getByRole('button', { name: 'Approve', exact: true }).click();
 	await reviewRules(page);
-	await signOut(page);
-	await page.goto(invitation);
-	await signInAs(page, backend, 'guest@example.com');
+	await switchAccount(page, backend, invitation, 'guest@example.com');
 	await reviewRules(page);
-	await signOut(page);
-	await page.goto(gameURL);
-	await signInAs(page, backend, 'host@example.com');
+	await switchAccount(page, backend, gameURL, 'host@example.com');
 
 	const trigger = page.getByRole('button', { name: 'Review and start', exact: true });
 	await trigger.click();
