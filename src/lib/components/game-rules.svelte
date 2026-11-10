@@ -258,8 +258,7 @@
 	<div class="flex flex-col gap-3">
 		{#if error}<p role="alert" class="text-sm text-destructive">{m.rules_error()}</p>{/if}
 		{@render readyAction()}<GameRound {game} />
-		<Close class={cn(buttonVariants({ variant: 'ghost' }), 'min-h-11 w-full')}
-			>{m.ui_close()}</Close
+		<Close class={cn(buttonVariants({ variant: 'ghost' }), 'min-h-11 w-full')}>{m.ui_close()}</Close
 		>
 	</div>
 {/snippet}
