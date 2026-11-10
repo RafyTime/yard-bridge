@@ -48,5 +48,6 @@
 	"rules_saved_placeholder": "Elige una configuración",
 	"rules_save": "Guardar configuración",
 	"rules_conflict": "Las reglas aplicadas cambiaron en otra pestaña. Tus cambios se conservan. Carga las reglas más recientes antes de aplicar cambios.",
+	"rules_changed": "Cambiado",
 	"rules_load_latest": "Cargar reglas más recientes"
 }

@@ -2,7 +2,10 @@
 	import { untrack } from 'svelte';
 	import type { Snippet } from 'svelte';
 	import * as Collapsible from '#lib/components/ui/collapsible/index.js';
+	import { MediaQuery } from 'svelte/reactivity';
 	import * as Dialog from '#lib/components/ui/dialog/index.js';
+	import * as Drawer from '#lib/components/ui/drawer/index.js';
+	import { Badge } from '#lib/components/ui/badge/index.js';
 	import GameRound from './game-round.svelte';
 	import RuleHelp from './rule-help.svelte';
 	import { HugeiconsIcon } from '@hugeicons/svelte';
@@ -35,6 +38,7 @@
 		players?: Snippet;
 	} = $props();
 	let reviewOpen = $state(false);
+	const desktop = new MediaQuery('(min-width: 768px)');
 	const changedCount = $derived(
 		Object.keys(defaultRules).filter(
 			(key) => draft[key as keyof RulesConfiguration] !== baseline[key as keyof RulesConfiguration]
@@ -195,6 +199,68 @@
 					client.mutation(api.gameRules.ready, { gameId: game.id, expectedVersion: game.version })
 				)}>{m.rules_ready()}</Button
 		>{/if}
+{/snippet}
+
+{#snippet review()}
+	<!-- Phones get a bottom drawer, wider screens a dialog; both share the same contents. -->
+	{#if desktop.current}<Dialog.Root bind:open={reviewOpen}
+			><Dialog.Trigger class={cn(buttonVariants(), 'min-h-12 w-full')}
+				>{m.rules_review_start()}</Dialog.Trigger
+			><Dialog.Content showCloseButton={false} class="flex max-h-[85svh] flex-col"
+				><Dialog.Header
+					><Dialog.Title>{m.rules_current()}</Dialog.Title><Dialog.Description
+						>{m.rules_review_description()}</Dialog.Description
+					></Dialog.Header
+				>
+				<div class="-mx-4 min-h-0 overflow-y-auto px-4">{@render reviewSummary()}</div>
+				{@render reviewActions(Dialog.Close)}</Dialog.Content
+			></Dialog.Root
+		>
+	{:else}<Drawer.Root bind:open={reviewOpen} autoFocus
+			><Drawer.Trigger class={cn(buttonVariants(), 'min-h-12 w-full')}
+				>{m.rules_review_start()}</Drawer.Trigger
+			><Drawer.Content
+				><Drawer.Header
+					><Drawer.Title>{m.rules_current()}</Drawer.Title><Drawer.Description
+						>{m.rules_review_description()}</Drawer.Description
+					></Drawer.Header
+				>
+				<div class="min-h-0 flex-1 overflow-y-auto px-4">{@render reviewSummary()}</div>
+				<div class="border-t px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
+					{@render reviewActions(Drawer.Close)}
+				</div></Drawer.Content
+			></Drawer.Root
+		>{/if}
+{/snippet}
+
+{#snippet reviewSummary()}
+	<dl class="flex flex-col divide-y text-sm">
+		{#each settings as setting (setting.key)}<div class="flex justify-between gap-4 py-3">
+				<dt>
+					{setting.label}{#if setting.value !== setting.base}<span
+							class="block text-xs text-muted-foreground"
+							>{m.rules_default({ value: setting.base })}</span
+						>{/if}
+				</dt>
+				<dd class="flex flex-col items-end gap-1 text-right font-medium">
+					{setting.value}{#if setting.value !== setting.base}<Badge variant="outline"
+							>{m.rules_changed()}</Badge
+						>{/if}
+				</dd>
+			</div>{/each}
+	</dl>
+	<p class="py-3 text-sm text-muted-foreground">
+		{changes.length ? m.rules_changes() : m.rules_no_changes()}
+	</p>
+{/snippet}
+
+{#snippet reviewActions(Close: typeof Dialog.Close | typeof Drawer.Close)}
+	<div class="flex flex-col gap-3">
+		{#if error}<p role="alert" class="text-sm text-destructive">{m.rules_error()}</p>{/if}
+		{@render readyAction()}<GameRound {game} />
+		<Close class={cn(buttonVariants({ variant: 'ghost' }), 'min-h-11 w-full')}>{m.ui_close()}</Close
+		>
+	</div>
 {/snippet}
 
 {#if panel === 'players' && players}{@render players()}{/if}
@@ -623,35 +689,8 @@
 							? m.rules_need_players()
 							: m.rules_waiting()}
 				</p>
-				{#if game.isHost}<Button class="min-h-12 w-full" onclick={() => (reviewOpen = true)}
-						>{m.rules_review_start()}</Button
-					>{:else}{@render readyAction()}{/if}
+				{#if game.isHost}{@render review()}{:else}{@render readyAction()}{/if}
 			{/if}
 		</div>
 	</aside>
-	<Dialog.Root bind:open={reviewOpen}
-		><Dialog.Content class="max-h-[85svh] overflow-y-auto"
-			><Dialog.Header
-				><Dialog.Title>{m.rules_current()}</Dialog.Title><Dialog.Description
-					>{m.rules_review_description()}</Dialog.Description
-				></Dialog.Header
-			>
-			<dl class="flex flex-col divide-y">
-				{#each settings as setting (setting.key)}<div class="flex justify-between gap-4 py-3">
-						<dt>
-							{setting.label}{#if setting.value !== setting.base}<span
-									class="block text-xs text-muted-foreground"
-									>{m.rules_default({ value: setting.base })}</span
-								>{/if}
-						</dt>
-						<dd class="text-right font-medium">{setting.value}</dd>
-					</div>{/each}
-			</dl>
-			<p class="text-sm text-muted-foreground">
-				{changes.length ? m.rules_changes() : m.rules_no_changes()}
-			</p>
-			{#if error}<p role="alert" class="text-sm text-destructive">{m.rules_error()}</p>{/if}
-			{@render readyAction()}<GameRound {game} />
-		</Dialog.Content></Dialog.Root
-	>
 {:else if error}<p role="alert">{m.rules_error()}</p>{/if}

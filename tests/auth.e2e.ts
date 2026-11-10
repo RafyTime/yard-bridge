@@ -1,7 +1,7 @@
 import { expect, test as base, type Page } from '@playwright/test';
 import { authBackend } from './fixtures/auth-backend';
 
-const test = base.extend<{ backend: Awaited<ReturnType<typeof authBackend>> }>({
+const test = base.extend<{ backend: Backend }>({
 	backend: async ({ context }, use) => {
 		const backend = await authBackend(context);
 		try {
@@ -42,6 +42,17 @@ async function reviewRules(page: Page) {
 	await expect(ready).toHaveCount(0);
 	if (await page.getByRole('dialog').count())
 		await page.getByRole('button', { name: 'Close', exact: true }).click();
+}
+
+type Backend = Awaited<ReturnType<typeof authBackend>>;
+
+async function signInAs(page: Page, backend: Backend, email: string) {
+	await page.getByLabel('Email address').fill(email);
+	await page.getByRole('button', { name: 'Send code', exact: true }).click();
+	await expect(page.getByLabel('Sign-in code')).toBeVisible();
+	await page.getByLabel('Sign-in code').fill(backend.code);
+	await page.getByRole('button', { name: 'Continue', exact: true }).click();
+	await expect(page.getByRole('heading', { name: 'You are signed in', exact: true })).toBeVisible();
 }
 
 test('email code signs in, returns after reload and reopening, then signs out', async ({
@@ -191,16 +202,7 @@ test('invitation waits for approval and an approved player returns without anoth
 	page,
 	backend
 }) => {
-	async function signIn(email: string) {
-		await page.getByLabel('Email address').fill(email);
-		await page.getByRole('button', { name: 'Send code', exact: true }).click();
-		await expect(page.getByLabel('Sign-in code')).toBeVisible();
-		await page.getByLabel('Sign-in code').fill(backend.code);
-		await page.getByRole('button', { name: 'Continue', exact: true }).click();
-		await expect(
-			page.getByRole('heading', { name: 'You are signed in', exact: true })
-		).toBeVisible();
-	}
+	const signIn = (email: string) => signInAs(page, backend, email);
 	await page.setViewportSize({ width: 390, height: 844 });
 	await page.goto('/');
 	await signIn('host@example.com');
@@ -316,6 +318,84 @@ test('invitation waits for approval and an approved player returns without anoth
 		path: test.info().outputPath('opening-round-uk-phone.png'),
 		fullPage: true
 	});
+});
+
+test('Host reviews changed rules in a phone drawer and starts the Round', async ({
+	page,
+	backend
+}) => {
+	await page.setViewportSize({ width: 360, height: 640 });
+	await page.goto('/');
+	await signInAs(page, backend, 'host@example.com');
+	await page.getByRole('button', { name: 'New game', exact: true }).click();
+	await page.getByLabel('Game name').fill('Drawer table');
+	await page.getByRole('button', { name: 'Create private game' }).click();
+	await page.getByRole('radio', { name: 'Table rules', exact: true }).click();
+	await page.getByLabel('Score cutoff', { exact: true }).fill('300');
+	await page.getByRole('button', { name: 'Apply rules', exact: true }).click();
+	await page.getByRole('radio', { name: 'Players', exact: true }).click();
+	await page.getByRole('button', { name: 'Get invitation link' }).click();
+	const invitation = await page.getByLabel('Invitation link', { exact: true }).inputValue();
+	await page.getByRole('button', { name: 'Done', exact: true }).click();
+	const gameURL = page.url();
+	await signOut(page);
+	await page.goto(invitation);
+	await signInAs(page, backend, 'guest@example.com');
+	await page.getByRole('button', { name: 'Request a seat', exact: true }).click();
+	await signOut(page);
+	await page.goto(gameURL);
+	await signInAs(page, backend, 'host@example.com');
+	await page.getByRole('button', { name: 'Approve', exact: true }).click();
+	await reviewRules(page);
+	await signOut(page);
+	await page.goto(invitation);
+	await signInAs(page, backend, 'guest@example.com');
+	await reviewRules(page);
+	await signOut(page);
+	await page.goto(gameURL);
+	await signInAs(page, backend, 'host@example.com');
+
+	const trigger = page.getByRole('button', { name: 'Review and start', exact: true });
+	await trigger.click();
+	const drawer = page.getByRole('dialog');
+	await expect(drawer).toBeVisible();
+	// A bottom drawer spans the phone width and rests on the bottom edge.
+	await expect
+		.poll(async () => {
+			const box = (await drawer.boundingBox())!;
+			return [box.width >= 340, Math.round(box.y + box.height)];
+		})
+		.toEqual([true, 640]);
+	expect(await drawer.evaluate((node) => node.contains(document.activeElement))).toBe(true);
+	await expect(drawer.getByText('Changed', { exact: true })).toHaveCount(1);
+	const start = drawer.getByRole('button', { name: 'Start first round', exact: true });
+	const close = drawer.getByRole('button', { name: 'Close', exact: true });
+	await drawer.getByText('Later-round starter', { exact: true }).scrollIntoViewIfNeeded();
+	await expect(drawer.getByText('Later-round starter', { exact: true })).toBeInViewport();
+	await expect(start).toBeInViewport();
+	await expect(close).toBeInViewport();
+	await page.screenshot({ path: test.info().outputPath('review-drawer-phone.png') });
+	await close.click();
+	await expect(drawer).toHaveCount(0);
+	await expect(trigger).toBeFocused();
+
+	// Wider screens keep a centred dialog.
+	await page.setViewportSize({ width: 1024, height: 768 });
+	await trigger.click();
+	await expect(drawer).toBeVisible();
+	await expect
+		.poll(async () => {
+			const box = (await drawer.boundingBox())!;
+			return box.y > 0 && box.y + box.height < 768;
+		})
+		.toBe(true);
+	await close.click();
+	await expect(trigger).toBeFocused();
+
+	await page.setViewportSize({ width: 360, height: 640 });
+	await trigger.click();
+	await start.click();
+	await expect(page.getByRole('heading', { name: 'Round 1', exact: true })).toBeVisible();
 });
 
 test('Host edits advanced rules and copies a saved configuration into a later Game on phones', async ({
