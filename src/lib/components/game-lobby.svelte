@@ -3,6 +3,8 @@
 	import { api } from '../../convex/_generated/api';
 	import * as ToggleGroup from '#lib/components/ui/toggle-group/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
+	import * as Avatar from '#lib/components/ui/avatar/index.js';
+	import { mockIdentity } from '#lib/mocks/players';
 	import * as m from '#lib/paraglide/messages.js';
 	import Invitations from './invitations.svelte';
 	import GameRules from './game-rules.svelte';
@@ -20,14 +22,19 @@
 			</p>
 		</div>
 		<ul class="flex flex-col divide-y">
-			{#each game.seats as seat, index (seat.id)}<li class="flex min-w-0 items-center gap-3 py-4">
-					<span
-						class="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-medium"
-						aria-hidden="true">{index + 1}</span
+			{#each game.seats as seat, index (seat.id)}{@const identity = mockIdentity(seat.id)}<li
+					class="flex min-w-0 items-center gap-3 py-4"
+				>
+					<!-- Decorative: the mock name beside it already identifies the Seat. -->
+					<Avatar.Root size="lg" aria-hidden="true"
+						><Avatar.Image src={identity.avatar} alt="" /><Avatar.Fallback
+							>{identity.initials}</Avatar.Fallback
+						></Avatar.Root
 					>
 					<div class="flex min-w-0 flex-1 flex-col gap-1.5">
-						<p class="font-medium">{m.invite_seat({ number: index + 1 })}</p>
-						<div class="flex flex-wrap gap-1.5">
+						<p class="truncate font-medium">{identity.name}</p>
+						<div class="flex flex-wrap items-center gap-1.5">
+							<p class="text-xs text-muted-foreground">{m.invite_seat({ number: index + 1 })}</p>
 							{#if seat.isHost}<Badge variant="outline">{m.invite_host()}</Badge
 								>{/if}{#if seat.id === game.viewerSeatId}<Badge variant="secondary"
 									>{m.invite_you()}</Badge

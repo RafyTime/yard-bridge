@@ -12,6 +12,16 @@ const test = base.extend<{ backend: Awaited<ReturnType<typeof authBackend>> }>({
 	}
 });
 
+// Reads the mock identity name on the Seat row that shows `label` (a badge or Seat number).
+function seatIdentity(page: Page, label: string) {
+	return page
+		.getByRole('region', { name: 'Players', exact: true })
+		.getByRole('listitem')
+		.filter({ has: page.getByText(label, { exact: true }) })
+		.getByRole('paragraph')
+		.first();
+}
+
 async function reviewRules(page: Page) {
 	const review = page.getByRole('button', { name: 'Review and start', exact: true });
 	const ready = page.getByRole('button', { name: 'I have reviewed these rules', exact: true });
@@ -160,6 +170,11 @@ test('invitation waits for approval and an approved player returns without anoth
 	await page.getByText('Saved configurations', { exact: true }).click();
 	await page.getByLabel('Configuration name', { exact: true }).fill('Unfinished table');
 	await page.getByRole('radio', { name: 'Players', exact: true }).click();
+	const hostName = await seatIdentity(page, 'Host').textContent();
+	expect(hostName).toMatch(/^[A-Z][a-z]+ [A-Z][a-z]+$/);
+	await expect(
+		page.getByRole('region', { name: 'Players', exact: true }).getByRole('img')
+	).toHaveCount(0);
 	await page.getByRole('button', { name: 'Approve', exact: true }).click();
 	await page.getByRole('radio', { name: 'Table rules', exact: true }).click();
 	await page.getByRole('radio', { name: 'Table rules', exact: true }).click();
@@ -173,14 +188,21 @@ test('invitation waits for approval and an approved player returns without anoth
 	await expect(page.getByRole('alert').filter({ hasText: /\S/ })).toHaveCount(0);
 	await page.getByRole('radio', { name: 'Players', exact: true }).click();
 	await expect(page.getByText('2 of 4 seats occupied', { exact: true })).toBeVisible();
+	await expect(seatIdentity(page, 'Host')).toHaveText(hostName!);
+	const guestName = await seatIdentity(page, 'Seat 2').textContent();
+	expect(guestName).toMatch(/^[A-Z][a-z]+ [A-Z][a-z]+$/);
 	await signOut();
 	await page.goto(invitation);
 	await signIn('guest@example.com');
 	await expect(page.getByText('Your seat is saved.', { exact: true })).toBeVisible();
 	await page.getByRole('radio', { name: 'Players', exact: true }).click();
 	await expect(page.getByText('2 of 4 seats occupied', { exact: true })).toBeVisible();
+	await expect(seatIdentity(page, 'You')).toHaveText(guestName!);
+	await expect(seatIdentity(page, 'Host')).toHaveText(hostName!);
 	await page.reload();
 	await expect(page.getByText('Your seat is saved.', { exact: true })).toBeVisible();
+	await page.getByRole('radio', { name: 'Players', exact: true }).click();
+	await expect(seatIdentity(page, 'You')).toHaveText(guestName!);
 	await expect(page.getByRole('button', { name: 'Request a seat', exact: true })).toHaveCount(0);
 	await expect(page.getByRole('button', { name: 'Apply rules', exact: true })).toHaveCount(0);
 	await reviewRules(page);
@@ -200,6 +222,7 @@ test('invitation waits for approval and an approved player returns without anoth
 	await expect(page.getByRole('button', { name: 'Review and start', exact: true })).toBeVisible();
 	await page.getByRole('radio', { name: 'Players', exact: true }).click();
 	await expect(page.getByText('Review needed', { exact: false })).toHaveCount(2);
+	await expect(seatIdentity(page, 'Host')).toHaveText(hostName!);
 	await reviewRules(page);
 	await signOut();
 	await page.goto(invitation);
