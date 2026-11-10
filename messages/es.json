@@ -46,6 +46,10 @@
 	"settings_dark": "Oscuro",
 	"settings_system": "Sistema",
 	"auth_identity_error": "No se pudo verificar tu sesión. Comprueba tu conexión o cierra la sesión e inténtalo de nuevo.",
+	"games_back": "Tus partidas",
+	"games_lobby": "Esperando jugadores",
+	"games_active": "En juego",
+	"games_seats": "{count} de {limit} plazas",
 	"rules_base_title": "Cómo jugar",
 	"rules_reset": "Restablecer borrador a las reglas predeterminadas",
 	"rules_reset_note": "Esto solo cambia tu borrador. Aplica las reglas para guardarlo.",
@@ -55,5 +59,6 @@
 	"rules_saved_placeholder": "Elige una configuración",
 	"rules_save": "Guardar configuración",
 	"rules_conflict": "Las reglas aplicadas cambiaron en otra pestaña. Tus cambios se conservan. Carga las reglas más recientes antes de aplicar cambios.",
+	"rules_changed": "Cambiado",
 	"rules_load_latest": "Cargar reglas más recientes"
 }
