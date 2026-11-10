@@ -157,7 +157,6 @@ test('invitation waits for approval and an approved player returns without anoth
 	await page.getByRole('radio', { name: 'Table rules', exact: true }).click();
 	await page.getByLabel('Score cutoff', { exact: true }).fill('350');
 	await page.getByRole('radio', { name: 'Table rules', exact: true }).click();
-	await page.getByText('Saved configurations', { exact: true }).click();
 	await page.getByLabel('Configuration name', { exact: true }).fill('Unfinished table');
 	await page.getByRole('radio', { name: 'Players', exact: true }).click();
 	await page.getByRole('button', { name: 'Approve', exact: true }).click();
@@ -168,7 +167,7 @@ test('invitation waits for approval and an approved player returns without anoth
 		'Unfinished table'
 	);
 	await expect(
-		page.getByRole('button', { name: 'Save current rules', exact: true })
+		page.getByRole('button', { name: 'Save configuration', exact: true })
 	).toBeDisabled();
 	await expect(page.getByRole('alert').filter({ hasText: /\S/ })).toHaveCount(0);
 	await page.getByRole('radio', { name: 'Players', exact: true }).click();
@@ -187,6 +186,9 @@ test('invitation waits for approval and an approved player returns without anoth
 	await expect(
 		page.getByText('You have reviewed the current rules.', { exact: true })
 	).toBeVisible();
+	await page.getByRole('radio', { name: 'Table rules', exact: true }).click();
+	await expect(page.getByRole('button', { name: 'How to play', exact: true })).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Saved configurations' })).toHaveCount(0);
 	await signOut();
 	await page.goto(gameURL);
 	await signIn('host@example.com');
@@ -249,9 +251,15 @@ test('Host edits advanced rules and copies a saved configuration into a later Ga
 	await page.getByRole('button', { name: 'Create private game' }).click();
 	await page.getByRole('radio', { name: 'Table rules', exact: true }).click();
 	await page.getByRole('button', { name: 'About Score cutoff', exact: true }).click();
-	await expect(
-		page.getByText('Reaching this total exactly resets your score to zero.', { exact: false })
-	).toBeVisible();
+	const explanation = page.getByText('Reaching this total exactly resets your score to zero.', {
+		exact: false
+	});
+	await expect(explanation).toBeVisible();
+	// The explanation sits apart from its control rather than crowding it.
+	const control = await page.getByLabel('Score cutoff', { exact: true }).boundingBox();
+	const help = await explanation.boundingBox();
+	expect(help!.y - (control!.y + control!.height)).toBeGreaterThanOrEqual(12);
+	await expect(page.getByRole('heading', { name: 'Saved configurations' })).toBeVisible();
 	await page.getByLabel('Score cutoff', { exact: true }).fill('0');
 	await expect(page.getByRole('button', { name: 'Apply rules', exact: true })).toBeDisabled();
 	await expect(page.getByText('Enter a positive whole number.', { exact: true })).toBeVisible();
@@ -272,18 +280,18 @@ test('Host edits advanced rules and copies a saved configuration into a later Ga
 		page.getByText('Invite at least one more player before starting.', { exact: true })
 	).toBeVisible();
 	await page.getByRole('radio', { name: 'Table rules', exact: true }).click();
-	await page.getByText('Saved configurations', { exact: true }).click();
 	await page.getByLabel('Configuration name', { exact: true }).fill('Weekend rules');
-	await page.getByRole('button', { name: 'Save current rules', exact: true }).click();
-	await expect(page.getByRole('button', { name: 'Use Weekend rules', exact: true })).toBeVisible();
+	await page.getByRole('button', { name: 'Save configuration', exact: true }).click();
+	await expect(page.getByLabel('Use a saved configuration', { exact: true })).toContainText(
+		'Weekend rules'
+	);
 	await page.getByRole('button', { name: 'All games', exact: true }).click();
 	await page.getByRole('button', { name: 'New game', exact: true }).click();
 	await page.getByLabel('Game name').fill('Next table');
 	await page.getByRole('button', { name: 'Create private game' }).click();
 	await page.getByRole('radio', { name: 'Table rules', exact: true }).click();
-	await page.getByText('Saved configurations', { exact: true }).click();
 	await reviewRules(page);
-	await page.getByRole('button', { name: 'Use Weekend rules', exact: true }).click();
+	await page.getByLabel('Use a saved configuration', { exact: true }).selectOption('Weekend rules');
 	await page.getByRole('radio', { name: 'Table rules', exact: true }).click();
 	await expect(page.getByLabel('Score cutoff', { exact: true })).toHaveValue('300');
 	await expect(page.getByRole('button', { name: 'Apply rules', exact: true })).toBeEnabled();
@@ -292,14 +300,17 @@ test('Host edits advanced rules and copies a saved configuration into a later Ga
 	).toBeVisible();
 	await page.getByLabel('Configuration name', { exact: true }).fill('Next rules');
 	await expect(
-		page.getByRole('button', { name: 'Save current rules', exact: true })
+		page.getByRole('button', { name: 'Save configuration', exact: true })
 	).toBeDisabled();
 	await page.getByRole('button', { name: 'Apply rules', exact: true }).click();
-	await expect(page.getByRole('button', { name: 'Save current rules', exact: true })).toBeEnabled();
+	await expect(page.getByRole('button', { name: 'Save configuration', exact: true })).toBeEnabled();
 	await expect(page.getByRole('alert').filter({ hasText: /\S/ })).toHaveCount(0);
 	await reviewRules(page);
 	await page.getByRole('radio', { name: 'Table rules', exact: true }).click();
-	await page.getByRole('button', { name: 'Use defaults', exact: true }).click();
+	await expect(
+		page.getByText('This only changes your draft. Apply rules to save it.', { exact: true })
+	).toBeVisible();
+	await page.getByRole('button', { name: 'Reset draft to defaults', exact: true }).click();
 	await page.getByRole('radio', { name: 'Table rules', exact: true }).click();
 	await expect(page.getByLabel('Score cutoff', { exact: true })).toHaveValue('200');
 	await expect(
@@ -307,13 +318,12 @@ test('Host edits advanced rules and copies a saved configuration into a later Ga
 	).toBeVisible();
 	await expect(page.getByLabel('Score cutoff', { exact: true })).toHaveValue('200');
 	await expect(
-		page.getByRole('button', { name: 'Save current rules', exact: true })
+		page.getByRole('button', { name: 'Save configuration', exact: true })
 	).toBeDisabled();
 	await page.reload();
 	await page.getByRole('radio', { name: 'Table rules', exact: true }).click();
 	await expect(page.getByLabel('Score cutoff', { exact: true })).toHaveValue('300');
 	await page.getByRole('radio', { name: 'Table rules', exact: true }).click();
-	await page.getByText('Saved configurations', { exact: true }).click();
 	await expect(page.getByLabel('Configuration name', { exact: true })).toHaveValue('');
 	await page.getByRole('radio', { name: 'Table rules', exact: true }).click();
 	await page.getByLabel('Score cutoff', { exact: true }).fill('500');
@@ -329,7 +339,7 @@ test('Host edits advanced rules and copies a saved configuration into a later Ga
 		page.getByRole('switch', { name: 'Special King of Spades', exact: true })
 	).toBeChecked();
 	await page.getByRole('radio', { name: 'Table rules', exact: true }).click();
-	await page.getByText('How to play', { exact: true }).click();
+	await page.getByRole('button', { name: 'How to play', exact: true }).click();
 	await expect(
 		page.getByRole('listitem').filter({ hasText: 'An Ace skips the next player by default.' })
 	).toBeVisible();
@@ -369,7 +379,6 @@ test('Rules drafts follow clean updates, require explicit conflict reload, and s
 	await page.getByRole('radio', { name: 'Table rules', exact: true }).click();
 	await page.getByLabel('Score cutoff', { exact: true }).fill('300');
 	await page.getByRole('radio', { name: 'Table rules', exact: true }).click();
-	await page.getByText('Saved configurations', { exact: true }).click();
 	await page.getByLabel('Configuration name', { exact: true }).fill('My draft');
 	await other.getByRole('radio', { name: 'Table rules', exact: true }).click();
 	await other.getByLabel('Score cutoff', { exact: true }).fill('275');
@@ -382,13 +391,13 @@ test('Rules drafts follow clean updates, require explicit conflict reload, and s
 	await expect(page.getByLabel('Configuration name', { exact: true })).toHaveValue('My draft');
 	await expect(page.getByRole('button', { name: 'Apply rules', exact: true })).toBeDisabled();
 	await expect(
-		page.getByRole('button', { name: 'Save current rules', exact: true })
+		page.getByRole('button', { name: 'Save configuration', exact: true })
 	).toBeDisabled();
 	await page.getByRole('button', { name: 'Load latest rules', exact: true }).click();
 	await page.getByRole('radio', { name: 'Table rules', exact: true }).click();
 	await expect(page.getByLabel('Score cutoff', { exact: true })).toHaveValue('275');
 	await expect(page.getByRole('alert').filter({ hasText: /\S/ })).toHaveCount(0);
-	await expect(page.getByRole('button', { name: 'Save current rules', exact: true })).toBeEnabled();
+	await expect(page.getByRole('button', { name: 'Save configuration', exact: true })).toBeEnabled();
 	await page.getByRole('radio', { name: 'Table rules', exact: true }).click();
 	await page.getByLabel('Score cutoff', { exact: true }).fill('350');
 	const resume = backend.pauseNextRulesUpdate();

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import type { Snippet } from 'svelte';
+	import * as Collapsible from '#lib/components/ui/collapsible/index.js';
 	import * as Dialog from '#lib/components/ui/dialog/index.js';
 	import GameRound from './game-round.svelte';
 	import RuleHelp from './rule-help.svelte';
@@ -8,13 +9,16 @@
 	import {
 		Cards01Icon,
 		MagicWand01Icon,
-		ArrowReloadHorizontalIcon
+		ArrowReloadHorizontalIcon,
+		BookOpen01Icon,
+		Bookmark01Icon
 	} from '@hugeicons/core-free-icons';
 	import type { FunctionReturnType } from 'convex/server';
 	import { useConvexClient, useQuery } from 'convex-svelte';
 	import { api } from '../../convex/_generated/api';
 	import { defaultRules, type RulesConfiguration } from '../../convex/rules';
-	import { Button } from '#lib/components/ui/button/index.js';
+	import { Button, buttonVariants } from '#lib/components/ui/button/index.js';
+	import { cn } from '#lib/utils.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { Switch } from '#lib/components/ui/switch/index.js';
 	import * as ToggleGroup from '#lib/components/ui/toggle-group/index.js';
@@ -206,7 +210,105 @@
 			<Button variant="outline" disabled={pending} onclick={loadLatest}
 				>{m.rules_load_latest()}</Button
 			>{/if}
+		<Collapsible.Root>
+			<Collapsible.Trigger
+				class={cn(buttonVariants({ variant: 'secondary' }), 'min-h-12 w-full gap-2 text-sm')}
+				><HugeiconsIcon
+					icon={BookOpen01Icon}
+					size={18}
+					aria-hidden="true"
+				/>{m.rules_base_title()}</Collapsible.Trigger
+			>
+			<Collapsible.Content>
+				<ul class="flex flex-col gap-3 pt-4 text-sm text-muted-foreground">
+					<li>{m.rules_base_match()}</li>
+					<li>{m.rules_base_draw()}</li>
+					<li>{m.rules_base_ace()}</li>
+					<li>{m.rules_base_score()}</li>
+					<li>{m.rules_base_start()}</li>
+				</ul>
+			</Collapsible.Content>
+		</Collapsible.Root>
 		{#if editable}
+			<section class="flex flex-col gap-4 rounded-lg border p-4" aria-labelledby="saved-heading">
+				<div>
+					<h4 id="saved-heading" class="flex items-center gap-2.5 font-semibold">
+						<HugeiconsIcon
+							icon={Bookmark01Icon}
+							size={18}
+							aria-hidden="true"
+						/>{m.rules_saved_title()}
+					</h4>
+					<p class="mt-1 text-sm text-muted-foreground">{m.rules_saved_hint()}</p>
+				</div>
+				{#if configurations.error}<p role="alert">{m.rules_error()}</p>
+				{:else if configurations.data}
+					{#if configurations.data.length === 0}<p class="text-sm text-muted-foreground">
+							{m.rules_saved_empty()}
+						</p>
+					{:else}
+						<Field.Field
+							><Field.FieldLabel for="rules-saved">{m.rules_saved_choose()}</Field.FieldLabel
+							><select
+								id="rules-saved"
+								class="h-11 w-full min-w-0 rounded-md border border-input bg-input/20 px-2 text-base outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 disabled:opacity-50 md:text-sm dark:bg-input/30"
+								value=""
+								disabled={pending}
+								onchange={(event) => {
+									const choice = configurations.data?.find(
+										(configuration) => configuration.id === event.currentTarget.value
+									);
+									if (choice) {
+										draft = { ...choice.rules };
+										saved = false;
+									}
+									// Reset the chooser so the same configuration can be picked again.
+									event.currentTarget.value = '';
+								}}
+							>
+								<option value="" disabled>{m.rules_saved_placeholder()}</option>
+								{#each configurations.data as configuration (configuration.id)}<option
+										value={configuration.id}>{configuration.name}</option
+									>{/each}
+							</select></Field.Field
+						>
+					{/if}
+				{/if}
+				<form
+					class="flex flex-col gap-3"
+					onsubmit={(event) => {
+						event.preventDefault();
+						if (dirty || conflicted) return;
+						void act(async () => {
+							await client.mutation(api.gameRules.save, {
+								gameId: game.id,
+								expectedVersion: game.version,
+								name
+							});
+							saved = true;
+							name = '';
+						});
+					}}
+				>
+					<Field.Field
+						><Field.FieldLabel for="rules-name">{m.rules_preset_name()}</Field.FieldLabel><Input
+							id="rules-name"
+							class="min-h-11"
+							bind:value={name}
+							required
+							maxlength={80}
+							disabled={pending}
+						/></Field.Field
+					>
+					<Button
+						class="min-h-11 whitespace-normal"
+						variant="outline"
+						type="submit"
+						disabled={pending || !name.trim() || dirty || conflicted}>{m.rules_save()}</Button
+					>
+				</form>
+				{#if saved}<p role="status" class="text-sm">{m.rules_saved()}</p>{/if}
+			</section>
 			<form
 				id="rules-form"
 				onsubmit={(event) => {
@@ -455,15 +557,21 @@
 							{/snippet}</RuleHelp
 						>
 					</section>
-					<Button
-						variant="outline"
-						class="min-h-11"
-						disabled={pending}
-						onclick={() => {
-							draft = { ...defaultRules };
-							saved = false;
-						}}>{m.rules_reset()}</Button
-					>
+					<div class="flex flex-col gap-2">
+						<Button
+							variant="outline"
+							class="min-h-11 whitespace-normal"
+							disabled={pending}
+							aria-describedby="rules-reset-note"
+							onclick={() => {
+								draft = { ...defaultRules };
+								saved = false;
+							}}>{m.rules_reset()}</Button
+						>
+						<p id="rules-reset-note" class="text-sm text-muted-foreground">
+							{m.rules_reset_note()}
+						</p>
+					</div>
 				</Field.FieldGroup>
 			</form>
 		{:else}
@@ -483,72 +591,6 @@
 						>
 					</li>{/each}
 			</ul>
-		{/if}
-		<details>
-			<summary class="min-h-11 cursor-pointer py-3">{m.rules_base_title()}</summary>
-			<ul class="flex flex-col gap-3 text-sm text-muted-foreground">
-				<li>{m.rules_base_match()}</li>
-				<li>{m.rules_base_draw()}</li>
-				<li>{m.rules_base_ace()}</li>
-				<li>{m.rules_base_score()}</li>
-				<li>{m.rules_base_start()}</li>
-			</ul>
-		</details>
-		{#if editable}
-			<details>
-				<summary class="min-h-11 cursor-pointer py-3">{m.rules_saved_title()}</summary>
-				<form
-					onsubmit={(event) => {
-						event.preventDefault();
-						if (dirty || conflicted) return;
-						void act(async () => {
-							await client.mutation(api.gameRules.save, {
-								gameId: game.id,
-								expectedVersion: game.version,
-								name
-							});
-							saved = true;
-							name = '';
-						});
-					}}
-				>
-					<Field.FieldGroup>
-						<Field.Field
-							><Field.FieldLabel for="rules-name">{m.rules_preset_name()}</Field.FieldLabel><Input
-								id="rules-name"
-								class="min-h-11"
-								bind:value={name}
-								required
-								maxlength={80}
-								disabled={pending}
-							/></Field.Field
-						>
-						<Button
-							class="min-h-11"
-							type="submit"
-							disabled={pending || !name.trim() || dirty || conflicted}>{m.rules_save()}</Button
-						>
-					</Field.FieldGroup>
-				</form>
-				{#if saved}<p role="status">{m.rules_saved()}</p>{/if}
-				{#if configurations.error}<p role="alert">{m.rules_error()}</p>
-				{:else if configurations.data}
-					{#if configurations.data.length === 0}<p>{m.rules_saved_empty()}</p>{/if}
-					<ul class="mt-3 flex flex-col gap-3">
-						{#each configurations.data as configuration (configuration.id)}<li>
-								<Button
-									class="min-h-11 max-w-full break-all whitespace-normal"
-									variant="outline"
-									disabled={pending}
-									onclick={() => {
-										draft = { ...configuration.rules };
-										saved = false;
-									}}>{m.rules_use({ name: configuration.name })}</Button
-								>
-							</li>{/each}
-					</ul>
-				{/if}
-			</details>
 		{/if}
 	</section>
 </div>
