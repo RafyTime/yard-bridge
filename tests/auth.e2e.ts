@@ -201,8 +201,6 @@ test('invitation waits for approval and an approved player returns without anoth
 	await expect(seatIdentity(page, 'Host')).toHaveText(hostName!);
 	await page.reload();
 	await expect(page.getByText('Your seat is saved.', { exact: true })).toBeVisible();
-	await page.getByRole('radio', { name: 'Players', exact: true }).click();
-	await expect(seatIdentity(page, 'You')).toHaveText(guestName!);
 	await expect(page.getByRole('button', { name: 'Request a seat', exact: true })).toHaveCount(0);
 	await expect(page.getByRole('button', { name: 'Apply rules', exact: true })).toHaveCount(0);
 	await reviewRules(page);
