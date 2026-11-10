@@ -1,7 +1,7 @@
 # 02: Welcome and sign-in screen
 
 Type: task
-Status: claimed
+Status: resolved
 Blocked by: 01
 Spec: [UI polish spec](../spec.md)
 
@@ -20,3 +20,7 @@ them. Language and appearance stay reachable through the account button.
 - [ ] Step transitions respect reduced motion.
 - [ ] Existing sign-in behaviour is unchanged: one-time-code autofill, focus moves to the code field, and the same error handling.
 - [ ] Fits a narrow phone in Ukrainian; existing sign-in browser tests pass with updated selectors if needed.
+
+## Answer
+
+Done in `4e7c679`. Sign-in moved into `src/lib/components/sign-in.svelte`: one card with numbered email and code steps, loading labels with a spinner, and transitions that respect reduced motion. The welcome heading is screen-reader only, under a smaller visible "Pull up a chair".
