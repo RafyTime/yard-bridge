@@ -1,7 +1,7 @@
 # 06: Review and start as a mobile drawer
 
 Type: task
-Status: ready-for-agent
+Status: claimed
 Blocked by: None (can start immediately; do after 05 to avoid collisions in the Rules tab)
 Spec: [UI polish spec](../spec.md)
 

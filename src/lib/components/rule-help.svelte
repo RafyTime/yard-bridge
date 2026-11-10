@@ -23,8 +23,9 @@
 <Collapsible.Root>
 	{@render row(info)}
 	<Collapsible.Content class="rule-explanation overflow-hidden">
-		<div class="flex flex-col gap-3 pb-4 pl-1 text-sm">
-			<p>{description}</p>
+		<!-- Padding (not margin) keeps the gap inside the animated height. -->
+		<div class="pt-3 pb-4">
+			<p class="rounded-md bg-muted px-3 py-3 text-sm text-muted-foreground">{description}</p>
 		</div>
 	</Collapsible.Content>
 </Collapsible.Root>
