@@ -22,9 +22,8 @@
 			</p>
 		</div>
 		<ul class="flex flex-col divide-y">
-			{#each game.seats as seat, index (seat.id)}{@const identity = mockIdentity(seat.id)}<li
-					class="flex min-w-0 items-center gap-3 py-4"
-				>
+			{#each game.seats as seat, index (seat.id)}{@const identity = mockIdentity(seat.id)}
+				<li class="flex min-w-0 items-center gap-3 py-4">
 					<!-- Decorative: the mock name beside it already identifies the Seat. -->
 					<Avatar.Root size="lg" aria-hidden="true"
 						><Avatar.Image src={identity.avatar} alt="" /><Avatar.Fallback
