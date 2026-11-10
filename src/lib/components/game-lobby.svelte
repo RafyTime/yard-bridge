@@ -4,7 +4,7 @@
 	import * as ToggleGroup from '#lib/components/ui/toggle-group/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import * as Avatar from '#lib/components/ui/avatar/index.js';
-	import { mockIdentity } from '#lib/mocks/players';
+	import { mockIdentity } from '#lib/mocks/players.js';
 	import * as m from '#lib/paraglide/messages.js';
 	import Invitations from './invitations.svelte';
 	import GameRules from './game-rules.svelte';
