@@ -1,14 +1,13 @@
 <script lang="ts">
-	import { Dialog as DialogPrimitive } from 'bits-ui';
-	import * as m from '#lib/paraglide/messages.js';
-	import { HugeiconsIcon } from '@hugeicons/svelte';
+	import { Dialog as DialogPrimitive } from "bits-ui";
+	import { HugeiconsIcon } from "@hugeicons/svelte"
 	import { Cancel01Icon } from '@hugeicons/core-free-icons';
-	import { Button } from '#lib/components/ui/button/index.js';
-	import { cn, type WithoutChildrenOrChild } from '#lib/utils.js';
-	import DialogOverlay from './dialog-overlay.svelte';
-	import DialogPortal from './dialog-portal.svelte';
-	import type { Snippet } from 'svelte';
-	import type { ComponentProps } from 'svelte';
+	import { Button } from "#lib/components/ui/button/index.js";
+	import { cn, type WithoutChildrenOrChild } from "#lib/utils.js";
+	import DialogOverlay from "./dialog-overlay.svelte";
+	import DialogPortal from "./dialog-portal.svelte";
+	import type { Snippet } from "svelte";
+	import type { ComponentProps } from "svelte";
 
 	let {
 		ref = $bindable(null),
@@ -30,7 +29,7 @@
 		bind:ref
 		data-slot="dialog-content"
 		class={cn(
-			'fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%_-_2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl bg-popover p-4 text-xs/relaxed text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95',
+			"bg-popover text-popover-foreground data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 ring-foreground/5 dark:ring-foreground/10 grid max-w-[calc(100%_-_2rem)] gap-6 rounded-[min(var(--radius-4xl),24px)] p-6 text-sm shadow-xl ring-1 duration-100 sm:max-w-md fixed top-1/2 left-1/2 z-50 w-full -translate-x-1/2 -translate-y-1/2 outline-none",
 			className
 		)}
 		{...restProps}
@@ -39,14 +38,9 @@
 		{#if showCloseButton}
 			<DialogPrimitive.Close data-slot="dialog-close">
 				{#snippet child({ props })}
-					<Button
-						variant="ghost"
-						class="absolute top-2 right-2 min-h-11 min-w-11"
-						size="icon-sm"
-						{...props}
-					>
-						<HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} />
-						<span class="sr-only">{m.ui_close()}</span>
+					<Button variant="ghost" class="absolute top-4 right-4 bg-secondary" size="icon-sm" {...props}>
+						<HugeiconsIcon icon={Cancel01Icon} strokeWidth={2}  />
+						<span class="sr-only">Close</span>
 					</Button>
 				{/snippet}
 			</DialogPrimitive.Close>
