@@ -68,3 +68,11 @@ export function mockIdentity(seatId: string): MockIdentity {
 		avatar: `data:image/svg+xml,${encodeURIComponent(svg)}`
 	};
 }
+
+// Tables hold at most four Seats, matching the backend's limit.
+export const mockSeatLimit = 4;
+
+/** Mock taken-Seat count for a Game card until the Games list returns real counts. */
+export function mockSeatCount(gameId: string) {
+	return 1 + (hash(gameId) % mockSeatLimit);
+}

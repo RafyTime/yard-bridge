@@ -186,15 +186,26 @@ test('a player creates multiple games and reopens the same seat after reload', a
 	await expect(page.getByText('You are the host.', { exact: true })).toBeVisible();
 	await page.reload();
 	await expect(page.getByRole('heading', { name: 'Evening table' })).toBeVisible();
-	await page.getByRole('button', { name: 'All games' }).click();
+	await page.getByRole('link', { name: 'Your games', exact: true }).click();
 	await page.getByRole('button', { name: 'New game', exact: true }).click();
 	await page.getByLabel('Game name').fill('Weekend table');
 	await page.getByRole('button', { name: 'Create private game' }).click();
 	await expect(page.getByRole('heading', { name: 'Weekend table' })).toBeVisible();
-	await page.getByRole('button', { name: 'All games' }).click();
-	await expect(page.getByRole('button', { name: 'Weekend table' })).toBeVisible();
-	await page.getByRole('button', { name: 'Evening table' }).click();
+	await page.getByRole('link', { name: 'Your games', exact: true }).click();
+	const weekend = page.getByRole('listitem').filter({ hasText: 'Weekend table' });
+	const evening = page.getByRole('listitem').filter({ hasText: 'Evening table' });
+	await expect(weekend).toContainText('Waiting for players');
+	await expect(evening).toContainText('Waiting for players');
+	// The seat count is mock data, so only its shape and stability are checked.
+	const seats = evening.getByText(/^[1-4] of 4 seats$/);
+	await expect(seats).toBeVisible();
+	const seatText = await seats.textContent();
+	await page.screenshot({ path: test.info().outputPath('games-home.png') });
+	await page.reload();
+	await expect(seats).toHaveText(seatText ?? '');
+	await evening.getByRole('link').click();
 	await expect(page.getByRole('heading', { name: 'Evening table' })).toBeVisible();
+	await expect(page.getByText('You are the host.', { exact: true })).toBeVisible();
 	expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
@@ -448,7 +459,7 @@ test('Host edits advanced rules and copies a saved configuration into a later Ga
 	await expect(page.getByLabel('Use a saved configuration', { exact: true })).toContainText(
 		'Weekend rules'
 	);
-	await page.getByRole('button', { name: 'All games', exact: true }).click();
+	await page.getByRole('link', { name: 'Your games', exact: true }).click();
 	await page.getByRole('button', { name: 'New game', exact: true }).click();
 	await page.getByLabel('Game name').fill('Next table');
 	await page.getByRole('button', { name: 'Create private game' }).click();
@@ -490,12 +501,12 @@ test('Host edits advanced rules and copies a saved configuration into a later Ga
 	await expect(page.getByLabel('Configuration name', { exact: true })).toHaveValue('');
 	await page.getByRole('radio', { name: 'Table rules', exact: true }).click();
 	await page.getByLabel('Score cutoff', { exact: true }).fill('500');
-	await page.getByRole('button', { name: 'All games', exact: true }).click();
-	await page.getByRole('button', { name: 'Our rules', exact: true }).click();
+	await page.getByRole('link', { name: 'Your games', exact: true }).click();
+	await page.getByRole('link', { name: /^Our rules/ }).click();
 	await page.getByRole('radio', { name: 'Table rules', exact: true }).click();
 	await expect(page.getByLabel('Score cutoff', { exact: true })).toHaveValue('300');
-	await page.getByRole('button', { name: 'All games', exact: true }).click();
-	await page.getByRole('button', { name: 'Next table', exact: true }).click();
+	await page.getByRole('link', { name: 'Your games', exact: true }).click();
+	await page.getByRole('link', { name: /^Next table/ }).click();
 	await page.getByRole('radio', { name: 'Table rules', exact: true }).click();
 	await expect(page.getByLabel('Score cutoff', { exact: true })).toHaveValue('300');
 	await expect(

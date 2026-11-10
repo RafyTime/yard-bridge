@@ -4,10 +4,14 @@
 	import { useConvexClient, useQuery } from 'convex-svelte';
 	import { api } from '../../convex/_generated/api';
 	import type { Id } from '../../convex/_generated/dataModel';
+	import { HugeiconsIcon } from '@hugeicons/svelte';
+	import { ArrowLeft01Icon, PlusSignIcon } from '@hugeicons/core-free-icons';
 	import { Button } from '#lib/components/ui/button/index.js';
+	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import * as Field from '#lib/components/ui/field/index.js';
 	import * as m from '#lib/paraglide/messages.js';
+	import { mockSeatCount, mockSeatLimit } from '#lib/mocks/players.js';
 	import Invitations from './invitations.svelte';
 	import GameLobby from './game-lobby.svelte';
 	import GameRules from './game-rules.svelte';
@@ -46,12 +50,21 @@
 	{#if invitationToken}
 		<Invitations token={invitationToken} />
 	{:else if gameId}
-		<Button class="min-h-11 self-start" variant="ghost" onclick={() => goto(page.url.pathname)}
-			>{m.games_back()}</Button
-		>
+		<!-- The way back sits directly above the Game title so it is always in reach. -->
+		<div class="flex flex-col items-start gap-3">
+			<Button class="min-h-11" variant="outline" href={page.url.pathname}
+				><HugeiconsIcon
+					icon={ArrowLeft01Icon}
+					size={18}
+					aria-hidden="true"
+				/>{m.games_back()}</Button
+			>
+			{#if game.data}
+				<h2 id="games-heading" class="text-2xl font-semibold break-words">{game.data.name}</h2>
+			{/if}
+		</div>
 		{#if game.error}<p role="alert">{m.games_unavailable()}</p>
 		{:else if game.data}
-			<h2 id="games-heading" class="text-2xl font-semibold break-words">{game.data.name}</h2>
 			<p class="text-sm text-muted-foreground">
 				{game.data.isHost ? m.games_host() : m.games_seated()}
 			</p>
@@ -66,12 +79,15 @@
 			<h2 id="games-heading" class="text-2xl font-semibold">
 				{creating ? m.games_create() : m.games_title()}
 			</h2>
-			{#if !creating}<Button class="min-h-11" onclick={() => (creating = true)}
-					>{m.games_new()}</Button
-				>{:else}<Button class="min-h-11" variant="ghost" onclick={() => (creating = false)}
+			{#if creating}<Button class="min-h-11" variant="ghost" onclick={() => (creating = false)}
 					>{m.ui_cancel()}</Button
 				>{/if}
 		</div>
+		{#if !creating}
+			<Button class="min-h-14 w-full text-base" onclick={() => (creating = true)}
+				><HugeiconsIcon icon={PlusSignIcon} size={20} aria-hidden="true" />{m.games_new()}</Button
+			>
+		{/if}
 		{#if creating}
 			<form onsubmit={create} aria-busy={pending}>
 				<Field.FieldGroup>
@@ -101,11 +117,20 @@
 				<ul class="flex flex-col gap-3">
 					{#each games.data as item (item.id)}
 						<li>
-							<Button
-								variant="outline"
-								class="min-h-20 w-full min-w-0 justify-start rounded-xl px-5 break-words whitespace-normal"
-								onclick={() => goto(`?game=${item.id}`)}>{item.name}</Button
+							<a
+								href={`?game=${item.id}`}
+								class="flex min-h-20 min-w-0 flex-col gap-2 rounded-xl border bg-card px-5 py-4 transition-colors hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none"
 							>
+								<span class="text-lg font-medium break-words">{item.name}</span>
+								<span class="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+									<Badge variant={item.status === 'lobby' ? 'secondary' : 'default'}
+										>{item.status === 'lobby' ? m.games_lobby() : m.games_active()}</Badge
+									>
+									<span
+										>{m.games_seats({ count: mockSeatCount(item.id), limit: mockSeatLimit })}</span
+									>
+								</span>
+							</a>
 						</li>
 					{/each}
 				</ul>
