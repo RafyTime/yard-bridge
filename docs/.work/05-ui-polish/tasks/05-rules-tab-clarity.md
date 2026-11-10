@@ -1,7 +1,7 @@
 # 05: Easier-to-follow Rules tab
 
 Type: task
-Status: ready-for-agent
+Status: resolved
 Blocked by: None (can start immediately)
 Spec: [UI polish spec](../spec.md)
 
@@ -23,3 +23,7 @@ Layout, copy, and placement change; behaviour does not.
 - [ ] How to play is a distinct, full-width secondary action showing the base rules, available to all players.
 - [ ] Draft preservation across Seat updates and tab switches, conflict warnings, explicit reload, and stale-Apply recovery are unchanged.
 - [ ] Rules, drafts/conflicts, and saved-configuration browser tests pass with updated selectors; new copy exists in en, es, and uk.
+
+## Answer
+
+Done in `dc51c18`. Rule explanations sit on a muted, padded panel. The defaults action is "Reset draft to defaults", with a note that the change still needs applying. Saved configurations is a Host-only section near the top. How to play is a full-width secondary action. Draft and conflict behaviour is unchanged.
