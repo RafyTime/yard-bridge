@@ -1,7 +1,7 @@
 # 05: Easier-to-follow Rules tab
 
 Type: task
-Status: ready-for-agent
+Status: claimed
 Blocked by: None (can start immediately)
 Spec: [UI polish spec](../spec.md)
 

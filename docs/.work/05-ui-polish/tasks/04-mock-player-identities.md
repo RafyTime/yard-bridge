@@ -1,7 +1,7 @@
 # 04: Mock player names and avatars
 
 Type: task
-Status: ready-for-agent
+Status: claimed
 Blocked by: None (can start immediately)
 Spec: [UI polish spec](../spec.md)
 
