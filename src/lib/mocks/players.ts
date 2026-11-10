@@ -2,6 +2,8 @@
 // derived from stable ids, so it never reshuffles while a Game updates.
 // Names are placeholder mock data, deliberately not translated.
 
+import { avatarPalettes, avatarUri, initials } from './avatar.js';
+
 const adjectives = [
 	'Lucky',
 	'Mellow',
@@ -30,13 +32,6 @@ const animals = [
 	'Seal',
 	'Wren'
 ] as const;
-const colors = [
-	['#d9e9ff', '#243b66'],
-	['#e4dcff', '#48336e'],
-	['#d5eedf', '#244d3b'],
-	['#ffe3d1', '#6b3a1e']
-] as const;
-
 export type MockIdentity = { name: string; initials: string; avatar: string };
 
 // FNV-1a: a small, stable string hash; quality is irrelevant for mock names.
@@ -58,18 +53,15 @@ export function mockIdentity(seatId: string): MockIdentity {
 	const seed = hash(seatId);
 	const adjective = pick(adjectives, seed);
 	const animal = pick(animals, seed >>> 8);
-	const [background, ink] = pick(colors, seed >>> 16);
-	const round = (seed >>> 24) % 2 === 0;
-	const smile = round ? 'M17 28 Q24 34 31 28' : 'M19 29 Q24 32 29 29';
-	const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"><rect width="48" height="48" fill="${background}"/><path d="M6 48 Q8 35 24 35 Q40 35 42 48" fill="${ink}"/><rect x="11" y="9" width="26" height="28" rx="${round ? 13 : 9}" fill="${background}" stroke="${ink}" stroke-width="2"/><circle cx="19" cy="22" r="2" fill="${ink}"/><circle cx="29" cy="22" r="2" fill="${ink}"/><path d="${smile}" fill="none" stroke="${ink}" stroke-width="2" stroke-linecap="round"/></svg>`;
+	const name = `${adjective} ${animal}`;
 	return {
-		name: `${adjective} ${animal}`,
-		initials: `${adjective[0]}${animal[0]}`,
-		avatar: `data:image/svg+xml,${encodeURIComponent(svg)}`
+		name,
+		initials: initials(name),
+		avatar: avatarUri(pick(avatarPalettes, seed >>> 16), (seed >>> 24) % 2 === 0)
 	};
 }
 
-// Tables hold at most four Seats, matching the backend's limit.
+// A Game holds at most four Seats, matching the backend's limit.
 export const mockSeatLimit = 4;
 
 /** Mock taken-Seat count for a Game card until the Games list returns real counts. */
