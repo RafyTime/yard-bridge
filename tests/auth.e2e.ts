@@ -51,13 +51,21 @@ test('email code signs in, returns after reload and reopening, then signs out', 
 }) => {
 	await page.setViewportSize({ width: 390, height: 844 });
 	await page.goto('/');
+	await expect(page.getByRole('heading', { name: 'Pull up a chair', exact: true })).toBeVisible();
 	await expect(page.getByLabel('Email address')).toBeVisible();
 	await expect(page.getByRole('button', { name: 'Send code', exact: true })).toBeVisible();
 	await page.screenshot({ path: test.info().outputPath('sign-in.png') });
 	expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 	await page.getByLabel('Email address').fill('Leo@example.com');
+	const deliver = backend.pauseNextDelivery();
 	await page.getByRole('button', { name: 'Send code', exact: true }).click();
+	await expect(page.getByRole('button', { name: 'Sending code…', exact: true })).toBeDisabled();
+	deliver();
 	await expect(page.getByLabel('Sign-in code')).toBeVisible();
+	await expect(page.getByLabel('Sign-in code')).toBeFocused();
+	await expect(page.getByRole('heading', { name: 'Check your email', exact: true })).toBeVisible();
+	await expect(page.getByText('leo@example.com', { exact: true })).toBeVisible();
+	await page.screenshot({ path: test.info().outputPath('sign-in-code.png') });
 	await expect(page.getByLabel('Sign-in code')).toHaveAttribute('autocomplete', 'one-time-code');
 	const firstCode = backend.code;
 	await page.getByLabel('Sign-in code').fill('00000000' === firstCode ? '11111111' : '00000000');
@@ -191,6 +199,8 @@ test('invitation waits for approval and an approved player returns without anoth
 	page,
 	backend
 }) => {
+	// Eight sign-ins across three accounts; Firefox needs more than the default budget.
+	test.slow();
 	async function signIn(email: string) {
 		await page.getByLabel('Email address').fill(email);
 		await page.getByRole('button', { name: 'Send code', exact: true }).click();

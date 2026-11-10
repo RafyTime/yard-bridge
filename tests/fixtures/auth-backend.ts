@@ -31,10 +31,14 @@ export async function authBackend(context: BrowserContext) {
 	});
 	let code = '';
 	let deliveryFails = false;
+	let deliveryPause: Promise<void> | undefined;
 	let rulesUpdatePause: Promise<void> | undefined;
 	const originalFetch = globalThis.fetch;
 	globalThis.fetch = async (input, init) => {
 		if (String(input) !== 'https://api.resend.com/emails') return originalFetch(input, init);
+		const pause = deliveryPause;
+		deliveryPause = undefined;
+		await pause;
 		if (deliveryFails) return new Response(null, { status: 503 });
 		const email: { text: string } = JSON.parse(String(init?.body));
 		code = email.text.match(/\b\d{8}\b/)![0];
@@ -178,6 +182,13 @@ export async function authBackend(context: BrowserContext) {
 		pauseNextRulesUpdate() {
 			let resume = () => {};
 			rulesUpdatePause = new Promise<void>((resolve) => {
+				resume = resolve;
+			});
+			return () => resume();
+		},
+		pauseNextDelivery() {
+			let resume = () => {};
+			deliveryPause = new Promise<void>((resolve) => {
 				resume = resolve;
 			});
 			return () => resume();
