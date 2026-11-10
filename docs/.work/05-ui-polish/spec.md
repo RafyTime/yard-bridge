@@ -40,7 +40,7 @@ capabilities.
 10. As a player, I want my language and appearance choices remembered after a reload, so that I don't have to set them again.
 11. As a player, I want Sign out inside the account sheet, so that it is available but not in my way.
 12. As a player, I want a prominent New game action on the Games screen, so that starting a Game is obvious.
-13. As a player, I want each Game shown as a card with its lobby or active status, so that I can tell which Games need me.
+13. As a player, I want each Game shown as a card with its lobby or active status and seat count, so that I can tell which Games need me (seat count mocked for now).
 14. As a player inside a Game, I want a clear "back to your Games" control beside the Game title, so that I can always find my other Games.
 15. As a player in the lobby, I want each Seat shown with a friendly name and avatar, so that the table feels personal.
 16. As a player, I want those identities to stay stable while the Game updates, so that people don't appear to reshuffle.
@@ -74,8 +74,10 @@ capabilities.
 - **Mock player identities:** derived deterministically from each Seat (reuse the
   prototype's name/avatar generation idea), so they stay stable across updates.
   They don't replace real Seat information.
-- **Games cards:** show only data the Games list already returns (name, status).
-  Seat count is out of scope because it would need a backend change.
+- **Games cards:** show the name and status the Games list already returns, plus
+  a mock seat count derived deterministically from the Game id so it stays
+  stable across reloads. Keep it in one helper beside the mock identities so the
+  real count can replace it in one place. No backend change.
 - **Rules tab:** keep all draft-preservation and conflict behaviour from the
   architecture cleanup intact. Changes are layout, copy, and placement only.
   Saved configurations still snapshot applied rules and stay disabled while the
@@ -102,7 +104,7 @@ capabilities.
 ## Out of Scope
 
 - Real usernames, avatars, profile storage, or an avatar service.
-- Seat counts or other new data on Game cards.
+- Real seat counts or other new backend data on Game cards.
 - Any backend, schema, or command changes.
 - Gameplay (Round) screen redesign.
 - A bottom navigation bar or a separate settings route.
@@ -111,5 +113,7 @@ capabilities.
 
 - Tickets 05 and 06 both touch the Rules tab. Do 05 first to avoid collisions.
   This is an ordering preference, not a blocking dependency.
+- Real seat counts, nicknames, and avatars are the next effort after this
+  overhaul. Keep all mocks isolated so they are easy to replace.
 - Prototype files remain the visual reference for identities, the review drawer,
   and rule help styling.
