@@ -24,7 +24,6 @@
 			<AppBar
 				signedIn={auth.isAuthenticated}
 				email={auth.isAuthenticated ? (viewer.data?.email ?? null) : null}
-				onSignedOut={() => {}}
 			/>
 		</div>
 		<section

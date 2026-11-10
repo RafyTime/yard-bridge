@@ -2,7 +2,7 @@
 	import { untrack } from 'svelte';
 	import type { Snippet } from 'svelte';
 	import * as Collapsible from '#lib/components/ui/collapsible/index.js';
-	import { MediaQuery } from 'svelte/reactivity';
+	import { desktop } from '#lib/media.js';
 	import * as Dialog from '#lib/components/ui/dialog/index.js';
 	import * as Drawer from '#lib/components/ui/drawer/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
@@ -38,7 +38,6 @@
 		players?: Snippet;
 	} = $props();
 	let reviewOpen = $state(false);
-	const desktop = new MediaQuery('(min-width: 768px)');
 	const changedCount = $derived(
 		Object.keys(defaultRules).filter(
 			(key) => draft[key as keyof RulesConfiguration] !== baseline[key as keyof RulesConfiguration]

@@ -1,11 +1,11 @@
 <script lang="ts">
-	import { SvelteURL, MediaQuery } from 'svelte/reactivity';
+	import { SvelteURL } from 'svelte/reactivity';
+	import { desktop } from '#lib/media.js';
 	import * as Dialog from '#lib/components/ui/dialog/index.js';
 	import * as Drawer from '#lib/components/ui/drawer/index.js';
 	import * as InputGroup from '#lib/components/ui/input-group/index.js';
 	import { HugeiconsIcon } from '@hugeicons/svelte';
 	import { Copy01Icon } from '@hugeicons/core-free-icons';
-	const desktop = new MediaQuery('(min-width: 768px)');
 	let open = $state(false);
 	let feedback = $state('');
 	async function copy() {

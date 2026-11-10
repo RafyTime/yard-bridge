@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { MediaQuery } from 'svelte/reactivity';
 	import { useAuth } from '@mmailaender/convex-auth-svelte/svelte';
 	import { setMode, userPrefersMode } from 'mode-watcher';
 	import { HugeiconsIcon } from '@hugeicons/svelte';
@@ -13,11 +12,13 @@
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { Separator } from '#lib/components/ui/separator/index.js';
 	import * as ToggleGroup from '#lib/components/ui/toggle-group/index.js';
+	import { desktop } from '#lib/media.js';
+	import { initials } from '#lib/mocks/avatar.js';
 	import {
 		avatarCount,
-		avatarUri,
-		initials,
+		displayName,
 		loadProfile,
+		profileAvatarUri,
 		saveProfile,
 		type MockProfile
 	} from '#lib/mocks/profile.js';
@@ -26,17 +27,14 @@
 
 	let {
 		signedIn,
-		email,
-		onSignedOut
+		email
 	}: {
 		signedIn: boolean;
 		/** Null while signed out or while the session's identity is still loading. */
 		email: string | null;
-		onSignedOut: () => void;
 	} = $props();
 
 	const auth = useAuth();
-	const desktop = new MediaQuery('(min-width: 768px)');
 	const languageNames = {
 		en: m.settings_language_en,
 		es: m.settings_language_es,
@@ -70,7 +68,6 @@
 		try {
 			await auth.signOut();
 			open = false;
-			onSignedOut();
 		} catch {
 			signOutFailed = true;
 		} finally {
@@ -82,7 +79,7 @@
 {#snippet trigger()}
 	{#if profile}
 		<Avatar.Root class="size-9"
-			><Avatar.Image src={avatarUri(profile.avatar)} alt="" /><Avatar.Fallback
+			><Avatar.Image src={profileAvatarUri(profile.avatar)} alt="" /><Avatar.Fallback
 				>{initials(profile.username)}</Avatar.Fallback
 			></Avatar.Root
 		>
@@ -95,13 +92,13 @@
 			<section class="flex flex-col gap-4" aria-labelledby="profile-heading">
 				<div class="flex min-w-0 items-center gap-3">
 					<Avatar.Root class="size-14"
-						><Avatar.Image src={avatarUri(profile.avatar)} alt="" /><Avatar.Fallback
+						><Avatar.Image src={profileAvatarUri(profile.avatar)} alt="" /><Avatar.Fallback
 							>{initials(profile.username)}</Avatar.Fallback
 						></Avatar.Root
 					>
 					<div class="flex min-w-0 flex-col gap-1">
 						<h3 id="profile-heading" class="truncate text-base font-semibold">
-							{profile.username || email.split('@')[0]}
+							{displayName(profile, email)}
 						</h3>
 						<p class="text-xs text-muted-foreground">
 							<span class="sr-only">{m.account_email()}: </span><span class="break-all"
@@ -147,7 +144,7 @@
 									aria-label={m.profile_avatar_option({ number: index + 1 })}
 									class="aspect-square size-auto w-full max-w-12 rounded-full p-0.5 data-[state=on]:ring-2 data-[state=on]:ring-primary"
 									><img
-										src={avatarUri(index)}
+										src={profileAvatarUri(index)}
 										alt=""
 										class="size-full rounded-full"
 									/></ToggleGroup.Item
