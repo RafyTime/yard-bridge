@@ -75,6 +75,7 @@
 	"rules_default": "Default: {value}",
 	"rules_advanced": "Detailed settings",
 	"rules_changes": "Changes from defaults",
+	"rules_changed": "Changed",
 	"rules_no_changes": "All settings use the defaults.",
 	"rules_hand_hint": "2 to 9 cards, so a 36-card deck fits four players.",
 	"rules_apply": "Apply rules",
