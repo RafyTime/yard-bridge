@@ -12,6 +12,17 @@ const test = base.extend<{ backend: Awaited<ReturnType<typeof authBackend>> }>({
 	}
 });
 
+// Account settings live behind the top bar's account button, not in the main layout.
+async function openAccount(page: Page) {
+	await page.getByRole('button', { name: 'Account and settings', exact: true }).click();
+	return page.getByRole('dialog', { name: 'Account and settings', exact: true });
+}
+
+async function signOut(page: Page) {
+	await (await openAccount(page)).getByRole('button', { name: 'Sign out', exact: true }).click();
+	await expect(page.getByLabel('Email address')).toBeVisible();
+}
+
 async function reviewRules(page: Page) {
 	const review = page.getByRole('button', { name: 'Review and start', exact: true });
 	const ready = page.getByRole('button', { name: 'I have reviewed these rules', exact: true });
@@ -52,7 +63,24 @@ test('email code signs in, returns after reload and reopening, then signs out', 
 	await page.getByLabel('Sign-in code').fill(backend.code);
 	await page.getByRole('button', { name: 'Continue', exact: true }).click();
 	await expect(page.getByRole('heading', { name: 'You are signed in', exact: true })).toBeVisible();
-	await expect(page.getByText('leo@example.com', { exact: true })).toBeVisible();
+	await expect(page.getByText('leo@example.com', { exact: true })).toHaveCount(0);
+	await expect(page.getByRole('button', { name: 'Sign out', exact: true })).toHaveCount(0);
+	const account = await openAccount(page);
+	await expect(account.getByText('leo@example.com', { exact: true })).toBeVisible();
+	await expect(account.getByText('Preview', { exact: true })).toBeVisible();
+	await account.getByLabel('Username').fill('Lucky Otter');
+	await account.getByRole('radio', { name: 'Avatar 3', exact: true }).click();
+	await page.keyboard.press('Escape');
+	await expect(account).toHaveCount(0);
+	await expect(
+		page.getByRole('button', { name: 'Account and settings', exact: true })
+	).toBeFocused();
+	await page.reload();
+	await expect(page.getByRole('heading', { name: 'You are signed in', exact: true })).toBeVisible();
+	const reloaded = await openAccount(page);
+	await expect(reloaded.getByLabel('Username')).toHaveValue('Lucky Otter');
+	await expect(reloaded.getByRole('radio', { name: 'Avatar 3', exact: true })).toBeChecked();
+	await page.keyboard.press('Escape');
 	await page.reload();
 	await expect(page.getByRole('heading', { name: 'You are signed in', exact: true })).toBeVisible();
 	await page.close();
@@ -61,8 +89,7 @@ test('email code signs in, returns after reload and reopening, then signs out', 
 	await expect(
 		reopened.getByRole('heading', { name: 'You are signed in', exact: true })
 	).toBeVisible();
-	await reopened.getByRole('button', { name: 'Sign out', exact: true }).click();
-	await expect(reopened.getByLabel('Email address')).toBeVisible();
+	await signOut(reopened);
 	await reopened.reload();
 	await expect(reopened.getByLabel('Email address')).toBeVisible();
 });
@@ -81,6 +108,43 @@ test('delivery failure stays on the email form and Ukrainian fits a narrow phone
 	);
 	await expect(page.getByLabel('Електронна пошта')).toBeVisible();
 	expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test('language and appearance apply immediately and survive a reload', async ({
+	page,
+	backend
+}) => {
+	void backend;
+	await page.emulateMedia({ colorScheme: 'light' });
+	await page.setViewportSize({ width: 320, height: 640 });
+	await page.goto('/');
+	await expect(page.getByText('Yard Bridge', { exact: true })).toBeVisible();
+	const button = page.getByRole('button', { name: 'Account and settings', exact: true });
+	const size = await button.boundingBox();
+	expect(size!.width).toBeGreaterThanOrEqual(44);
+	expect(size!.height).toBeGreaterThanOrEqual(44);
+	let settings = await openAccount(page);
+	await expect(settings.getByRole('button', { name: 'Sign out', exact: true })).toHaveCount(0);
+	await settings.getByRole('radio', { name: 'Dark', exact: true }).click();
+	await expect(page.locator('html')).toHaveClass(/\bdark\b/);
+	await settings.getByRole('radio', { name: 'Українська', exact: true }).click();
+	await expect(page.getByLabel('Електронна пошта')).toBeVisible();
+	await page.reload();
+	await expect(page.getByLabel('Електронна пошта')).toBeVisible();
+	await expect(page.locator('html')).toHaveClass(/\bdark\b/);
+	await page.getByRole('button', { name: 'Обліковий запис і налаштування', exact: true }).click();
+	settings = page.getByRole('dialog', { name: 'Обліковий запис і налаштування', exact: true });
+	await expect(settings.getByRole('radio', { name: 'Темна', exact: true })).toBeChecked();
+	expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+	const box = await settings.boundingBox();
+	expect(box!.x).toBeGreaterThanOrEqual(0);
+	expect(box!.x + box!.width).toBeLessThanOrEqual(320);
+	await settings.getByRole('radio', { name: 'Системна', exact: true }).click();
+	await expect(page.locator('html')).not.toHaveClass(/\bdark\b/);
+	await page.reload();
+	await expect(page.locator('html')).not.toHaveClass(/\bdark\b/);
+	await page.emulateMedia({ colorScheme: 'dark' });
+	await expect(page.locator('html')).toHaveClass(/\bdark\b/);
 });
 
 test('a player creates multiple games and reopens the same seat after reload', async ({
@@ -123,11 +187,9 @@ test('invitation waits for approval and an approved player returns without anoth
 		await expect(page.getByLabel('Sign-in code')).toBeVisible();
 		await page.getByLabel('Sign-in code').fill(backend.code);
 		await page.getByRole('button', { name: 'Continue', exact: true }).click();
-		await expect(page.getByRole('button', { name: 'Sign out', exact: true })).toBeVisible();
-	}
-	async function signOut() {
-		await page.getByRole('button', { name: 'Sign out', exact: true }).click();
-		await expect(page.getByLabel('Email address')).toBeVisible();
+		await expect(
+			page.getByRole('heading', { name: 'You are signed in', exact: true })
+		).toBeVisible();
 	}
 	await page.setViewportSize({ width: 390, height: 844 });
 	await page.goto('/');
@@ -139,7 +201,7 @@ test('invitation waits for approval and an approved player returns without anoth
 	const invitation = await page.getByLabel('Invitation link', { exact: true }).inputValue();
 	await page.getByRole('button', { name: 'Done', exact: true }).click();
 	const gameURL = page.url();
-	await signOut();
+	await signOut(page);
 	await page.goto(invitation);
 	await signIn('guest@example.com');
 	await expect(page.getByRole('button', { name: 'Request a seat', exact: true })).toBeVisible();
@@ -148,7 +210,7 @@ test('invitation waits for approval and an approved player returns without anoth
 	await expect(
 		page.getByRole('status').filter({ hasText: 'waiting for host approval' })
 	).toBeVisible();
-	await signOut();
+	await signOut(page);
 	await page.goto(gameURL);
 	await signIn('host@example.com');
 	await expect(page.getByText('guest@example.com', { exact: true })).toBeVisible();
@@ -173,7 +235,7 @@ test('invitation waits for approval and an approved player returns without anoth
 	await expect(page.getByRole('alert').filter({ hasText: /\S/ })).toHaveCount(0);
 	await page.getByRole('radio', { name: 'Players', exact: true }).click();
 	await expect(page.getByText('2 of 4 seats occupied', { exact: true })).toBeVisible();
-	await signOut();
+	await signOut(page);
 	await page.goto(invitation);
 	await signIn('guest@example.com');
 	await expect(page.getByText('Your seat is saved.', { exact: true })).toBeVisible();
@@ -187,7 +249,7 @@ test('invitation waits for approval and an approved player returns without anoth
 	await expect(
 		page.getByText('You have reviewed the current rules.', { exact: true })
 	).toBeVisible();
-	await signOut();
+	await signOut(page);
 	await page.goto(gameURL);
 	await signIn('host@example.com');
 	await reviewRules(page);
@@ -201,11 +263,11 @@ test('invitation waits for approval and an approved player returns without anoth
 	await page.getByRole('radio', { name: 'Players', exact: true }).click();
 	await expect(page.getByText('Review needed', { exact: false })).toHaveCount(2);
 	await reviewRules(page);
-	await signOut();
+	await signOut(page);
 	await page.goto(invitation);
 	await signIn('guest@example.com');
 	await reviewRules(page);
-	await signOut();
+	await signOut(page);
 	await page.goto(gameURL);
 	await signIn('host@example.com');
 	await page.getByRole('button', { name: 'Review and start', exact: true }).click();

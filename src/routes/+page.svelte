@@ -2,6 +2,7 @@
 	import { page } from '$app/state';
 	import MobileLobbyPrototype from '#lib/components/mobile-lobby-prototype.svelte';
 	import Games from '#lib/components/games.svelte';
+	import AppBar from '#lib/components/app-bar.svelte';
 	import { useAuth } from '@mmailaender/convex-auth-svelte/svelte';
 	import { useQuery } from 'convex-svelte';
 	import { Button } from '#lib/components/ui/button/index.js';
@@ -61,21 +62,13 @@
 		}
 	}
 
-	async function signOut() {
-		if (pending) return;
-		pending = true;
+	// Sign out lives in the account menu; start the next sign-in from a clean form.
+	function resetSignIn() {
+		sentTo = null;
+		code = '';
+		email = '';
 		error = null;
-		try {
-			await auth.signOut();
-			sentTo = null;
-			code = '';
-			email = '';
-			notice = '';
-		} catch {
-			error = m.auth_sign_out_error();
-		} finally {
-			pending = false;
-		}
+		notice = '';
 	}
 </script>
 
@@ -84,22 +77,22 @@
 {#if import.meta.env.DEV && page.url.searchParams.has('prototype')}
 	<MobileLobbyPrototype />
 {:else}
-	<main class="flex min-h-svh justify-center px-5 py-6">
+	<main class="flex min-h-svh flex-col items-center gap-6 px-5 py-4">
+		<div class="w-full max-w-lg">
+			<AppBar
+				signedIn={auth.isAuthenticated}
+				email={auth.isAuthenticated ? (viewer.data?.email ?? null) : null}
+				onSignedOut={resetSignIn}
+			/>
+		</div>
 		<section
 			class="flex w-full max-w-lg flex-col gap-6"
 			class:pb-52={auth.isAuthenticated && page.url.searchParams.has('game')}
 			aria-labelledby="welcome-heading"
 		>
-			<header class="flex flex-col gap-2">
-				<p class="text-sm font-medium text-muted-foreground">Yard Bridge</p>
-				<h1
-					id="welcome-heading"
-					class="text-3xl font-semibold"
-					class:sr-only={auth.isAuthenticated}
-				>
-					{m.auth_welcome()}
-				</h1>
-			</header>
+			<h1 id="welcome-heading" class="text-3xl font-semibold" class:sr-only={auth.isAuthenticated}>
+				{m.auth_welcome()}
+			</h1>
 			{#if auth.isLoading}
 				<p role="status">{m.auth_loading()}</p>
 			{:else if auth.isAuthenticated}
@@ -107,12 +100,10 @@
 					<p role="alert">{m.auth_identity_error()}</p>
 				{:else if viewer.data}
 					<h2 class="sr-only">{m.auth_signed_in()}</h2>
-					<p class="text-sm break-all text-muted-foreground">{viewer.data.email}</p>
 					<Games />
 				{:else}
 					<p role="status">{m.auth_loading()}</p>
 				{/if}
-				<Button class="min-h-11" onclick={signOut} disabled={pending}>{m.auth_sign_out()}</Button>
 			{:else if sentTo !== null}
 				<p class="break-words">{m.auth_check_email({ email: sentTo })}</p>
 				<form onsubmit={verifyCode} aria-busy={pending}>
