@@ -1,7 +1,7 @@
 # 03: Games home and the way back
 
 Type: task
-Status: ready-for-agent
+Status: claimed
 Blocked by: 01
 Spec: [UI polish spec](../spec.md)
 

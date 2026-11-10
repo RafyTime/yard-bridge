@@ -1,7 +1,7 @@
 # 01: App bar with account and settings sheet
 
 Type: task
-Status: claimed
+Status: resolved
 Blocked by: None (can start immediately)
 Spec: [UI polish spec](../spec.md)
 
@@ -26,3 +26,7 @@ Sign out button no longer sit in the main layout.
 - [ ] New copy exists in en, es, and uk; the sheet fits a narrow phone in Ukrainian.
 - [ ] The sheet respects reduced motion and returns focus to the account button on close.
 - [ ] The existing sign-in/sign-out browser test is adapted, and a new browser test covers language and appearance persisting across a reload.
+
+## Answer
+
+Merged in `8b7c7c1`. `app-bar.svelte` shows the centred wordmark and the account button. `account-menu.svelte` is a sheet on mobile and a dialog on desktop, holding the mock profile (`src/lib/mocks/profile.ts`, stored in localStorage), language (Paraglide URL strategy), appearance (mode-watcher) and Sign out.
