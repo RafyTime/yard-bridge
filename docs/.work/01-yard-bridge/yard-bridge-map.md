@@ -16,6 +16,8 @@ Planning status: approved on 28 September 2026. The user confirmed the shared sp
 
 ## Decisions-so-far
 
+- [Ticket 07](tasks/07-play-ordinary-turns.md) adds version-checked Play and Draw commands. Draw continues on the server until a card matches, recycling the played pile below its top card, and the player must then play that card alone. With nothing to draw or recycle, the turn passes. The Round records a turn version, a pending drawn card, and its recycle count. Pending opening states block ordinary moves until later tickets resolve them.
+
 - [Ticket 06](tasks/06-open-round-with-private-hands.md) starts one durable Round from a ready table, with a server-shuffled 36-card deck, random starter, frozen rules, and separate private hands. Authorized views expose only the viewer's hand and shared table counts and opening state. Pending opening obligations and effects remain recorded for later turn commands.
 
 - [Ticket 05](tasks/05-configure-rules-and-ready.md) keeps Rules configurations as Game values and private saved snapshots. Host edits atomically clear readiness; version-checked reviews acknowledge the current rules, and two to four ready Seats make the table ready to start. All approved players can inspect defaults, deviations, and the base rules before reviewing.
