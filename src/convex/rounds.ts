@@ -117,9 +117,8 @@ export const view = query({
 
 const turnArgs = { roundId: v.id('rounds'), expectedVersion: v.number() };
 
-// Load the caller's hand for an ordinary move, rejecting stale versions, other Seats' turns,
-// and opening states that ordinary moves cannot resolve.
-async function ordinaryTurn(
+// Load the Round for the caller's turn, rejecting outsiders, stale versions, and other Seats.
+async function currentTurn(
 	ctx: MutationCtx,
 	{ roundId, expectedVersion }: { roundId: Id<'rounds'>; expectedVersion: number }
 ) {
@@ -137,14 +136,42 @@ async function ordinaryTurn(
 	if (round.version !== expectedVersion)
 		throw new ConvexError('Round changed. Review the latest table');
 	if (round.currentSeatId !== seat._id) throw new ConvexError('Not your turn');
+	return round;
+}
+
+// Load the caller's hand for Play or Draw, rejecting opening states these moves cannot resolve.
+async function ordinaryTurn(
+	ctx: MutationCtx,
+	turn: { roundId: Id<'rounds'>; expectedVersion: number }
+) {
+	const round = await currentTurn(ctx, turn);
 	if (openingBlocksMoves(round)) throw new ConvexError('The opening card must be resolved first');
 	const hand = await ctx.db
 		.query('roundHands')
-		.withIndex('by_roundId_and_seatId', (q) => q.eq('roundId', round._id).eq('seatId', seat._id))
+		.withIndex('by_roundId_and_seatId', (q) =>
+			q.eq('roundId', round._id).eq('seatId', round.currentSeatId)
+		)
 		.unique();
 	if (!hand) throw new ConvexError('Game unavailable');
 	return { round, hand };
 }
+
+// The starter of an opening Jack sets the active suit, then play passes on.
+export const chooseSuit = mutation({
+	args: { ...turnArgs, suit: suitValidator },
+	returns: v.null(),
+	handler: async (ctx, { suit, ...turn }) => {
+		const round = await currentTurn(ctx, turn);
+		if (round.opening.kind !== 'choose-suit') throw new ConvexError('No suit to choose');
+		await ctx.db.patch('rounds', round._id, {
+			activeSuit: suit,
+			opening: { kind: 'none' },
+			currentSeatId: nextSeatId(round),
+			version: round.version + 1
+		});
+		return null;
+	}
+});
 
 export const play = mutation({
 	// `cards` is an ordered same-rank group placed first to last; the last card is the new top.

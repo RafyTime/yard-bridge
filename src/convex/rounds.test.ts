@@ -532,3 +532,91 @@ test('an opening 6 is covered through Draw, and a cover that cannot be drawn is 
 		});
 	expect(next.playable).toEqual(next.hand);
 });
+
+test('a drawn card is played alone, and a drawn 6 still must be covered', async () => {
+	const { players, views, seatIds } = await opened(
+		[cards('Kc Ks Kd Ad'), cards('Qc Ac 7d 8s 10c')],
+		card('9h'),
+		cards('7c 10h 7s 6c')
+	);
+	const [host, guest] = players;
+	let [hostView, view] = await views();
+	const roundId = view.id;
+	await guest.mutation(api.rounds.draw, { roundId, expectedVersion: view.version });
+	[, view] = await views();
+	expect(view.drawnCard).toEqual(card('10h'));
+	await expect(
+		guest.mutation(api.rounds.play, {
+			roundId,
+			expectedVersion: view.version,
+			cards: cards('10h 10c')
+		})
+	).rejects.toThrow('Play the card you drew');
+	await guest.mutation(api.rounds.play, {
+		roundId,
+		expectedVersion: view.version,
+		cards: cards('10h')
+	});
+	[hostView] = await views();
+	expect(hostView).toMatchObject({ currentSeatId: seatIds[0], canDraw: true });
+	await host.mutation(api.rounds.draw, { roundId, expectedVersion: hostView.version });
+	[hostView] = await views();
+	expect(hostView.drawnCard).toEqual(card('6c'));
+	await host.mutation(api.rounds.play, {
+		roundId,
+		expectedVersion: hostView.version,
+		cards: cards('6c')
+	});
+	[hostView, view] = await views();
+	for (const seat of [hostView, view])
+		expect(seat).toMatchObject({ mustCover: true, activeSuit: 'clubs', currentSeatId: seatIds[0] });
+	expect(hostView).toMatchObject({ drawnCard: null, playable: cards('Kc') });
+});
+
+test('the starter chooses the active suit for an opening Jack before play continues', async () => {
+	const { players, views, seatIds } = await opened(
+		[cards('Kc Ks Kd Ad'), cards('Qc Ac 7d 8s 10s')],
+		card('Jh')
+	);
+	const [host, guest] = players;
+	let [hostView, view] = await views();
+	for (const seat of [hostView, view])
+		expect(seat).toMatchObject({
+			opening: { kind: 'choose-suit', seatId: seatIds[0] },
+			activeSuit: null,
+			currentSeatId: seatIds[0],
+			playable: [],
+			canDraw: false
+		});
+	const turn = { roundId: view.id, expectedVersion: view.version };
+	await expect(host.mutation(api.rounds.play, { ...turn, cards: cards('Kc') })).rejects.toThrow(
+		'opening card must be resolved'
+	);
+	await expect(host.mutation(api.rounds.draw, turn)).rejects.toThrow(
+		'opening card must be resolved'
+	);
+	await expect(guest.mutation(api.rounds.chooseSuit, { ...turn, suit: 'spades' })).rejects.toThrow(
+		'Not your turn'
+	);
+	await host.mutation(api.rounds.chooseSuit, { ...turn, suit: 'spades' });
+	await expect(host.mutation(api.rounds.chooseSuit, { ...turn, suit: 'clubs' })).rejects.toThrow(
+		'Round changed'
+	);
+	[hostView, view] = await views();
+	for (const seat of [hostView, view])
+		expect(seat).toMatchObject({
+			opening: { kind: 'none' },
+			activeSuit: 'spades',
+			topCard: card('Jh'),
+			currentSeatId: seatIds[1],
+			version: turn.expectedVersion + 1
+		});
+	expect(view.playable).toEqual(cards('8s 10s'));
+	await expect(
+		guest.mutation(api.rounds.chooseSuit, {
+			roundId: view.id,
+			expectedVersion: view.version,
+			suit: 'hearts'
+		})
+	).rejects.toThrow('No suit to choose');
+});
