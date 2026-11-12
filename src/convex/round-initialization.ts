@@ -1,7 +1,8 @@
 import type { Infer } from 'convex/values';
 import type { Doc, Id } from './_generated/dataModel';
 import { openingValidator } from './cards';
-import type { Card } from './cards';
+import type { Card, Effect } from './cards';
+import { drawEffect } from './round-turns';
 import type { RulesConfiguration } from './rules';
 
 // Initialize the complete deal and pending opening effect from server-selected inputs.
@@ -27,19 +28,14 @@ export function initializeRound({
 	}
 	const topCard = hands[starterIndex].pop()!;
 	let opening: Infer<typeof openingValidator> = { kind: 'none' };
+	let effect: Effect | null = null;
 	if (rules.openingEffects) {
 		if (topCard.rank === 'J') opening = { kind: 'choose-suit', seatId: starter._id };
 		else if (topCard.rank === '6') opening = { kind: 'cover-six', seatId: starter._id };
-		else if (topCard.rank === '7')
-			opening = { kind: 'effect', targetSeatId: next._id, drawCount: 1, skip: false };
-		else if (topCard.rank === '8')
-			opening = { kind: 'effect', targetSeatId: next._id, drawCount: 2, skip: true };
-		else if (topCard.rank === 'A')
-			opening = { kind: 'effect', targetSeatId: next._id, drawCount: 0, skip: true };
-		else if (topCard.rank === 'Q' && topCard.suit === 'spades')
-			opening = { kind: 'effect', targetSeatId: next._id, drawCount: 5, skip: false };
-		else if (topCard.rank === 'K' && topCard.suit === 'spades' && rules.kingOfSpades)
-			opening = { kind: 'effect', targetSeatId: next._id, drawCount: 7, skip: false };
+		// An opening Ace's skip stays pending until ticket 10 resolves Aces.
+		const pending =
+			topCard.rank === 'A' ? { drawCount: 0, skip: true } : drawEffect([topCard], rules);
+		if (pending) effect = { targetSeatId: next._id, ...pending };
 	}
 	return {
 		rules,
@@ -50,6 +46,7 @@ export function initializeRound({
 			opening.kind === 'choose-suit' || opening.kind === 'cover-six' ? starter._id : next._id,
 		activeSuit: opening.kind === 'choose-suit' ? null : topCard.suit,
 		opening,
+		effect,
 		drawnCard: null,
 		mustCover: opening.kind === 'cover-six',
 		recycles: 0,

@@ -141,11 +141,11 @@
 			{:else if table.mustCover && !isTurn}<p>
 					{m.round_cover_waiting({ number: seatNumber(table.currentSeatId) })}
 				</p>
-			{:else if table.opening.kind === 'effect'}
-				{#if table.opening.drawCount > 0}<p>
-						{m.round_draw_effect({ count: table.opening.drawCount })}
+			{:else if table.effect}
+				{#if table.effect.drawCount > 0}<p>
+						{m.round_draw_effect({ count: table.effect.drawCount })}
 					</p>{/if}
-				{#if table.opening.skip}<p>{m.round_skip_effect()}</p>{/if}
+				{#if table.effect.skip}<p>{m.round_skip_effect()}</p>{/if}
 			{:else if !table.openingEffects}<p class="text-muted-foreground">
 					{m.round_effects_off()}
 				</p>{/if}

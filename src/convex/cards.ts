@@ -13,14 +13,17 @@ export type Card = Infer<typeof cardValidator>;
 export const openingValidator = v.union(
 	v.object({ kind: v.literal('none') }),
 	v.object({ kind: v.literal('choose-suit'), seatId: v.id('seats') }),
-	v.object({ kind: v.literal('cover-six'), seatId: v.id('seats') }),
-	v.object({
-		kind: v.literal('effect'),
-		targetSeatId: v.id('seats'),
-		drawCount: v.number(),
-		skip: v.boolean()
-	})
+	v.object({ kind: v.literal('cover-six'), seatId: v.id('seats') })
 );
+
+// A draw or skip waiting on its target Seat, from the opening card or a play. The target
+// resolves it with Accept before any other move.
+export const effectValidator = v.object({
+	targetSeatId: v.id('seats'),
+	drawCount: v.number(),
+	skip: v.boolean()
+});
+export type Effect = Infer<typeof effectValidator>;
 
 export const sameCard = (left: Card, right: Card) =>
 	left.rank === right.rank && left.suit === right.suit;

@@ -1,10 +1,11 @@
 import { ConvexError, v } from 'convex/values';
-import type { Id } from './_generated/dataModel';
+import type { Doc, Id } from './_generated/dataModel';
 import { mutation, query } from './_generated/server';
 import type { MutationCtx } from './_generated/server';
 import { requirePlayer } from './access';
 import {
 	cardValidator,
+	effectValidator,
 	openingValidator,
 	ranks,
 	sameCard,
@@ -14,10 +15,12 @@ import {
 } from './cards';
 import { initializeRound } from './round-initialization';
 import {
+	blockedReason,
 	canPlay,
+	drawCards,
+	drawEffect,
 	drawUntilPlayable,
 	nextSeatId,
-	openingBlocksMoves,
 	playableCards,
 	withCardCount
 } from './round-turns';
@@ -70,6 +73,7 @@ export const view = query({
 		currentSeatId: v.id('seats'),
 		activeSuit: v.union(suitValidator, v.null()),
 		opening: openingValidator,
+		effect: v.union(effectValidator, v.null()),
 		mustCover: v.boolean(),
 		openingEffects: v.boolean(),
 		seats: v.array(v.object({ seatId: v.id('seats'), cardCount: v.number() }))
@@ -100,7 +104,7 @@ export const view = query({
 			version: round.version,
 			hand: hand.cards,
 			playable,
-			canDraw: isTurn && !openingBlocksMoves(round) && !playable.length,
+			canDraw: isTurn && !blockedReason(round) && !playable.length,
 			drawnCard: isTurn ? round.drawnCard : null,
 			topCard: round.playedPile[round.playedPile.length - 1],
 			drawCount: round.drawPile.length,
@@ -109,6 +113,7 @@ export const view = query({
 			activeSuit: round.activeSuit,
 			mustCover: round.mustCover,
 			opening: round.opening,
+			effect: round.effect,
 			openingEffects: round.rules.openingEffects,
 			seats: round.handCounts
 		};
@@ -139,13 +144,8 @@ async function currentTurn(
 	return round;
 }
 
-// Load the caller's hand for Play or Draw, rejecting opening states these moves cannot resolve.
-async function ordinaryTurn(
-	ctx: MutationCtx,
-	turn: { roundId: Id<'rounds'>; expectedVersion: number }
-) {
-	const round = await currentTurn(ctx, turn);
-	if (openingBlocksMoves(round)) throw new ConvexError('The opening card must be resolved first');
+// Load the caller's hand for the turn.
+async function currentHand(ctx: MutationCtx, round: Doc<'rounds'>) {
 	const hand = await ctx.db
 		.query('roundHands')
 		.withIndex('by_roundId_and_seatId', (q) =>
@@ -153,7 +153,18 @@ async function ordinaryTurn(
 		)
 		.unique();
 	if (!hand) throw new ConvexError('Game unavailable');
-	return { round, hand };
+	return hand;
+}
+
+// Load the turn for Play or Draw, rejecting pending states these moves cannot resolve.
+async function ordinaryTurn(
+	ctx: MutationCtx,
+	turn: { roundId: Id<'rounds'>; expectedVersion: number }
+) {
+	const round = await currentTurn(ctx, turn);
+	const blocked = blockedReason(round);
+	if (blocked) throw new ConvexError(blocked);
+	return { round, hand: await currentHand(ctx, round) };
 }
 
 // The starter of an opening Jack sets the active suit, then play passes on.
@@ -198,12 +209,15 @@ export const play = mutation({
 		if (top.rank !== 'J' && suit) throw new ConvexError('Only a Jack chooses a suit');
 		// A 6 on top keeps the turn until the same Seat covers it.
 		const mustCover = top.rank === '6';
+		const next = nextSeatId(round);
+		const effect = drawEffect(group, round.rules);
 		await ctx.db.patch('roundHands', hand._id, { cards });
 		await ctx.db.patch('rounds', round._id, {
 			playedPile: [...round.playedPile, ...group],
 			activeSuit: suit ?? top.suit,
-			currentSeatId: mustCover ? round.currentSeatId : nextSeatId(round),
+			currentSeatId: mustCover ? round.currentSeatId : next,
 			mustCover,
+			effect: effect && { targetSeatId: next, ...effect },
 			drawnCard: null,
 			opening: { kind: 'none' },
 			handCounts: withCardCount(round, hand.seatId, cards.length),
@@ -231,6 +245,31 @@ export const draw = mutation({
 			drawnCard: playable,
 			mustCover: playable ? round.mustCover : false,
 			opening: playable ? round.opening : { kind: 'none' },
+			handCounts: withCardCount(round, hand.seatId, cards.length),
+			version: round.version + 1
+		});
+		return null;
+	}
+});
+
+// The target of a pending effect draws its cards, or what remains after recycling, then plays
+// on unless the effect skips them.
+export const accept = mutation({
+	args: turnArgs,
+	returns: v.null(),
+	handler: async (ctx, turn) => {
+		const round = await currentTurn(ctx, turn);
+		const { effect } = round;
+		if (!effect) throw new ConvexError('No effect to accept');
+		if (!effect.drawCount) throw new ConvexError('Ace effects are not available yet');
+		const hand = await currentHand(ctx, round);
+		const { drawn, ...piles } = drawCards(round, effect.drawCount);
+		const cards = [...hand.cards, ...drawn];
+		await ctx.db.patch('roundHands', hand._id, { cards });
+		await ctx.db.patch('rounds', round._id, {
+			...piles,
+			effect: null,
+			currentSeatId: effect.skip ? nextSeatId(round) : round.currentSeatId,
 			handCounts: withCardCount(round, hand.seatId, cards.length),
 			version: round.version + 1
 		});

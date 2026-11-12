@@ -3,6 +3,7 @@ import { convexTest } from 'convex-test';
 import { afterEach, expect, test, vi } from 'vite-plus/test';
 import { api } from './_generated/api';
 import type { Card } from './cards';
+import type { RulesConfiguration } from './rules';
 import schema from './schema';
 import { createPlayer } from '../../tests/fixtures/convex-player';
 import {
@@ -17,7 +18,7 @@ import {
 
 const modules = import.meta.glob(['./**/*.{ts,js}', '!./**/*.test.ts', '!./**/*.d.ts']);
 
-async function table(count = 2, handSize = 5, openingEffects = true) {
+async function table(count = 2, rules: Partial<RulesConfiguration> = {}) {
 	const t = convexTest(schema, modules);
 	const player = (index: number) => createPlayer(t, `player${index}@example.com`);
 	const players = await Promise.all(Array.from({ length: count }, (_, index) => player(index)));
@@ -33,7 +34,7 @@ async function table(count = 2, handSize = 5, openingEffects = true) {
 	await host.mutation(api.gameRules.update, {
 		gameId,
 		expectedVersion: game.version,
-		rules: { ...game.rules, handSize, openingEffects }
+		rules: { ...game.rules, ...rules }
 	});
 	game = await host.query(api.games.view, { gameId });
 	for (const player of players)
@@ -129,8 +130,13 @@ afterEach(() => {
 });
 
 // Opens a Round from a controlled deal with Seat 1 as the starter, so Seat 2 moves first.
-async function opened(hands: Card[][], top: Card, draw: Card[] = [], openingEffects = true) {
-	const setup = await table(hands.length, hands[1].length, openingEffects);
+async function opened(
+	hands: Card[][],
+	top: Card,
+	draw: Card[] = [],
+	rules: Partial<RulesConfiguration> = {}
+) {
+	const setup = await table(hands.length, { handSize: hands[1].length, ...rules });
 	const { host, players, gameId, game } = setup;
 	const deck = dealDeck(hands, top, draw);
 	vi.stubGlobal(
@@ -335,7 +341,7 @@ test('an empty draw pile passes the turn, then recycles the played pile below it
 	for (const other of others) expect(other.seats[0].cardCount).toBe(10);
 });
 
-test('a pending opening effect blocks ordinary moves until its rules resolve it', async () => {
+test('a pending opening effect blocks ordinary moves until its target accepts it', async () => {
 	const { players, views } = await opened(
 		[cards('10c 10d Ks Kd'), cards('10h 9s Qc Ac 7d')],
 		card('7h')
@@ -345,15 +351,15 @@ test('a pending opening effect blocks ordinary moves until its rules resolve it'
 	const turn = { roundId: guestView.id, expectedVersion: guestView.version };
 	await expect(
 		players[1].mutation(api.rounds.play, { ...turn, cards: [card('10h')] })
-	).rejects.toThrow('opening card must be resolved');
+	).rejects.toThrow('Accept the pending effect first');
 	await expect(players[1].mutation(api.rounds.draw, turn)).rejects.toThrow(
-		'opening card must be resolved'
+		'Accept the pending effect first'
 	);
 	const disabled = await opened(
 		[cards('10c 10d Ks Kd'), cards('10h 9s Qc Ac 7d')],
 		card('7h'),
 		[],
-		false
+		{ openingEffects: false }
 	);
 	const [, open] = await disabled.views();
 	expect(open.playable).toEqual(cards('10h 7d'));
@@ -619,4 +625,60 @@ test('the starter chooses the active suit for an opening Jack before play contin
 			suit: 'hearts'
 		})
 	).rejects.toThrow('No suit to choose');
+});
+
+test('a played 7 leaves one card pending on the next Seat, who accepts it and then plays', async () => {
+	const { players, views, seatIds } = await opened(
+		[cards('10c 10d Ks Kd'), cards('7h 9s Qc Ac 8d')],
+		card('9h'),
+		cards('7c Jd')
+	);
+	const [host, guest] = players;
+	let [, view] = await views();
+	const roundId = view.id;
+	await guest.mutation(api.rounds.play, {
+		roundId,
+		expectedVersion: view.version,
+		cards: cards('7h')
+	});
+	let hostView;
+	[hostView, view] = await views();
+	for (const seat of [hostView, view])
+		expect(seat).toMatchObject({
+			effect: { targetSeatId: seatIds[0], drawCount: 1, skip: false },
+			currentSeatId: seatIds[0]
+		});
+	expect(hostView).toMatchObject({ playable: [], canDraw: false });
+	const turn = { roundId, expectedVersion: hostView.version };
+	await expect(host.mutation(api.rounds.play, { ...turn, cards: cards('10c') })).rejects.toThrow(
+		'Accept the pending effect first'
+	);
+	await expect(host.mutation(api.rounds.draw, turn)).rejects.toThrow(
+		'Accept the pending effect first'
+	);
+	await expect(guest.mutation(api.rounds.accept, turn)).rejects.toThrow('Not your turn');
+	await host.mutation(api.rounds.accept, turn);
+	[hostView, view] = await views();
+	for (const seat of [hostView, view])
+		expect(seat).toMatchObject({
+			effect: null,
+			currentSeatId: seatIds[0],
+			drawCount: 25,
+			seats: [
+				{ seatId: seatIds[0], cardCount: 5 },
+				{ seatId: seatIds[1], cardCount: 4 }
+			]
+		});
+	expect(hostView).toMatchObject({ hand: cards('10c 10d Ks Kd 7c'), playable: cards('7c') });
+	// The accepted penalty is spent; a new 7 starts a fresh one-card effect.
+	await host.mutation(api.rounds.play, {
+		roundId,
+		expectedVersion: hostView.version,
+		cards: cards('7c')
+	});
+	[, view] = await views();
+	expect(view).toMatchObject({
+		effect: { targetSeatId: seatIds[1], drawCount: 1, skip: false },
+		currentSeatId: seatIds[1]
+	});
 });

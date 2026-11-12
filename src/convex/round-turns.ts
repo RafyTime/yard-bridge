@@ -1,6 +1,7 @@
 import type { Doc, Id } from './_generated/dataModel';
 import { shuffle } from './cards';
 import type { Card } from './cards';
+import type { RulesConfiguration } from './rules';
 
 type Round = Doc<'rounds'>;
 
@@ -12,14 +13,31 @@ export function canPlay(round: Pick<Round, 'playedPile' | 'activeSuit' | 'mustCo
 	return !round.mustCover && (card.rank === '6' || card.rank === 'J');
 }
 
-// Opening states that ordinary moves cannot resolve: the starter's suit choice after an opening
-// Jack, and opening effects that later rule tickets apply.
-export const openingBlocksMoves = (round: Pick<Round, 'opening'>) =>
-	round.opening.kind === 'choose-suit' || round.opening.kind === 'effect';
+// The draw effect of a played group's top card. Same-rank 7s and 8s add their draws; any other
+// group fires only its top card. Aces arrive with ticket 10.
+export function drawEffect(
+	group: readonly Card[],
+	rules: Pick<RulesConfiguration, 'kingOfSpades'>
+) {
+	const top = group[group.length - 1];
+	if (top.rank === '7') return { drawCount: group.length, skip: false };
+	if (top.rank === '8') return { drawCount: 2 * group.length, skip: true };
+	if (top.suit === 'spades' && top.rank === 'Q') return { drawCount: 5, skip: false };
+	if (top.suit === 'spades' && top.rank === 'K' && rules.kingOfSpades)
+		return { drawCount: 7, skip: false };
+	return null;
+}
+
+// Pending states that Play and Draw cannot resolve, with the reason shown to the mover.
+export function blockedReason(round: Pick<Round, 'opening' | 'effect'>) {
+	if (round.opening.kind === 'choose-suit') return 'The opening card must be resolved first';
+	if (round.effect) return 'Accept the pending effect first';
+	return null;
+}
 
 // Cards the Seat may play now: only the drawn card after a Draw, otherwise every match in hand.
 export function playableCards(round: Round, seatId: Id<'seats'>, hand: readonly Card[]) {
-	if (round.currentSeatId !== seatId || openingBlocksMoves(round)) return [];
+	if (round.currentSeatId !== seatId || blockedReason(round)) return [];
 	if (round.drawnCard) return [round.drawnCard];
 	return hand.filter((card) => canPlay(round, card));
 }
@@ -34,21 +52,44 @@ export function withCardCount(round: Round, seatId: Id<'seats'>, cardCount: numb
 	return round.handCounts.map((seat) => (seat.seatId === seatId ? { seatId, cardCount } : seat));
 }
 
-// Draw until a playable card appears, recycling the played pile below its top card when the
-// draw pile runs out. `playable` is null when nothing more can be drawn or recycled.
+type Piles = Pick<Round, 'drawPile' | 'playedPile' | 'recycles'>;
+
+// Take the next card, recycling the played pile below its top card when the draw pile is empty.
+// `card` is null when nothing more can be drawn or recycled.
+function takeCard({ drawPile, playedPile, recycles }: Piles) {
+	if (!drawPile.length) {
+		if (playedPile.length < 2) return { card: null, drawPile, playedPile, recycles };
+		drawPile = shuffle(playedPile.slice(0, -1));
+		playedPile = playedPile.slice(-1);
+		recycles++;
+	}
+	const [card, ...rest] = drawPile;
+	return { card, drawPile: rest, playedPile, recycles };
+}
+
+// Draw up to `count` cards. A short pile yields only what can be drawn after recycling.
+export function drawCards({ drawPile, playedPile, recycles }: Piles, count: number) {
+	let piles: Piles = { drawPile, playedPile, recycles };
+	const drawn: Card[] = [];
+	while (drawn.length < count) {
+		const { card, ...next } = takeCard(piles);
+		if (!card) break;
+		piles = next;
+		drawn.push(card);
+	}
+	return { drawn, ...piles };
+}
+
+// Draw until a playable card appears. `playable` is null when nothing more can be drawn or recycled.
 export function drawUntilPlayable(round: Round) {
-	let { drawPile, playedPile, recycles } = round;
+	const { drawPile, playedPile, recycles } = round;
+	let piles: Piles = { drawPile, playedPile, recycles };
 	const drawn: Card[] = [];
 	for (;;) {
-		if (!drawPile.length) {
-			if (playedPile.length < 2) return { drawn, drawPile, playedPile, recycles, playable: null };
-			drawPile = shuffle(playedPile.slice(0, -1));
-			playedPile = playedPile.slice(-1);
-			recycles++;
-		}
-		const [card, ...rest] = drawPile;
-		drawPile = rest;
+		const { card, ...next } = takeCard(piles);
+		if (!card) return { drawn, ...piles, playable: null };
+		piles = next;
 		drawn.push(card);
-		if (canPlay(round, card)) return { drawn, drawPile, playedPile, recycles, playable: card };
+		if (canPlay(round, card)) return { drawn, ...piles, playable: card };
 	}
 }

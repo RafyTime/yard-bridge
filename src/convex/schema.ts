@@ -2,7 +2,7 @@ import { defineSchema, defineTable } from 'convex/server';
 import { v } from 'convex/values';
 import { authTables } from '@convex-dev/auth/server';
 import { rulesValidator } from './rules';
-import { cardValidator, openingValidator, suitValidator } from './cards';
+import { cardValidator, effectValidator, openingValidator, suitValidator } from './cards';
 
 export default defineSchema({
 	...authTables,
@@ -28,6 +28,7 @@ export default defineSchema({
 		currentSeatId: v.id('seats'),
 		activeSuit: v.union(suitValidator, v.null()),
 		opening: openingValidator,
+		effect: v.union(effectValidator, v.null()),
 		// A Draw that found a playable card leaves it here until the current Seat plays it.
 		drawnCard: v.union(cardValidator, v.null()),
 		// The current Seat placed the top 6 and must cover it before play passes.
