@@ -801,9 +801,7 @@ test('a stacked 8 effect waits on its target, who accepts the draw and is skippe
 	await page.goto(`/uk${new URL(page.url()).search}`);
 	await page.setViewportSize({ width: 320, height: 640 });
 	await expect(
-		page
-			.getByRole('status')
-			.filter({ hasText: 'Візьміть з колоди 4 шт. і пропустіть хід.' })
+		page.getByRole('status').filter({ hasText: 'Візьміть з колоди 4 шт. і пропустіть хід.' })
 	).toBeVisible();
 	expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 	await page.screenshot({ path: test.info().outputPath('penalty-uk-phone.png'), fullPage: true });
