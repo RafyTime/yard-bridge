@@ -47,7 +47,11 @@
 	const sameCard = (left: Card, right: Card) =>
 		left.rank === right.rank && left.suit === right.suit;
 	// Turn commands carry the viewed version, so a move chosen from an outdated table is rejected.
-	async function move(table: Round, command: 'play' | 'draw' | 'chooseSuit', suit?: Suit) {
+	async function move(
+		table: Round,
+		command: 'play' | 'draw' | 'chooseSuit' | 'accept',
+		suit?: Suit
+	) {
 		if (moving) return;
 		moving = true;
 		moveError = false;
@@ -57,6 +61,7 @@
 				await client.mutation(api.rounds.play, { ...turn, cards: chosen, suit });
 			else if (command === 'chooseSuit' && suit)
 				await client.mutation(api.rounds.chooseSuit, { ...turn, suit });
+			else if (command === 'accept') await client.mutation(api.rounds.accept, turn);
 			else await client.mutation(api.rounds.draw, turn);
 		} catch {
 			moveError = true;
@@ -141,11 +146,14 @@
 			{:else if table.mustCover && !isTurn}<p>
 					{m.round_cover_waiting({ number: seatNumber(table.currentSeatId) })}
 				</p>
-			{:else if table.effect}
-				{#if table.effect.drawCount > 0}<p>
-						{m.round_draw_effect({ count: table.effect.drawCount })}
-					</p>{/if}
-				{#if table.effect.skip}<p>{m.round_skip_effect()}</p>{/if}
+			{:else if table.effect && !isTurn}
+				{@const effect = {
+					number: seatNumber(table.effect.targetSeatId),
+					count: table.effect.drawCount
+				}}
+				{#if !effect.count}<p>{m.round_skip_effect()}</p>
+				{:else if table.effect.skip}<p>{m.round_effect_skip(effect)}</p>
+				{:else}<p>{m.round_effect_play(effect)}</p>{/if}
 			{:else if !table.openingEffects}<p class="text-muted-foreground">
 					{m.round_effects_off()}
 				</p>{/if}
@@ -155,6 +163,16 @@
 			{:else if isTurn && table.mustCover && table.activeSuit}<p role="status">
 					{m.round_cover_prompt({ suit: suitNames[table.activeSuit] })}
 				</p>
+			{:else if isTurn && table.effect?.drawCount}
+				{@const count = table.effect.drawCount}
+				<p role="status">
+					{table.effect.skip
+						? m.round_effect_incoming_skip({ count })
+						: m.round_effect_incoming_play({ count })}
+				</p>
+				<Button class="min-h-11" onclick={() => move(table, 'accept')} disabled={moving}
+					>{moving ? m.auth_working() : m.round_effect_accept({ count })}</Button
+				>
 			{:else if table.playable.length || table.canDraw}<p role="status">{m.round_your_turn()}</p>
 			{:else if isTurn && table.opening.kind !== 'choose-suit'}<p role="status">
 					{m.round_waiting_opening()}
