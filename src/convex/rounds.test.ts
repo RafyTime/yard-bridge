@@ -153,7 +153,7 @@ test('the active player plays a matching card and every Seat sees the next turn'
 	await players[1].mutation(api.rounds.play, {
 		roundId: before.id,
 		expectedVersion: before.version,
-		card: card('10h')
+		cards: [card('10h')]
 	});
 	const [host, guest] = await views();
 	for (const view of [host, guest]) {
@@ -171,7 +171,7 @@ test('the active player plays a matching card and every Seat sees the next turn'
 	await players[0].mutation(api.rounds.play, {
 		roundId: host.id,
 		expectedVersion: host.version,
-		card: card('10c')
+		cards: [card('10c')]
 	});
 	const [, next] = await views();
 	expect(next.topCard).toEqual(card('10c'));
@@ -188,23 +188,23 @@ test('other Seats, outsiders, and illegal cards cannot change the Round', async 
 	const { id: roundId, version: expectedVersion } = before[0];
 	const [host, guest] = players;
 	await expect(
-		host.mutation(api.rounds.play, { roundId, expectedVersion, card: card('10c') })
+		host.mutation(api.rounds.play, { roundId, expectedVersion, cards: [card('10c')] })
 	).rejects.toThrow('Not your turn');
 	await expect(host.mutation(api.rounds.draw, { roundId, expectedVersion })).rejects.toThrow(
 		'Not your turn'
 	);
 	await expect(
-		guest.mutation(api.rounds.play, { roundId, expectedVersion, card: card('Qc') })
+		guest.mutation(api.rounds.play, { roundId, expectedVersion, cards: [card('Qc')] })
 	).rejects.toThrow('Card does not match');
 	await expect(
-		guest.mutation(api.rounds.play, { roundId, expectedVersion, card: card('9d') })
+		guest.mutation(api.rounds.play, { roundId, expectedVersion, cards: [card('9d')] })
 	).rejects.toThrow('Card not in your hand');
 	await expect(guest.mutation(api.rounds.draw, { roundId, expectedVersion })).rejects.toThrow(
 		'already have a playable card'
 	);
 	const outsider = await player(9);
 	await expect(
-		outsider.mutation(api.rounds.play, { roundId, expectedVersion, card: card('10h') })
+		outsider.mutation(api.rounds.play, { roundId, expectedVersion, cards: [card('10h')] })
 	).rejects.toThrow('Game unavailable');
 	expect(await views()).toEqual(before);
 	expect(before[1]).toMatchObject({ playable: cards('10h 9s'), canDraw: false, drawnCard: null });
@@ -219,16 +219,16 @@ test('a stale, repeated, or simultaneous move commits only once', async () => {
 	const [, guest] = players;
 	const [{ id: roundId, version: expectedVersion }] = await views();
 	const results = await Promise.allSettled([
-		guest.mutation(api.rounds.play, { roundId, expectedVersion, card: card('10h') }),
-		guest.mutation(api.rounds.play, { roundId, expectedVersion, card: card('9s') })
+		guest.mutation(api.rounds.play, { roundId, expectedVersion, cards: [card('10h')] }),
+		guest.mutation(api.rounds.play, { roundId, expectedVersion, cards: [card('9s')] })
 	]);
 	expect(results.map((result) => result.status).sort()).toEqual(['fulfilled', 'rejected']);
 	await expect(
-		guest.mutation(api.rounds.play, { roundId, expectedVersion, card: card('10h') })
+		guest.mutation(api.rounds.play, { roundId, expectedVersion, cards: [card('10h')] })
 	).rejects.toThrow('Round changed');
 	// 10♣ is legal on either new top card, but the Host chose it from an outdated table.
 	await expect(
-		players[0].mutation(api.rounds.play, { roundId, expectedVersion, card: card('10c') })
+		players[0].mutation(api.rounds.play, { roundId, expectedVersion, cards: [card('10c')] })
 	).rejects.toThrow('Round changed');
 	const [host, after] = await views();
 	expect(after.hand).toHaveLength(4);
@@ -274,11 +274,11 @@ test('a player without a match draws until one appears and must play that card a
 		'Play the card you drew'
 	);
 	await expect(
-		guest.mutation(api.rounds.play, { roundId, expectedVersion, card: card('7c') })
+		guest.mutation(api.rounds.play, { roundId, expectedVersion, cards: [card('7c')] })
 	).rejects.toThrow('Play the card you drew');
-	await guest.mutation(api.rounds.play, { roundId, expectedVersion, card: card('10h') });
+	await guest.mutation(api.rounds.play, { roundId, expectedVersion, cards: [card('10h')] });
 	await expect(
-		host.mutation(api.rounds.play, { roundId, expectedVersion, card: card('10c') })
+		host.mutation(api.rounds.play, { roundId, expectedVersion, cards: [card('10c')] })
 	).rejects.toThrow('Round changed');
 	const [after] = await views();
 	expect(after).toMatchObject({
@@ -293,9 +293,9 @@ test('a player without a match draws until one appears and must play that card a
 test('an empty draw pile passes the turn, then recycles the played pile below its top card', async () => {
 	const { players, views, seatIds } = await opened(
 		[
-			cards('6h 7h 8h Qh Kh Ah 9c 9d'),
+			cards('7c 7h 8h Qh Kh Ah 9c 9d'),
 			cards('Kc Kd Ks Ac Ad As Qc Qd Qs'),
-			cards('10h 7c 7d 10c 8c 8d 10d 6c 6d'),
+			cards('10h 6h 7d 10c 8c 8d 10d 6c 6d'),
 			cards('10s Jc Jd Js 6s 9s 7s 8s Jh')
 		],
 		card('9h')
@@ -311,12 +311,12 @@ test('an empty draw pile passes the turn, then recycles the played pile below it
 	await third.mutation(api.rounds.play, {
 		roundId,
 		expectedVersion: view.version,
-		card: card('10h')
+		cards: [card('10h')]
 	});
 	await fourth.mutation(api.rounds.play, {
 		roundId,
 		expectedVersion: view.version + 1,
-		card: card('10s')
+		cards: [card('10s')]
 	});
 	[view] = await views();
 	expect(view).toMatchObject({ currentSeatId: seatIds[0], canDraw: true });
@@ -344,7 +344,7 @@ test('a pending opening effect blocks ordinary moves until its rules resolve it'
 	expect(guestView).toMatchObject({ playable: [], canDraw: false });
 	const turn = { roundId: guestView.id, expectedVersion: guestView.version };
 	await expect(
-		players[1].mutation(api.rounds.play, { ...turn, card: card('10h') })
+		players[1].mutation(api.rounds.play, { ...turn, cards: [card('10h')] })
 	).rejects.toThrow('opening card must be resolved');
 	await expect(players[1].mutation(api.rounds.draw, turn)).rejects.toThrow(
 		'opening card must be resolved'
@@ -357,4 +357,31 @@ test('a pending opening effect blocks ordinary moves until its rules resolve it'
 	);
 	const [, open] = await disabled.views();
 	expect(open.playable).toEqual(cards('10h 7d'));
+});
+
+test('a 6 or Jack plays regardless of the table, and a Jack sets the suit every Seat sees', async () => {
+	const { players, views, seatIds } = await opened(
+		[cards('10c 10d Ks Kd'), cards('Jc 6s Qc Ac 7d')],
+		card('9h')
+	);
+	const [, guest] = players;
+	const [before, guestBefore] = await views();
+	expect(guestBefore.playable).toEqual(cards('Jc 6s'));
+	const turn = { roundId: before.id, expectedVersion: before.version };
+	await expect(guest.mutation(api.rounds.play, { ...turn, cards: cards('Jc') })).rejects.toThrow(
+		'Choose a suit for the Jack'
+	);
+	await expect(
+		guest.mutation(api.rounds.play, { ...turn, cards: cards('6s'), suit: 'hearts' })
+	).rejects.toThrow('Only a Jack chooses a suit');
+	await guest.mutation(api.rounds.play, { ...turn, cards: cards('Jc'), suit: 'diamonds' });
+	const [host, after] = await views();
+	for (const view of [host, after])
+		expect(view).toMatchObject({
+			topCard: card('Jc'),
+			activeSuit: 'diamonds',
+			currentSeatId: seatIds[0],
+			mustCover: false
+		});
+	expect(host.playable).toEqual(cards('10d Kd'));
 });

@@ -44,7 +44,7 @@
 		moveError = false;
 		const turn = { roundId: table.id, expectedVersion: table.version };
 		try {
-			if (card) await client.mutation(api.rounds.play, { ...turn, card });
+			if (card) await client.mutation(api.rounds.play, { ...turn, cards: [card] });
 			else await client.mutation(api.rounds.draw, turn);
 		} catch {
 			moveError = true;

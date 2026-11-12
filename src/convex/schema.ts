@@ -30,6 +30,8 @@ export default defineSchema({
 		opening: openingValidator,
 		// A Draw that found a playable card leaves it here until the current Seat plays it.
 		drawnCard: v.union(cardValidator, v.null()),
+		// The current Seat placed the top 6 and must cover it before play passes.
+		mustCover: v.boolean(),
 		// Counts recycles of the played pile; scoring applies the multiplier after the first.
 		recycles: v.number(),
 		// Increases with every accepted turn command so stale or repeated moves cannot commit.

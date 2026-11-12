@@ -17,6 +17,7 @@ import {
 	canPlay,
 	drawUntilPlayable,
 	nextSeatId,
+	openingBlocksMoves,
 	playableCards,
 	withCardCount
 } from './round-turns';
@@ -69,6 +70,7 @@ export const view = query({
 		currentSeatId: v.id('seats'),
 		activeSuit: v.union(suitValidator, v.null()),
 		opening: openingValidator,
+		mustCover: v.boolean(),
 		openingEffects: v.boolean(),
 		seats: v.array(v.object({ seatId: v.id('seats'), cardCount: v.number() }))
 	}),
@@ -98,13 +100,14 @@ export const view = query({
 			version: round.version,
 			hand: hand.cards,
 			playable,
-			canDraw: isTurn && round.opening.kind === 'none' && !playable.length,
+			canDraw: isTurn && !openingBlocksMoves(round) && !playable.length,
 			drawnCard: isTurn ? round.drawnCard : null,
 			topCard: round.playedPile[round.playedPile.length - 1],
 			drawCount: round.drawPile.length,
 			starterSeatId: round.starterSeatId,
 			currentSeatId: round.currentSeatId,
 			activeSuit: round.activeSuit,
+			mustCover: round.mustCover,
 			opening: round.opening,
 			openingEffects: round.rules.openingEffects,
 			seats: round.handCounts
@@ -145,20 +148,30 @@ async function ordinaryTurn(
 }
 
 export const play = mutation({
-	args: { ...turnArgs, card: cardValidator },
+	// `cards` is an ordered same-rank group placed first to last; the last card is the new top.
+	// A Jack on top needs the chosen `suit`.
+	args: { ...turnArgs, cards: v.array(cardValidator), suit: v.optional(suitValidator) },
 	returns: v.null(),
-	handler: async (ctx, { card, ...turn }) => {
+	handler: async (ctx, { cards: group, suit, ...turn }) => {
 		const { round, hand } = await ordinaryTurn(ctx, turn);
-		if (round.drawnCard && !sameCard(round.drawnCard, card))
+		const [first] = group;
+		const top = group.at(-1);
+		if (!first || !top) throw new ConvexError('Choose a card to play');
+		if (round.drawnCard && (group.length > 1 || !sameCard(round.drawnCard, first)))
 			throw new ConvexError('Play the card you drew');
-		const index = hand.cards.findIndex((held) => sameCard(held, card));
-		if (index < 0) throw new ConvexError('Card not in your hand');
-		if (!canPlay(round, card)) throw new ConvexError('Card does not match the table');
-		const cards = hand.cards.filter((_, held) => held !== index);
+		const cards = [...hand.cards];
+		for (const card of group) {
+			const index = cards.findIndex((held) => sameCard(held, card));
+			if (index < 0) throw new ConvexError('Card not in your hand');
+			cards.splice(index, 1);
+		}
+		if (!canPlay(round, first)) throw new ConvexError('Card does not match the table');
+		if (top.rank === 'J' && !suit) throw new ConvexError('Choose a suit for the Jack');
+		if (top.rank !== 'J' && suit) throw new ConvexError('Only a Jack chooses a suit');
 		await ctx.db.patch('roundHands', hand._id, { cards });
 		await ctx.db.patch('rounds', round._id, {
-			playedPile: [...round.playedPile, card],
-			activeSuit: card.suit,
+			playedPile: [...round.playedPile, ...group],
+			activeSuit: suit ?? top.suit,
 			currentSeatId: nextSeatId(round),
 			drawnCard: null,
 			handCounts: withCardCount(round, hand.seatId, cards.length),

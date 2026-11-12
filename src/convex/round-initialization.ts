@@ -51,6 +51,7 @@ export function initializeRound({
 		activeSuit: opening.kind === 'choose-suit' ? null : topCard.suit,
 		opening,
 		drawnCard: null,
+		mustCover: opening.kind === 'cover-six',
 		recycles: 0,
 		version: 0,
 		handCounts: seats.map((seat, index) => ({ seatId: seat._id, cardCount: hands[index].length })),

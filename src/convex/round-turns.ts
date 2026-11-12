@@ -4,16 +4,25 @@ import type { Card } from './cards';
 
 type Round = Doc<'rounds'>;
 
-// Ordinary suit-or-rank matching against the top card and the active suit.
+// Suit-or-rank matching against the top card and the active suit; a 6 or Jack is wild.
 export function canPlay(round: Pick<Round, 'playedPile' | 'activeSuit'>, card: Card) {
 	const top = round.playedPile[round.playedPile.length - 1];
-	return card.suit === round.activeSuit || card.rank === top.rank;
+	return (
+		card.suit === round.activeSuit ||
+		card.rank === top.rank ||
+		card.rank === '6' ||
+		card.rank === 'J'
+	);
 }
 
+// Opening states that ordinary moves cannot resolve: the starter's suit choice after an opening
+// Jack, and opening effects that later rule tickets apply.
+export const openingBlocksMoves = (round: Pick<Round, 'opening'>) =>
+	round.opening.kind === 'choose-suit' || round.opening.kind === 'effect';
+
 // Cards the Seat may play now: only the drawn card after a Draw, otherwise every match in hand.
-// Moves wait while an opening obligation or effect is pending.
 export function playableCards(round: Round, seatId: Id<'seats'>, hand: readonly Card[]) {
-	if (round.currentSeatId !== seatId || round.opening.kind !== 'none') return [];
+	if (round.currentSeatId !== seatId || openingBlocksMoves(round)) return [];
 	if (round.drawnCard) return [round.drawnCard];
 	return hand.filter((card) => canPlay(round, card));
 }
