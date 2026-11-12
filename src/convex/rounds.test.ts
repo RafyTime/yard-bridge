@@ -682,3 +682,98 @@ test('a played 7 leaves one card pending on the next Seat, who accepts it and th
 		currentSeatId: seatIds[1]
 	});
 });
+
+test('stacked 7s and 8s add their draws for the next Seat around a four-player table', async () => {
+	const { players, views, seatIds } = await opened(
+		[
+			cards('10c Ks Qc As'),
+			cards('7h 7c Kc Kd Ac'),
+			cards('9c Qh Qs 10s 10d'),
+			cards('8c 8d 9d 9s Ah')
+		],
+		card('9h'),
+		cards('Jd Js Jc Jh 6s 6h')
+	);
+	const [host, second, third, fourth] = players;
+	let [view] = await views();
+	const roundId = view.id;
+	const expectAll = async (state: object) => {
+		const all = await views();
+		for (const seat of all) expect(seat).toMatchObject(state);
+		return all;
+	};
+	await second.mutation(api.rounds.play, {
+		roundId,
+		expectedVersion: view.version,
+		cards: cards('7h 7c')
+	});
+	[view] = await expectAll({
+		effect: { targetSeatId: seatIds[2], drawCount: 2, skip: false },
+		currentSeatId: seatIds[2]
+	});
+	await third.mutation(api.rounds.accept, { roundId, expectedVersion: view.version });
+	const accepted = await expectAll({ effect: null, currentSeatId: seatIds[2] });
+	view = accepted[0];
+	expect(accepted[2].hand).toEqual(cards('9c Qh Qs 10s 10d Jd Js'));
+	await third.mutation(api.rounds.play, {
+		roundId,
+		expectedVersion: view.version,
+		cards: cards('9c')
+	});
+	[view] = await expectAll({ effect: null, currentSeatId: seatIds[3] });
+	await fourth.mutation(api.rounds.play, {
+		roundId,
+		expectedVersion: view.version,
+		cards: cards('8c 8d')
+	});
+	[view] = await expectAll({
+		effect: { targetSeatId: seatIds[0], drawCount: 4, skip: true },
+		currentSeatId: seatIds[0]
+	});
+	await host.mutation(api.rounds.accept, { roundId, expectedVersion: view.version });
+	[view] = await expectAll({
+		effect: null,
+		currentSeatId: seatIds[1],
+		seats: [
+			{ seatId: seatIds[0], cardCount: 8 },
+			{ seatId: seatIds[1], cardCount: 3 },
+			{ seatId: seatIds[2], cardCount: 6 },
+			{ seatId: seatIds[3], cardCount: 3 }
+		]
+	});
+	expect(view.hand).toEqual(cards('10c Ks Qc As Jc Jh 6s 6h'));
+});
+
+test.each([
+	{ count: 2, target: 0, next: 1 },
+	{ count: 3, target: 2, next: 0 }
+])(
+	'an 8 makes the next Seat of $count draw two and skips their turn',
+	async ({ count, target, next }) => {
+		const hands = [cards('10c Ks Qc As'), cards('8h 9s Kc Kd Ac'), cards('9c Qh Qs 10s 10d')];
+		const { players, views, seatIds } = await opened(
+			hands.slice(0, count),
+			card('9h'),
+			cards('Jd Js')
+		);
+		let [view] = await views();
+		await players[1].mutation(api.rounds.play, {
+			roundId: view.id,
+			expectedVersion: view.version,
+			cards: cards('8h')
+		});
+		[view] = await views();
+		expect(view).toMatchObject({
+			effect: { targetSeatId: seatIds[target], drawCount: 2, skip: true },
+			currentSeatId: seatIds[target]
+		});
+		await players[target].mutation(api.rounds.accept, {
+			roundId: view.id,
+			expectedVersion: view.version
+		});
+		const after = await views();
+		for (const seat of after)
+			expect(seat).toMatchObject({ effect: null, currentSeatId: seatIds[next] });
+		expect(after[target].hand.slice(-2)).toEqual(cards('Jd Js'));
+	}
+);
