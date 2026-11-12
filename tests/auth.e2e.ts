@@ -657,14 +657,16 @@ test('players take ordinary turns, drawing until the drawn card must be played',
 	await expect(page.getByText('Seat 2: 8 cards', { exact: false })).toBeVisible();
 	await expect(hand.getByRole('button', { disabled: false })).toHaveCount(1);
 	await page.reload();
-	await page.getByRole('button', { name: 'Play 10 of hearts', exact: true }).click();
+	await page.getByRole('button', { name: 'Select 10 of hearts', exact: true }).click();
+	await page.getByRole('button', { name: 'Play selected cards', exact: true }).click();
 	await expect(page.getByText('Current player: seat 1.', { exact: true })).toBeVisible();
 	await expect(page.getByRole('img', { name: '10 of hearts', exact: true })).toBeVisible();
 	await expect(page.getByText('Seat 2: 7 cards', { exact: false })).toBeVisible();
 	expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 
 	await switchAccount(page, backend, gameURL, 'host@example.com');
-	await page.getByRole('button', { name: 'Play 10 of clubs', exact: true }).click();
+	await page.getByRole('button', { name: 'Select 10 of clubs', exact: true }).click();
+	await page.getByRole('button', { name: 'Play selected cards', exact: true }).click();
 	await expect(page.getByText('Current player: seat 2.', { exact: true })).toBeVisible();
 	await expect(page.getByText('Seat 1: 3 cards', { exact: false })).toBeVisible();
 	await page.screenshot({
@@ -677,6 +679,75 @@ test('players take ordinary turns, drawing until the drawn card must be played',
 	expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 	await page.screenshot({
 		path: test.info().outputPath('ordinary-turn-uk-phone.png'),
+		fullPage: true
+	});
+});
+
+test('players arrange a same-rank group, cover a 6, and choose a Jack suit', async ({
+	page,
+	backend
+}) => {
+	// Six sign-ins across two accounts; Firefox needs more than the default budget.
+	test.slow();
+	await page.setViewportSize({ width: 390, height: 844 });
+	await page.goto('/');
+	await signInAs(page, backend, 'host@example.com');
+	await page.getByRole('button', { name: 'New game', exact: true }).click();
+	await page.getByLabel('Game name').fill('Wild table');
+	await page.getByRole('button', { name: 'Create private game' }).click();
+	const invitation = await invitationLink(page);
+	const gameURL = page.url();
+	await switchAccount(page, backend, invitation, 'guest@example.com');
+	await page.getByRole('button', { name: 'Request a seat', exact: true }).click();
+	await switchAccount(page, backend, gameURL, 'host@example.com');
+	await page.getByRole('button', { name: 'Approve', exact: true }).click();
+	await reviewRules(page);
+	await switchAccount(page, backend, invitation, 'guest@example.com');
+	await reviewRules(page);
+	await switchAccount(page, backend, gameURL, 'host@example.com');
+	// The Host opens 9♥ and holds 6♠ and K♠; the guest holds 10♥ 10♠ and J♣.
+	const deck = dealDeck([cards('6s Ks Kd 8c'), cards('10h 10s Jc 7d Qd')], card('9h'));
+	backend.scriptNextRound([...shuffleValues(orderedDeck, deck), choice(0, 2)]);
+	await page.getByRole('button', { name: 'Review and start', exact: true }).click();
+	await page.getByRole('button', { name: 'Start first round', exact: true }).click();
+	await expect(page.getByText('Current player: seat 2.', { exact: true })).toBeVisible();
+
+	await switchAccount(page, backend, gameURL, 'guest@example.com');
+	const hand = page.getByRole('list', { name: 'Your hand', exact: true });
+	await expect(hand.getByRole('button', { name: '10 of spades', exact: true })).toBeDisabled();
+	await hand.getByRole('button', { name: 'Select 10 of hearts', exact: true }).click();
+	await hand.getByRole('button', { name: 'Select 10 of spades', exact: true }).click();
+	const group = page.getByRole('list', { name: 'Your play, first to last', exact: true });
+	await expect(group.getByRole('listitem')).toHaveText(['10 of hearts', '10 of spades']);
+	await page.getByRole('button', { name: 'Play selected cards', exact: true }).click();
+	await expect(page.getByRole('img', { name: '10 of spades', exact: true })).toBeVisible();
+	await expect(page.getByText('Active suit: spades.', { exact: true })).toBeVisible();
+
+	await switchAccount(page, backend, gameURL, 'host@example.com');
+	await hand.getByRole('button', { name: 'Select 6 of spades', exact: true }).click();
+	await page.getByRole('button', { name: 'Play selected cards', exact: true }).click();
+	await expect(
+		page.getByRole('status').filter({ hasText: 'Cover the 6 with a spades card or another 6' })
+	).toBeVisible();
+	await expect(hand.getByRole('button', { disabled: false })).toHaveCount(1);
+	await hand.getByRole('button', { name: 'Select K of spades', exact: true }).click();
+	await page.getByRole('button', { name: 'Play selected cards', exact: true }).click();
+	await expect(page.getByText('Current player: seat 2.', { exact: true })).toBeVisible();
+
+	await switchAccount(page, backend, gameURL, 'guest@example.com');
+	await hand.getByRole('button', { name: 'Select J of clubs', exact: true }).click();
+	const picker = page.getByRole('group', { name: 'Choose the active suit', exact: true });
+	await page.screenshot({ path: test.info().outputPath('jack-suit-phone.png'), fullPage: true });
+	await picker.getByRole('button', { name: 'hearts', exact: true }).click();
+	await expect(page.getByText('Active suit: hearts.', { exact: true })).toBeVisible();
+	await expect(page.getByRole('img', { name: 'J of clubs', exact: true })).toBeVisible();
+	expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+	await page.goto(`/uk${new URL(page.url()).search}`);
+	await page.setViewportSize({ width: 320, height: 640 });
+	await expect(page.getByText('Активна масть: черви.', { exact: true })).toBeVisible();
+	expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+	await page.screenshot({
+		path: test.info().outputPath('wild-turn-uk-phone.png'),
 		fullPage: true
 	});
 });
