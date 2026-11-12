@@ -1,9 +1,25 @@
 import { ConvexError, v } from 'convex/values';
+import type { Id } from './_generated/dataModel';
 import { mutation, query } from './_generated/server';
+import type { MutationCtx } from './_generated/server';
 import { requirePlayer } from './access';
-import { cardValidator, openingValidator, ranks, suits, suitValidator } from './cards';
-import type { Card } from './cards';
+import {
+	cardValidator,
+	openingValidator,
+	ranks,
+	sameCard,
+	shuffle,
+	suits,
+	suitValidator
+} from './cards';
 import { initializeRound } from './round-initialization';
+import {
+	canPlay,
+	drawUntilPlayable,
+	nextSeatId,
+	playableCards,
+	withCardCount
+} from './round-turns';
 
 export const start = mutation({
 	args: { gameId: v.id('games'), expectedGameVersion: v.number() },
@@ -21,12 +37,7 @@ export const start = mutation({
 			.take(5);
 		if (seats.length < 2 || seats.length > 4 || seats.some((seat) => !seat.ready))
 			throw new ConvexError('Every player must review the rules');
-		const deck: Card[] = suits.flatMap((suit) => ranks.map((rank) => ({ suit, rank })));
-		// Convex seeds Math.random independently for each mutation and preserves it on retries.
-		for (let index = deck.length - 1; index > 0; index--) {
-			const other = Math.floor(Math.random() * (index + 1));
-			[deck[index], deck[other]] = [deck[other], deck[index]];
-		}
+		const deck = shuffle(suits.flatMap((suit) => ranks.map((rank) => ({ suit, rank }))));
 		const starterIndex = Math.floor(Math.random() * seats.length);
 		const { hands, ...round } = initializeRound({
 			deck,
@@ -46,7 +57,12 @@ export const view = query({
 	returns: v.object({
 		id: v.id('rounds'),
 		number: v.number(),
+		version: v.number(),
 		hand: v.array(cardValidator),
+		// Server-decided moves for this viewer; both stay empty outside the viewer's turn.
+		playable: v.array(cardValidator),
+		canDraw: v.boolean(),
+		drawnCard: v.union(cardValidator, v.null()),
 		topCard: cardValidator,
 		drawCount: v.number(),
 		starterSeatId: v.id('seats'),
@@ -74,10 +90,16 @@ export const view = query({
 			.withIndex('by_roundId_and_seatId', (q) => q.eq('roundId', round._id).eq('seatId', seat._id))
 			.unique();
 		if (!hand) throw new ConvexError('Game unavailable');
+		const playable = playableCards(round, seat._id, hand.cards);
+		const isTurn = round.currentSeatId === seat._id;
 		return {
 			id: round._id,
 			number: round.number,
+			version: round.version,
 			hand: hand.cards,
+			playable,
+			canDraw: isTurn && round.opening.kind === 'none' && !playable.length,
+			drawnCard: isTurn ? round.drawnCard : null,
 			topCard: round.playedPile[round.playedPile.length - 1],
 			drawCount: round.drawPile.length,
 			starterSeatId: round.starterSeatId,
@@ -87,5 +109,82 @@ export const view = query({
 			openingEffects: round.rules.openingEffects,
 			seats: round.handCounts
 		};
+	}
+});
+
+const turnArgs = { roundId: v.id('rounds'), expectedVersion: v.number() };
+
+// Load the caller's hand for an ordinary move, rejecting stale versions, other Seats' turns,
+// and pending opening states that later rule tickets resolve.
+async function ordinaryTurn(
+	ctx: MutationCtx,
+	{ roundId, expectedVersion }: { roundId: Id<'rounds'>; expectedVersion: number }
+) {
+	const player = await requirePlayer(ctx);
+	const round = await ctx.db.get('rounds', roundId);
+	const seat =
+		round &&
+		(await ctx.db
+			.query('seats')
+			.withIndex('by_gameId_and_userId', (q) => q.eq('gameId', round.gameId).eq('userId', player.id))
+			.unique());
+	if (!round || !seat) throw new ConvexError('Game unavailable');
+	if (round.version !== expectedVersion)
+		throw new ConvexError('Round changed. Review the latest table');
+	if (round.currentSeatId !== seat._id) throw new ConvexError('Not your turn');
+	if (round.opening.kind !== 'none')
+		throw new ConvexError('The opening card must be resolved first');
+	const hand = await ctx.db
+		.query('roundHands')
+		.withIndex('by_roundId_and_seatId', (q) => q.eq('roundId', round._id).eq('seatId', seat._id))
+		.unique();
+	if (!hand) throw new ConvexError('Game unavailable');
+	return { round, hand };
+}
+
+export const play = mutation({
+	args: { ...turnArgs, card: cardValidator },
+	returns: v.null(),
+	handler: async (ctx, { card, ...turn }) => {
+		const { round, hand } = await ordinaryTurn(ctx, turn);
+		if (round.drawnCard && !sameCard(round.drawnCard, card))
+			throw new ConvexError('Play the card you drew');
+		const index = hand.cards.findIndex((held) => sameCard(held, card));
+		if (index < 0) throw new ConvexError('Card not in your hand');
+		if (!canPlay(round, card)) throw new ConvexError('Card does not match the table');
+		const cards = hand.cards.filter((_, held) => held !== index);
+		await ctx.db.patch('roundHands', hand._id, { cards });
+		await ctx.db.patch('rounds', round._id, {
+			playedPile: [...round.playedPile, card],
+			activeSuit: card.suit,
+			currentSeatId: nextSeatId(round),
+			drawnCard: null,
+			handCounts: withCardCount(round, hand.seatId, cards.length),
+			version: round.version + 1
+		});
+		return null;
+	}
+});
+
+export const draw = mutation({
+	args: turnArgs,
+	returns: v.null(),
+	handler: async (ctx, turn) => {
+		const { round, hand } = await ordinaryTurn(ctx, turn);
+		if (round.drawnCard) throw new ConvexError('Play the card you drew');
+		if (hand.cards.some((card) => canPlay(round, card)))
+			throw new ConvexError('You already have a playable card');
+		const { drawn, playable, ...piles } = drawUntilPlayable(round);
+		const cards = [...hand.cards, ...drawn];
+		await ctx.db.patch('roundHands', hand._id, { cards });
+		await ctx.db.patch('rounds', round._id, {
+			...piles,
+			// With nothing left to draw or recycle, the turn passes.
+			currentSeatId: playable ? round.currentSeatId : nextSeatId(round),
+			drawnCard: playable,
+			handCounts: withCardCount(round, hand.seatId, cards.length),
+			version: round.version + 1
+		});
+		return null;
 	}
 });

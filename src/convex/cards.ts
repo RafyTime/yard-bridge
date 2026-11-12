@@ -21,3 +21,16 @@ export const openingValidator = v.union(
 		skip: v.boolean()
 	})
 );
+
+export const sameCard = (left: Card, right: Card) =>
+	left.rank === right.rank && left.suit === right.suit;
+
+// Convex seeds Math.random independently for each mutation and preserves it on retries.
+export function shuffle(cards: readonly Card[]) {
+	const shuffled = [...cards];
+	for (let index = shuffled.length - 1; index > 0; index--) {
+		const other = Math.floor(Math.random() * (index + 1));
+		[shuffled[index], shuffled[other]] = [shuffled[other], shuffled[index]];
+	}
+	return shuffled;
+}

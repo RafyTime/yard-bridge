@@ -28,6 +28,12 @@ export default defineSchema({
 		currentSeatId: v.id('seats'),
 		activeSuit: v.union(suitValidator, v.null()),
 		opening: openingValidator,
+		// A Draw that found a playable card leaves it here until the current Seat plays it.
+		drawnCard: v.union(cardValidator, v.null()),
+		// Counts recycles of the played pile; scoring applies the multiplier after the first.
+		recycles: v.number(),
+		// Increases with every accepted turn command so stale or repeated moves cannot commit.
+		version: v.number(),
 		handCounts: v.array(v.object({ seatId: v.id('seats'), cardCount: v.number() }))
 	}).index('by_gameId', ['gameId']),
 	roundHands: defineTable({

@@ -50,6 +50,9 @@ export function initializeRound({
 			opening.kind === 'choose-suit' || opening.kind === 'cover-six' ? starter._id : next._id,
 		activeSuit: opening.kind === 'choose-suit' ? null : topCard.suit,
 		opening,
+		drawnCard: null,
+		recycles: 0,
+		version: 0,
 		handCounts: seats.map((seat, index) => ({ seatId: seat._id, cardCount: hands[index].length })),
 		hands: seats.map((seat, index) => ({ seatId: seat._id, cards: hands[index] }))
 	};
