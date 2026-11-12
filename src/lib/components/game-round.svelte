@@ -33,6 +33,31 @@
 			pending = false;
 		}
 	}
+	type Round = NonNullable<typeof round.data>;
+	type Card = Round['hand'][number];
+	let moving = $state(false);
+	let moveError = $state(false);
+	// Turn commands carry the viewed version, so a move chosen from an outdated table is rejected.
+	async function move(table: Round, card?: Card) {
+		if (moving) return;
+		moving = true;
+		moveError = false;
+		const turn = { roundId: table.id, expectedVersion: table.version };
+		try {
+			if (card) await client.mutation(api.rounds.play, { ...turn, card });
+			else await client.mutation(api.rounds.draw, turn);
+		} catch {
+			moveError = true;
+		} finally {
+			moving = false;
+		}
+	}
+	function cardLabel(card: Card) {
+		return m.round_card({ rank: card.rank, suit: suitNames[card.suit] });
+	}
+	function isPlayable(table: Round, card: Card) {
+		return table.playable.some((item) => item.rank === card.rank && item.suit === card.suit);
+	}
 	function seatNumber(id: string) {
 		return game.seats.findIndex((seat) => seat.id === id) + 1;
 	}
@@ -62,10 +87,7 @@
 					<div
 						role="img"
 						class="flex h-20 w-14 flex-col items-center justify-center rounded-lg border bg-card text-2xl font-semibold text-card-foreground"
-						aria-label={m.round_card({
-							rank: table.topCard.rank,
-							suit: suitNames[table.topCard.suit]
-						})}
+						aria-label={cardLabel(table.topCard)}
 					>
 						{table.topCard.rank}<span aria-hidden="true">{suitSymbols[table.topCard.suit]}</span>
 					</div>
@@ -83,6 +105,17 @@
 					{m.round_effects_off()}
 				</p>{/if}
 			{#if table.activeSuit}<p>{m.round_active_suit({ suit: suitNames[table.activeSuit] })}</p>{/if}
+			{#if table.drawnCard}<p role="status">
+					{m.round_play_drawn({ card: cardLabel(table.drawnCard) })}
+				</p>
+			{:else if table.playable.length || table.canDraw}<p role="status">{m.round_your_turn()}</p>
+			{:else if table.currentSeatId === game.viewerSeatId}<p role="status">
+					{m.round_waiting_opening()}
+				</p>{/if}
+			{#if table.canDraw}<Button class="min-h-11" onclick={() => move(table)} disabled={moving}
+					>{moving ? m.auth_working() : m.round_draw()}</Button
+				>{/if}
+			{#if moveError}<p role="alert">{m.round_move_error()}</p>{/if}
 			<ul class="flex flex-col gap-2" aria-label={m.round_counts()}>
 				{#each table.seats as seat (seat.seatId)}<li>
 						{m.round_count({
@@ -94,11 +127,17 @@
 			<h4 class="font-semibold">{m.round_hand()}</h4>
 			<ul class="flex flex-wrap gap-2" aria-label={m.round_hand()}>
 				{#each table.hand as card (`${card.rank}:${card.suit}`)}
-					<li
-						class="flex h-20 w-14 flex-col items-center justify-center rounded-lg border bg-card text-xl font-semibold text-card-foreground"
-						aria-label={m.round_card({ rank: card.rank, suit: suitNames[card.suit] })}
-					>
-						{card.rank}<span aria-hidden="true">{suitSymbols[card.suit]}</span>
+					{@const playable = isPlayable(table, card)}
+					<li>
+						<button
+							type="button"
+							class="flex h-20 w-14 flex-col items-center justify-center rounded-lg border bg-card text-xl font-semibold text-card-foreground transition-transform enabled:-translate-y-1 enabled:border-primary enabled:shadow-md disabled:opacity-100 motion-reduce:transition-none"
+							aria-label={playable ? m.round_play_card({ card: cardLabel(card) }) : cardLabel(card)}
+							disabled={!playable || moving}
+							onclick={() => move(table, card)}
+						>
+							{card.rank}<span aria-hidden="true">{suitSymbols[card.suit]}</span>
+						</button>
 					</li>
 				{/each}
 			</ul>
