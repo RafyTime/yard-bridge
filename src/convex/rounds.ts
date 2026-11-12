@@ -170,11 +170,14 @@ export const play = mutation({
 		if (!canPlay(round, first)) throw new ConvexError('Card does not match the table');
 		if (top.rank === 'J' && !suit) throw new ConvexError('Choose a suit for the Jack');
 		if (top.rank !== 'J' && suit) throw new ConvexError('Only a Jack chooses a suit');
+		// A 6 on top keeps the turn until the same Seat covers it.
+		const mustCover = top.rank === '6';
 		await ctx.db.patch('roundHands', hand._id, { cards });
 		await ctx.db.patch('rounds', round._id, {
 			playedPile: [...round.playedPile, ...group],
 			activeSuit: suit ?? top.suit,
-			currentSeatId: nextSeatId(round),
+			currentSeatId: mustCover ? round.currentSeatId : nextSeatId(round),
+			mustCover,
 			drawnCard: null,
 			handCounts: withCardCount(round, hand.seatId, cards.length),
 			version: round.version + 1

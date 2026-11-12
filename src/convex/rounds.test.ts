@@ -418,3 +418,57 @@ test('a player places an ordered same-rank group and its last card becomes the t
 	expect(after.hand).toEqual(cards('Qc 7d'));
 	expect(host.playable).toEqual(cards('Kc'));
 });
+
+test('a played 6 keeps the turn until it is covered by its suit or another 6', async () => {
+	const { players, views, seatIds } = await opened(
+		[cards('Kc Kd Ks Ad'), cards('6s 6d 9d Jc 7s')],
+		card('9h')
+	);
+	const [, guest] = players;
+	let [host, view] = await views();
+	const roundId = host.id;
+	await guest.mutation(api.rounds.play, {
+		roundId,
+		expectedVersion: view.version,
+		cards: cards('6s')
+	});
+	[host, view] = await views();
+	for (const seat of [host, view])
+		expect(seat).toMatchObject({ topCard: card('6s'), mustCover: true, currentSeatId: seatIds[1] });
+	expect(host.playable).toEqual([]);
+	expect(view).toMatchObject({ playable: cards('6d 7s'), canDraw: false });
+	await expect(
+		guest.mutation(api.rounds.play, {
+			roundId,
+			expectedVersion: view.version,
+			cards: cards('Jc'),
+			suit: 'spades'
+		})
+	).rejects.toThrow('does not match');
+	await guest.mutation(api.rounds.play, {
+		roundId,
+		expectedVersion: view.version,
+		cards: cards('6d')
+	});
+	[host, view] = await views();
+	for (const seat of [host, view])
+		expect(seat).toMatchObject({
+			activeSuit: 'diamonds',
+			mustCover: true,
+			currentSeatId: seatIds[1]
+		});
+	expect(view.playable).toEqual(cards('9d'));
+	await guest.mutation(api.rounds.play, {
+		roundId,
+		expectedVersion: view.version,
+		cards: cards('9d')
+	});
+	[host, view] = await views();
+	for (const seat of [host, view])
+		expect(seat).toMatchObject({
+			topCard: card('9d'),
+			mustCover: false,
+			currentSeatId: seatIds[0]
+		});
+	expect(host.playable).toEqual(cards('Kd Ad'));
+});

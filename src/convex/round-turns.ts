@@ -4,15 +4,12 @@ import type { Card } from './cards';
 
 type Round = Doc<'rounds'>;
 
-// Suit-or-rank matching against the top card and the active suit; a 6 or Jack is wild.
-export function canPlay(round: Pick<Round, 'playedPile' | 'activeSuit'>, card: Card) {
+// Suit-or-rank matching against the top card and the active suit. A 6 or Jack is wild, but a
+// cover for the top 6 must be its suit or another 6.
+export function canPlay(round: Pick<Round, 'playedPile' | 'activeSuit' | 'mustCover'>, card: Card) {
 	const top = round.playedPile[round.playedPile.length - 1];
-	return (
-		card.suit === round.activeSuit ||
-		card.rank === top.rank ||
-		card.rank === '6' ||
-		card.rank === 'J'
-	);
+	if (card.suit === round.activeSuit || card.rank === top.rank) return true;
+	return !round.mustCover && (card.rank === '6' || card.rank === 'J');
 }
 
 // Opening states that ordinary moves cannot resolve: the starter's suit choice after an opening
