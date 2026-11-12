@@ -1,9 +1,11 @@
 import type { BrowserContext } from '@playwright/test';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { convexTest } from 'convex-test';
 import { makeFunctionReference } from 'convex/server';
 import type { Value } from 'convex/values';
 import { exportPKCS8, generateKeyPair, jwtVerify } from 'jose';
 import schema from '../../src/convex/schema';
+import { scriptedMath } from './controlled-random';
 
 // Exercise the real browser adapter and public backend functions without a hosted deployment.
 // Only the Convex wire transport and Resend delivery are replaced.
@@ -33,6 +35,13 @@ export async function authBackend(context: BrowserContext) {
 	let deliveryFails = false;
 	let deliveryPause: Promise<void> | undefined;
 	let rulesUpdatePause: Promise<void> | undefined;
+	// Only a scripted Round start sees the scripted randomness; Playwright keeps the real Math.
+	const originalMath = globalThis.Math;
+	const startRandom = new AsyncLocalStorage<Math>();
+	let nextStartMath: Math | undefined;
+	globalThis.Math = Object.create(originalMath, {
+		random: { value: () => (startRandom.getStore() ?? originalMath).random() }
+	});
 	const originalFetch = globalThis.fetch;
 	globalThis.fetch = async (input, init) => {
 		if (String(input) !== 'https://api.resend.com/emails') return originalFetch(input, init);
@@ -116,10 +125,14 @@ export async function authBackend(context: BrowserContext) {
 								rulesUpdatePause = undefined;
 								await pause;
 							}
-							const result = await session().mutation(
-								makeFunctionReference<'mutation'>(message.udfPath),
-								message.args[0]
-							);
+							const startMath = message.udfPath === 'rounds:start' ? nextStartMath : undefined;
+							if (startMath) nextStartMath = undefined;
+							const run = () =>
+								session().mutation(
+									makeFunctionReference<'mutation'>(message.udfPath),
+									message.args[0]
+								);
+							const result = startMath ? await startRandom.run(startMath, run) : await run();
 							await transition();
 							socket.send(
 								JSON.stringify({
@@ -193,11 +206,16 @@ export async function authBackend(context: BrowserContext) {
 			});
 			return () => resume();
 		},
+		// Scripts Math.random for the next Round start; see `shuffleValues` and `choice`.
+		scriptNextRound(values: readonly number[]) {
+			nextStartMath = scriptedMath(values);
+		},
 		failDelivery() {
 			deliveryFails = true;
 		},
 		restore() {
 			globalThis.fetch = originalFetch;
+			globalThis.Math = originalMath;
 			for (const [key, value] of Object.entries(previousEnvironment)) {
 				if (value === undefined) delete process.env[key];
 				else process.env[key] = value;

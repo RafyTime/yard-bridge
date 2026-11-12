@@ -1,5 +1,13 @@
 import { expect, test as base, type Page } from '@playwright/test';
 import { authBackend } from './fixtures/auth-backend';
+import {
+	card,
+	cards,
+	choice,
+	dealDeck,
+	orderedDeck,
+	shuffleValues
+} from './fixtures/controlled-random';
 
 const test = base.extend<{ backend: Backend }>({
 	backend: async ({ context }, use) => {
@@ -603,4 +611,72 @@ test('Rules drafts follow clean updates, require explicit conflict reload, and s
 	await page.getByRole('radio', { name: 'Table rules', exact: true }).click();
 	await expect(page.getByLabel('Score cutoff', { exact: true })).toHaveValue('400');
 	await expect(page.getByRole('alert').filter({ hasText: /\S/ })).toHaveCount(0);
+});
+
+test('players take ordinary turns, drawing until the drawn card must be played', async ({
+	page,
+	backend
+}) => {
+	// Six sign-ins across two accounts; Firefox needs more than the default budget.
+	test.slow();
+	await page.setViewportSize({ width: 390, height: 844 });
+	await page.goto('/');
+	await signInAs(page, backend, 'host@example.com');
+	await page.getByRole('button', { name: 'New game', exact: true }).click();
+	await page.getByLabel('Game name').fill('Turn table');
+	await page.getByRole('button', { name: 'Create private game' }).click();
+	const invitation = await invitationLink(page);
+	const gameURL = page.url();
+	await switchAccount(page, backend, invitation, 'guest@example.com');
+	await page.getByRole('button', { name: 'Request a seat', exact: true }).click();
+	await switchAccount(page, backend, gameURL, 'host@example.com');
+	await page.getByRole('button', { name: 'Approve', exact: true }).click();
+	await reviewRules(page);
+	await switchAccount(page, backend, invitation, 'guest@example.com');
+	await reviewRules(page);
+	await switchAccount(page, backend, gameURL, 'host@example.com');
+	// The Host opens 9♥; the guest has no match and draws 7♣ and 8♣ before 10♥.
+	const deck = dealDeck(
+		[cards('10c 10d Ks Kd'), cards('Qc Ac 7d 8s Qd')],
+		card('9h'),
+		cards('7c 8c 10h')
+	);
+	backend.scriptNextRound([...shuffleValues(orderedDeck, deck), choice(0, 2)]);
+	await page.getByRole('button', { name: 'Review and start', exact: true }).click();
+	await page.getByRole('button', { name: 'Start first round', exact: true }).click();
+	await expect(page.getByText('Current player: seat 2.', { exact: true })).toBeVisible();
+	const hand = page.getByRole('list', { name: 'Your hand', exact: true });
+	await expect(hand.getByRole('button', { disabled: false })).toHaveCount(0);
+
+	await switchAccount(page, backend, gameURL, 'guest@example.com');
+	await expect(page.getByRole('status').filter({ hasText: 'Your turn.' })).toBeVisible();
+	await page.getByRole('button', { name: 'Draw', exact: true }).click();
+	await expect(
+		page.getByRole('status').filter({ hasText: 'You drew the 10 of hearts. Play it now.' })
+	).toBeVisible();
+	await expect(page.getByText('Seat 2: 8 cards', { exact: false })).toBeVisible();
+	await expect(hand.getByRole('button', { disabled: false })).toHaveCount(1);
+	await page.reload();
+	await page.getByRole('button', { name: 'Play 10 of hearts', exact: true }).click();
+	await expect(page.getByText('Current player: seat 1.', { exact: true })).toBeVisible();
+	await expect(page.getByRole('img', { name: '10 of hearts', exact: true })).toBeVisible();
+	await expect(page.getByText('Seat 2: 7 cards', { exact: false })).toBeVisible();
+	expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+
+	await switchAccount(page, backend, gameURL, 'host@example.com');
+	await page.getByRole('button', { name: 'Play 10 of clubs', exact: true }).click();
+	await expect(page.getByText('Current player: seat 2.', { exact: true })).toBeVisible();
+	await expect(page.getByText('Seat 1: 3 cards', { exact: false })).toBeVisible();
+	await page.screenshot({
+		path: test.info().outputPath('ordinary-turn-phone.png'),
+		fullPage: true
+	});
+	await page.goto(`/uk${new URL(page.url()).search}`);
+	await page.setViewportSize({ width: 320, height: 640 });
+	await expect(page.getByText('Зараз ходить гравець на місці 2.', { exact: true })).toBeVisible();
+	expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+	await page.screenshot({
+		path: test.info().outputPath('ordinary-turn-uk-phone.png'),
+		fullPage: true
+	});
 });
