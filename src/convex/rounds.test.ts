@@ -385,3 +385,36 @@ test('a 6 or Jack plays regardless of the table, and a Jack sets the suit every 
 		});
 	expect(host.playable).toEqual(cards('10d Kd'));
 });
+
+test('a player places an ordered same-rank group and its last card becomes the top', async () => {
+	const { players, views, seatIds } = await opened(
+		[cards('Kc Kd Ks Ad'), cards('10h 10s 10c Qc 7d')],
+		card('9h')
+	);
+	const [, guest] = players;
+	const [before] = await views();
+	const turn = { roundId: before.id, expectedVersion: before.version };
+	for (const [group, error] of [
+		['10h Qc', 'same rank'],
+		['10s 10h', 'does not match'],
+		['10h 10h', 'not in your hand']
+	])
+		await expect(guest.mutation(api.rounds.play, { ...turn, cards: cards(group) })).rejects.toThrow(
+			error
+		);
+	expect(await views()).toEqual([before, expect.anything()]);
+	await guest.mutation(api.rounds.play, { ...turn, cards: cards('10h 10s 10c') });
+	const [host, after] = await views();
+	for (const view of [host, after])
+		expect(view).toMatchObject({
+			topCard: card('10c'),
+			activeSuit: 'clubs',
+			currentSeatId: seatIds[0],
+			seats: [
+				{ seatId: seatIds[0], cardCount: 4 },
+				{ seatId: seatIds[1], cardCount: 2 }
+			]
+		});
+	expect(after.hand).toEqual(cards('Qc 7d'));
+	expect(host.playable).toEqual(cards('Kc'));
+});

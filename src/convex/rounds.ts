@@ -159,6 +159,8 @@ export const play = mutation({
 		if (!first || !top) throw new ConvexError('Choose a card to play');
 		if (round.drawnCard && (group.length > 1 || !sameCard(round.drawnCard, first)))
 			throw new ConvexError('Play the card you drew');
+		if (group.some((card) => card.rank !== first.rank))
+			throw new ConvexError('A group must share the same rank');
 		const cards = [...hand.cards];
 		for (const card of group) {
 			const index = cards.findIndex((held) => sameCard(held, card));
