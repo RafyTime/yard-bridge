@@ -516,14 +516,14 @@ test('an opening 6 is covered through Draw, and a cover that cannot be drawn is 
 		],
 		card('6h')
 	);
-	let [starter, next] = await exhausted.views();
+	const [starter] = await exhausted.views();
 	expect(starter).toMatchObject({ drawCount: 0, canDraw: true });
 	await exhausted.players[0].mutation(api.rounds.draw, {
 		roundId: starter.id,
 		expectedVersion: starter.version
 	});
-	[starter, next] = await exhausted.views();
-	for (const seat of [starter, next])
+	const [after, next] = await exhausted.views();
+	for (const seat of [after, next])
 		expect(seat).toMatchObject({
 			opening: { kind: 'none' },
 			mustCover: false,
@@ -540,7 +540,7 @@ test('a drawn card is played alone, and a drawn 6 still must be covered', async 
 		cards('7c 10h 7s 6c')
 	);
 	const [host, guest] = players;
-	let [hostView, view] = await views();
+	let [, view] = await views();
 	const roundId = view.id;
 	await guest.mutation(api.rounds.draw, { roundId, expectedVersion: view.version });
 	[, view] = await views();
@@ -557,7 +557,7 @@ test('a drawn card is played alone, and a drawn 6 still must be covered', async 
 		expectedVersion: view.version,
 		cards: cards('10h')
 	});
-	[hostView] = await views();
+	let [hostView] = await views();
 	expect(hostView).toMatchObject({ currentSeatId: seatIds[0], canDraw: true });
 	await host.mutation(api.rounds.draw, { roundId, expectedVersion: hostView.version });
 	[hostView] = await views();
