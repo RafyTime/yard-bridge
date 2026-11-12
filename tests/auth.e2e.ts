@@ -751,3 +751,64 @@ test('players arrange a same-rank group, cover a 6, and choose a Jack suit', asy
 		fullPage: true
 	});
 });
+
+test('a stacked 8 penalty waits on its target, who accepts the draw and is skipped', async ({
+	page,
+	backend
+}) => {
+	// Six sign-ins across two accounts; Firefox needs more than the default budget.
+	test.slow();
+	await page.setViewportSize({ width: 390, height: 844 });
+	await page.goto('/');
+	await signInAs(page, backend, 'host@example.com');
+	await page.getByRole('button', { name: 'New game', exact: true }).click();
+	await page.getByLabel('Game name').fill('Penalty table');
+	await page.getByRole('button', { name: 'Create private game' }).click();
+	const invitation = await invitationLink(page);
+	const gameURL = page.url();
+	await switchAccount(page, backend, invitation, 'guest@example.com');
+	await page.getByRole('button', { name: 'Request a seat', exact: true }).click();
+	await switchAccount(page, backend, gameURL, 'host@example.com');
+	await page.getByRole('button', { name: 'Approve', exact: true }).click();
+	await reviewRules(page);
+	await switchAccount(page, backend, invitation, 'guest@example.com');
+	await reviewRules(page);
+	await switchAccount(page, backend, gameURL, 'host@example.com');
+	// The Host opens 9♥; the guest stacks 8♥ 8♦, so the Host draws four and is skipped.
+	const deck = dealDeck([cards('10c 10d Ks Kd'), cards('8h 8d Qc Ac 7s')], card('9h'));
+	backend.scriptNextRound([...shuffleValues(orderedDeck, deck), choice(0, 2)]);
+	await page.getByRole('button', { name: 'Review and start', exact: true }).click();
+	await page.getByRole('button', { name: 'Start first round', exact: true }).click();
+	await expect(page.getByText('Current player: seat 2.', { exact: true })).toBeVisible();
+
+	await switchAccount(page, backend, gameURL, 'guest@example.com');
+	const hand = page.getByRole('list', { name: 'Your hand', exact: true });
+	await hand.getByRole('button', { name: 'Select 8 of hearts', exact: true }).click();
+	await hand.getByRole('button', { name: 'Select 8 of diamonds', exact: true }).click();
+	await page.getByRole('button', { name: 'Play selected cards', exact: true }).click();
+	await expect(
+		page.getByText('Seat 1 must draw 4 and miss this turn.', { exact: true })
+	).toBeVisible();
+	await expect(page.getByRole('button', { name: /^Accept/ })).toHaveCount(0);
+
+	await switchAccount(page, backend, gameURL, 'host@example.com');
+	await expect(
+		page.getByRole('status').filter({ hasText: 'Penalty for you: draw 4 and miss this turn.' })
+	).toBeVisible();
+	await expect(hand.getByRole('button', { disabled: false })).toHaveCount(0);
+	await expect(page.getByRole('button', { name: 'Draw', exact: true })).toHaveCount(0);
+	await page.screenshot({ path: test.info().outputPath('penalty-phone.png'), fullPage: true });
+	await page.goto(`/uk${new URL(page.url()).search}`);
+	await page.setViewportSize({ width: 320, height: 640 });
+	await expect(
+		page
+			.getByRole('status')
+			.filter({ hasText: 'Штраф для вас: візьміть з колоди 4 шт. і пропустіть хід.' })
+	).toBeVisible();
+	expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+	await page.screenshot({ path: test.info().outputPath('penalty-uk-phone.png'), fullPage: true });
+	await page.getByRole('button', { name: 'Прийняти й узяти 4 шт.', exact: true }).click();
+	await expect(page.getByText('Зараз ходить гравець на місці 2.', { exact: true })).toBeVisible();
+	await expect(page.getByText('Місце 1: 8 карт', { exact: false })).toBeVisible();
+	await expect(page.getByRole('status').filter({ hasText: 'Штраф' })).toHaveCount(0);
+});
