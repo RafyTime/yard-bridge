@@ -472,3 +472,63 @@ test('a played 6 keeps the turn until it is covered by its suit or another 6', a
 		});
 	expect(host.playable).toEqual(cards('Kd Ad'));
 });
+
+test('an opening 6 is covered through Draw, and a cover that cannot be drawn is waived', async () => {
+	const { players, views, seatIds } = await opened(
+		[cards('Kc Ks Kd 9c'), cards('Qc Ac 7d 8s Qd')],
+		card('6h'),
+		cards('7c 8h')
+	);
+	const [host] = players;
+	let [view, guest] = await views();
+	for (const seat of [view, guest])
+		expect(seat).toMatchObject({
+			opening: { kind: 'cover-six', seatId: seatIds[0] },
+			mustCover: true,
+			activeSuit: 'hearts',
+			currentSeatId: seatIds[0]
+		});
+	expect(view).toMatchObject({ playable: [], canDraw: true });
+	expect(guest).toMatchObject({ playable: [], canDraw: false });
+	await host.mutation(api.rounds.draw, { roundId: view.id, expectedVersion: view.version });
+	[view] = await views();
+	expect(view).toMatchObject({ drawnCard: card('8h'), mustCover: true });
+	await host.mutation(api.rounds.play, {
+		roundId: view.id,
+		expectedVersion: view.version,
+		cards: cards('8h')
+	});
+	[view, guest] = await views();
+	for (const seat of [view, guest])
+		expect(seat).toMatchObject({
+			opening: { kind: 'none' },
+			mustCover: false,
+			topCard: card('8h'),
+			currentSeatId: seatIds[1]
+		});
+
+	const exhausted = await opened(
+		[
+			cards('Kc Ks Kd 9c 9s 9d 10c 10s'),
+			cards('7h 8h 9h 10h Jh Qh Kh Ah 6c'),
+			cards('6d 6s 7c 8c Jc Qc Ac 7s 8s'),
+			cards('Js Qs As 7d 8d 10d Jd Qd Ad')
+		],
+		card('6h')
+	);
+	let [starter, next] = await exhausted.views();
+	expect(starter).toMatchObject({ drawCount: 0, canDraw: true });
+	await exhausted.players[0].mutation(api.rounds.draw, {
+		roundId: starter.id,
+		expectedVersion: starter.version
+	});
+	[starter, next] = await exhausted.views();
+	for (const seat of [starter, next])
+		expect(seat).toMatchObject({
+			opening: { kind: 'none' },
+			mustCover: false,
+			topCard: card('6h'),
+			currentSeatId: exhausted.seatIds[1]
+		});
+	expect(next.playable).toEqual(next.hand);
+});

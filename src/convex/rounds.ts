@@ -118,7 +118,7 @@ export const view = query({
 const turnArgs = { roundId: v.id('rounds'), expectedVersion: v.number() };
 
 // Load the caller's hand for an ordinary move, rejecting stale versions, other Seats' turns,
-// and pending opening states that later rule tickets resolve.
+// and opening states that ordinary moves cannot resolve.
 async function ordinaryTurn(
 	ctx: MutationCtx,
 	{ roundId, expectedVersion }: { roundId: Id<'rounds'>; expectedVersion: number }
@@ -137,8 +137,7 @@ async function ordinaryTurn(
 	if (round.version !== expectedVersion)
 		throw new ConvexError('Round changed. Review the latest table');
 	if (round.currentSeatId !== seat._id) throw new ConvexError('Not your turn');
-	if (round.opening.kind !== 'none')
-		throw new ConvexError('The opening card must be resolved first');
+	if (openingBlocksMoves(round)) throw new ConvexError('The opening card must be resolved first');
 	const hand = await ctx.db
 		.query('roundHands')
 		.withIndex('by_roundId_and_seatId', (q) => q.eq('roundId', round._id).eq('seatId', seat._id))
@@ -179,6 +178,7 @@ export const play = mutation({
 			currentSeatId: mustCover ? round.currentSeatId : nextSeatId(round),
 			mustCover,
 			drawnCard: null,
+			opening: { kind: 'none' },
 			handCounts: withCardCount(round, hand.seatId, cards.length),
 			version: round.version + 1
 		});
@@ -199,9 +199,11 @@ export const draw = mutation({
 		await ctx.db.patch('roundHands', hand._id, { cards });
 		await ctx.db.patch('rounds', round._id, {
 			...piles,
-			// With nothing left to draw or recycle, the turn passes.
+			// With nothing left to draw or recycle, the turn passes and any 6 cover is waived.
 			currentSeatId: playable ? round.currentSeatId : nextSeatId(round),
 			drawnCard: playable,
+			mustCover: playable ? round.mustCover : false,
+			opening: playable ? round.opening : { kind: 'none' },
 			handCounts: withCardCount(round, hand.seatId, cards.length),
 			version: round.version + 1
 		});
