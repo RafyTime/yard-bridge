@@ -126,7 +126,9 @@ async function ordinaryTurn(
 		round &&
 		(await ctx.db
 			.query('seats')
-			.withIndex('by_gameId_and_userId', (q) => q.eq('gameId', round.gameId).eq('userId', player.id))
+			.withIndex('by_gameId_and_userId', (q) =>
+				q.eq('gameId', round.gameId).eq('userId', player.id)
+			)
 			.unique());
 	if (!round || !seat) throw new ConvexError('Game unavailable');
 	if (round.version !== expectedVersion)

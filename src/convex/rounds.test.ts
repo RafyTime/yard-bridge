@@ -139,7 +139,8 @@ async function opened(hands: Card[][], top: Card, draw: Card[] = [], openingEffe
 	);
 	await host.mutation(api.rounds.start, { gameId, expectedGameVersion: game.version });
 	vi.unstubAllGlobals();
-	const views = () => Promise.all(players.map((player) => player.query(api.rounds.view, { gameId })));
+	const views = () =>
+		Promise.all(players.map((player) => player.query(api.rounds.view, { gameId })));
 	return { ...setup, views, seatIds: game.seats.map((seat) => seat.id) };
 }
 
@@ -237,4 +238,123 @@ test('a stale, repeated, or simultaneous move commits only once', async () => {
 		{ seatId: seatIds[1], cardCount: 4 }
 	]);
 	expect(host.currentSeatId).toBe(seatIds[0]);
+});
+
+test('a player without a match draws until one appears and must play that card alone', async () => {
+	const { players, views, seatIds } = await opened(
+		[cards('10c 10d Ks Kd'), cards('Qc Ac 7d 8s Qd')],
+		card('9h'),
+		cards('7c 8c 10h Kh')
+	);
+	const [host, guest] = players;
+	const [before, guestBefore] = await views();
+	expect(guestBefore).toMatchObject({ playable: [], canDraw: true });
+	const { id: roundId } = before;
+	await guest.mutation(api.rounds.draw, { roundId, expectedVersion: before.version });
+	const [hostView, guestView] = await views();
+	expect(guestView.hand).toEqual(cards('Qc Ac 7d 8s Qd 7c 8c 10h'));
+	expect(guestView).toMatchObject({
+		drawnCard: card('10h'),
+		playable: [card('10h')],
+		canDraw: false,
+		currentSeatId: seatIds[1],
+		drawCount: before.drawCount - 3
+	});
+	expect(hostView).toMatchObject({
+		drawnCard: null,
+		playable: [],
+		drawCount: before.drawCount - 3
+	});
+	expect(hostView.seats).toEqual([
+		{ seatId: seatIds[0], cardCount: 4 },
+		{ seatId: seatIds[1], cardCount: 8 }
+	]);
+	const expectedVersion = guestView.version;
+	await expect(guest.mutation(api.rounds.draw, { roundId, expectedVersion })).rejects.toThrow(
+		'Play the card you drew'
+	);
+	await expect(
+		guest.mutation(api.rounds.play, { roundId, expectedVersion, card: card('7c') })
+	).rejects.toThrow('Play the card you drew');
+	await guest.mutation(api.rounds.play, { roundId, expectedVersion, card: card('10h') });
+	await expect(
+		host.mutation(api.rounds.play, { roundId, expectedVersion, card: card('10c') })
+	).rejects.toThrow('Round changed');
+	const [after] = await views();
+	expect(after).toMatchObject({
+		topCard: card('10h'),
+		currentSeatId: seatIds[0],
+		playable: cards('10c 10d'),
+		drawnCard: null
+	});
+	expect(after.seats[1].cardCount).toBe(7);
+});
+
+test('an empty draw pile passes the turn, then recycles the played pile below its top card', async () => {
+	const { players, views, seatIds } = await opened(
+		[
+			cards('6h 7h 8h Qh Kh Ah 9c 9d'),
+			cards('Kc Kd Ks Ac Ad As Qc Qd Qs'),
+			cards('10h 7c 7d 10c 8c 8d 10d 6c 6d'),
+			cards('10s Jc Jd Js 6s 9s 7s 8s Jh')
+		],
+		card('9h')
+	);
+	const [host, second, third, fourth] = players;
+	let [view] = await views();
+	const roundId = view.id;
+	expect(view.drawCount).toBe(0);
+	await second.mutation(api.rounds.draw, { roundId, expectedVersion: view.version });
+	[view] = await views();
+	expect(view).toMatchObject({ currentSeatId: seatIds[2], topCard: card('9h'), drawCount: 0 });
+	expect(view.seats[1].cardCount).toBe(9);
+	await third.mutation(api.rounds.play, {
+		roundId,
+		expectedVersion: view.version,
+		card: card('10h')
+	});
+	await fourth.mutation(api.rounds.play, {
+		roundId,
+		expectedVersion: view.version + 1,
+		card: card('10s')
+	});
+	[view] = await views();
+	expect(view).toMatchObject({ currentSeatId: seatIds[0], canDraw: true });
+	const recycled = cards('9h 10h');
+	vi.stubGlobal('Math', scriptedMath(shuffleValues(recycled, recycled)));
+	await host.mutation(api.rounds.draw, { roundId, expectedVersion: view.version });
+	vi.unstubAllGlobals();
+	const [hostView, ...others] = await views();
+	expect(hostView).toMatchObject({
+		topCard: card('10s'),
+		drawCount: 0,
+		drawnCard: card('10h'),
+		currentSeatId: seatIds[0]
+	});
+	expect(hostView.hand.slice(-2)).toEqual(recycled);
+	for (const other of others) expect(other.seats[0].cardCount).toBe(10);
+});
+
+test('a pending opening effect blocks ordinary moves until its rules resolve it', async () => {
+	const { players, views } = await opened(
+		[cards('10c 10d Ks Kd'), cards('10h 9s Qc Ac 7d')],
+		card('7h')
+	);
+	const [, guestView] = await views();
+	expect(guestView).toMatchObject({ playable: [], canDraw: false });
+	const turn = { roundId: guestView.id, expectedVersion: guestView.version };
+	await expect(
+		players[1].mutation(api.rounds.play, { ...turn, card: card('10h') })
+	).rejects.toThrow('opening card must be resolved');
+	await expect(players[1].mutation(api.rounds.draw, turn)).rejects.toThrow(
+		'opening card must be resolved'
+	);
+	const disabled = await opened(
+		[cards('10c 10d Ks Kd'), cards('10h 9s Qc Ac 7d')],
+		card('7h'),
+		[],
+		false
+	);
+	const [, open] = await disabled.views();
+	expect(open.playable).toEqual(cards('10h 7d'));
 });
