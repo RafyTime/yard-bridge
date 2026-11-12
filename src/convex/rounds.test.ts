@@ -777,3 +777,173 @@ test.each([
 		expect(after[target].hand.slice(-2)).toEqual(cards('Jd Js'));
 	}
 );
+
+test.each([
+	{ group: 'Qh Qs', top: 'Qd', rules: {}, drawCount: 5 },
+	{ group: 'Qs Qh', top: 'Qd', rules: {}, drawCount: 0 },
+	{ group: 'Kh Ks', top: 'Kd', rules: { kingOfSpades: true }, drawCount: 7 },
+	{ group: 'Kh Ks', top: 'Kd', rules: { kingOfSpades: false }, drawCount: 0 }
+])(
+	'playing $group with $rules fires only the top card: $drawCount to draw without a skip',
+	async ({ group, top, rules, drawCount }) => {
+		const { players, views, seatIds } = await opened(
+			[cards('10c 10d 9c 9d'), cards(`${group} 9s 7c Ac`)],
+			card(top),
+			[],
+			rules
+		);
+		const [host, guest] = players;
+		let [view] = await views();
+		await guest.mutation(api.rounds.play, {
+			roundId: view.id,
+			expectedVersion: view.version,
+			cards: cards(group)
+		});
+		[view] = await views();
+		expect(view).toMatchObject({
+			effect: drawCount ? { targetSeatId: seatIds[0], drawCount, skip: false } : null,
+			currentSeatId: seatIds[0]
+		});
+		if (!drawCount) return;
+		await host.mutation(api.rounds.accept, { roundId: view.id, expectedVersion: view.version });
+		[view] = await views();
+		expect(view).toMatchObject({ effect: null, currentSeatId: seatIds[0] });
+		expect(view.hand).toHaveLength(4 + drawCount);
+	}
+);
+
+test.each([
+	{ top: '7h', rules: {}, effect: { drawCount: 1, skip: false } },
+	{ top: '8h', rules: {}, effect: { drawCount: 2, skip: true } },
+	{ top: '8h', rules: { openingEffects: false }, effect: null },
+	{ top: 'Qs', rules: {}, effect: { drawCount: 5, skip: false } },
+	{ top: 'Qs', rules: { openingEffects: false }, effect: null },
+	{ top: 'Ks', rules: { kingOfSpades: true }, effect: { drawCount: 7, skip: false } },
+	{ top: 'Ks', rules: { kingOfSpades: false }, effect: null },
+	{ top: 'Ks', rules: { kingOfSpades: true, openingEffects: false }, effect: null }
+])(
+	'an opening $top under $rules leaves $effect on the next Seat',
+	async ({ top, rules, effect }) => {
+		const { players, views, seatIds } = await opened(
+			[cards('10c 10d 9c 9d'), cards('10h 9s Qc Ac 7d')],
+			card(top),
+			[],
+			rules
+		);
+		let [view, guest] = await views();
+		expect(view).toMatchObject({
+			effect: effect && { targetSeatId: seatIds[1], ...effect },
+			currentSeatId: seatIds[1]
+		});
+		if (!effect) {
+			expect(guest.canDraw || guest.playable.length > 0).toBe(true);
+			return;
+		}
+		await players[1].mutation(api.rounds.accept, {
+			roundId: view.id,
+			expectedVersion: view.version
+		});
+		[view, guest] = await views();
+		expect(view).toMatchObject({
+			effect: null,
+			currentSeatId: seatIds[effect.skip ? 0 : 1]
+		});
+		expect(guest.hand).toHaveLength(5 + effect.drawCount);
+	}
+);
+
+test('an opening Ace skip stays pending and cannot be accepted until Ace effects arrive', async () => {
+	const { players, views, seatIds } = await opened(
+		[cards('10c 10d 9c 9d'), cards('10h 9s Qc Ac 7d')],
+		card('Ah')
+	);
+	const [, guest] = await views();
+	expect(guest).toMatchObject({
+		effect: { targetSeatId: seatIds[1], drawCount: 0, skip: true },
+		playable: [],
+		canDraw: false
+	});
+	const turn = { roundId: guest.id, expectedVersion: guest.version };
+	await expect(players[1].mutation(api.rounds.accept, turn)).rejects.toThrow(
+		'Ace effects are not available yet'
+	);
+	await expect(
+		players[1].mutation(api.rounds.play, { ...turn, cards: cards('Ac') })
+	).rejects.toThrow('Accept the pending effect first');
+});
+
+test('a stale, repeated, or simultaneous accept draws the penalty only once', async () => {
+	const { players, views, seatIds } = await opened(
+		[cards('10c 10d Ks Kd'), cards('7h 9s Qc Ac 8d')],
+		card('9h'),
+		cards('Jc Jd')
+	);
+	const [host, guest] = players;
+	let [view] = await views();
+	await guest.mutation(api.rounds.play, {
+		roundId: view.id,
+		expectedVersion: view.version,
+		cards: cards('7h')
+	});
+	[view] = await views();
+	const turn = { roundId: view.id, expectedVersion: view.version };
+	const results = await Promise.allSettled([
+		host.mutation(api.rounds.accept, turn),
+		host.mutation(api.rounds.accept, turn)
+	]);
+	expect(results.map((result) => result.status).sort()).toEqual(['fulfilled', 'rejected']);
+	await expect(host.mutation(api.rounds.accept, turn)).rejects.toThrow('Round changed');
+	[view] = await views();
+	await expect(
+		host.mutation(api.rounds.accept, { ...turn, expectedVersion: view.version })
+	).rejects.toThrow('No effect to accept');
+	expect(view).toMatchObject({
+		hand: cards('10c 10d Ks Kd Jc'),
+		currentSeatId: seatIds[0],
+		version: turn.expectedVersion + 1
+	});
+});
+
+test('a penalty larger than the piles draws what remains after recycling', async () => {
+	const { players, views, seatIds } = await opened(
+		[
+			cards('Kc Ks Kd 9c 9s 9d 10c 10s'),
+			cards('Qh 8h 10h Jh Ah 6c 7c 8c Jc'),
+			cards('Qs 7s 8s Js As 6d 7d 8d Jd'),
+			cards('Qc Qd Ac Ad 10d 6s 6h 7h Kh')
+		],
+		card('9h')
+	);
+	const [, second, third, fourth] = players;
+	let [view] = await views();
+	const roundId = view.id;
+	await second.mutation(api.rounds.play, {
+		roundId,
+		expectedVersion: view.version,
+		cards: cards('Qh')
+	});
+	await third.mutation(api.rounds.play, {
+		roundId,
+		expectedVersion: view.version + 1,
+		cards: cards('Qs')
+	});
+	[view] = await views();
+	expect(view).toMatchObject({
+		drawCount: 0,
+		effect: { targetSeatId: seatIds[3], drawCount: 5, skip: false }
+	});
+	const recycled = cards('9h Qh');
+	vi.stubGlobal('Math', scriptedMath(shuffleValues(recycled, recycled)));
+	await fourth.mutation(api.rounds.accept, { roundId, expectedVersion: view.version });
+	vi.unstubAllGlobals();
+	const after = await views();
+	for (const seat of after)
+		expect(seat).toMatchObject({
+			effect: null,
+			drawCount: 0,
+			topCard: card('Qs'),
+			currentSeatId: seatIds[3]
+		});
+	expect(after[3].hand.slice(-2)).toEqual(recycled);
+	expect(after[3].hand).toHaveLength(11);
+});
