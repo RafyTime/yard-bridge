@@ -752,7 +752,7 @@ test('players arrange a same-rank group, cover a 6, and choose a Jack suit', asy
 	});
 });
 
-test('a stacked 8 penalty waits on its target, who accepts the draw and is skipped', async ({
+test('a stacked 8 effect waits on its target, who accepts the draw and is skipped', async ({
 	page,
 	backend
 }) => {
@@ -793,7 +793,7 @@ test('a stacked 8 penalty waits on its target, who accepts the draw and is skipp
 
 	await switchAccount(page, backend, gameURL, 'host@example.com');
 	await expect(
-		page.getByRole('status').filter({ hasText: 'Penalty for you: draw 4 and miss this turn.' })
+		page.getByRole('status').filter({ hasText: 'Draw 4 and miss this turn.' })
 	).toBeVisible();
 	await expect(hand.getByRole('button', { disabled: false })).toHaveCount(0);
 	await expect(page.getByRole('button', { name: 'Draw', exact: true })).toHaveCount(0);
@@ -803,12 +803,12 @@ test('a stacked 8 penalty waits on its target, who accepts the draw and is skipp
 	await expect(
 		page
 			.getByRole('status')
-			.filter({ hasText: 'Штраф для вас: візьміть з колоди 4 шт. і пропустіть хід.' })
+			.filter({ hasText: 'Візьміть з колоди 4 шт. і пропустіть хід.' })
 	).toBeVisible();
 	expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 	await page.screenshot({ path: test.info().outputPath('penalty-uk-phone.png'), fullPage: true });
 	await page.getByRole('button', { name: 'Прийняти й узяти 4 шт.', exact: true }).click();
 	await expect(page.getByText('Зараз ходить гравець на місці 2.', { exact: true })).toBeVisible();
 	await expect(page.getByText('Місце 1: 8 карт', { exact: false })).toBeVisible();
-	await expect(page.getByRole('status').filter({ hasText: 'Штраф' })).toHaveCount(0);
+	await expect(page.getByRole('status').filter({ hasText: 'Візьміть з колоди' })).toHaveCount(0);
 });
