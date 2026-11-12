@@ -49,10 +49,12 @@ See the [map's Decisions-so-far](../yard-bridge-map.md#decisions-so-far).
 
 Verification: `PUBLIC_CONVEX_URL=https://ci.invalid RUN_CONVEX_SMOKE=0 bun run quality`
 on 12 November 2026. Formatting, linting, and type checks passed, and 66 unit tests passed.
-In the browser suite, 44 tests passed and 1 was skipped. The new flow passed on Chromium,
+In the browser suite, 43 tests passed and 1 was skipped. The new flow passed on Chromium,
 Pixel Chrome, Firefox, and iPhone WebKit. The two iPhone WebKit focus checks that already
-failed before this ticket still fail, in the sign-in and rules-drawer tests. No deployment
-or shared channel was changed.
+failed before this ticket still fail, in the sign-in and rules-drawer tests. One Firefox
+test, a different one on each full run, timed out waiting for the sign-in code field. That
+test makes no Round moves, and all 11 Firefox tests passed when that project ran alone. No
+deployment or shared channel was changed.
 
 ## Comments
 
