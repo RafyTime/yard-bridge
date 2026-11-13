@@ -42,8 +42,8 @@ Build a private, mobile-first PWA for two to four players. The host invites play
 28. As a player without a legal card, I want to draw until I can play, so that the turn advances under our chosen rule.
 29. As a player, I want to play a newly drawn playable card immediately, so that drawing cannot be used to stockpile a legal card.
 30. As a player, I want the pile below its top card recycled when the draw pile empties, so that a round can continue.
-31. As a player, I want a 7 to make the next player draw one and then play, so that its penalty matches our rules.
-32. As a player, I want an 8 to make the next player draw two and skip, so that its penalty matches our rules.
+31. As a player, I want a 7 to make the next player draw one and then play, so that its draw effect matches our rules.
+32. As a player, I want an 8 to make the next player draw two and skip, so that its draw effect matches our rules.
 33. As a player, I want the Queen of Spades to make the next player draw five and skip their turn, so that its special effect works in any table size.
 34. As a host, I want a separate King of Spades toggle, so that I can enable its seven-card draw and skip without changing the score cutoff.
 35. As a player, I want 7s and 8s in one same-rank play to add their draws, so that those stacks work as agreed.
@@ -88,7 +88,7 @@ Build a private, mobile-first PWA for two to four players. The host invites play
 - Freeze settings at the first Round start. Core settings include score cutoff, King of Spades effect, and hand size. Advanced settings include opening effects, Bridge declaration, Ace behavior, recycle multiplier, and starter policy. Present all players with core rules and changed details before readying; clear ready states after any host edit.
 - A 6 and Jack may be played regardless of suit or rank. Cover a 6 with a card of its suit or another 6; another 6 continues the obligation. Covering cards apply their effects. If the draw pile and recyclable played cards are exhausted, waive an unfulfillable cover and pass.
 - Draw until a legal play exists, then play the newly drawn playable card immediately. Recycle played cards except the top when necessary. When every active player has passed once with no legal play and no drawable or recyclable card remains, end the Round and score all remaining hands without a Jack finish deduction.
-- Resolve 7 as draw one then play, 8 as draw two then skip, Queen of Spades as draw five then skip, and enabled King of Spades as draw seven then skip. Each targets the next active player in table order. Same-rank 7s and 8s in one play add their draws; other same-rank plays trigger only the top card's special effect. Penalties do not transfer across turns. If a draw effect asks for more cards than the draw pile holds, recycle first, then draw whatever remains; play continues without a draw pile.
+- Resolve 7 as draw one then play, 8 as draw two then skip, Queen of Spades as draw five then skip, and enabled King of Spades as draw seven then skip. Each targets the next active player in table order. Same-rank 7s and 8s in one play add their draws; other same-rank plays trigger only the top card's special effect. A draw effect applies only to its target's turn and does not pass on. If a draw effect asks for more cards than the draw pile holds, recycle first, then draw whatever remains; play continues without a draw pile.
 - Default Ace behavior skips the next player. In the alternative Ace rule, a targeted player may immediately play an Ace from hand to cancel the entire incoming draw or skip, including a stack. That Ace uses the player's turn and play passes onward.
 - An enabled Bridge declaration ends the Round even when the declarer holds cards. Emptying a hand also ends the Round, after its final card effect resolves. A Bridge declarer scores cards still held.
 - Score remaining hands as follows: 6 through 9 are zero; 10, ordinary Queen, and ordinary King are 10; Ace is 15; Jack is 20; Queen of Spades is 50; enabled special King of Spades is 80. With its toggle off, King of Spades is an ordinary King worth 10.
@@ -103,7 +103,7 @@ Build a private, mobile-first PWA for two to four players. The host invites play
 ## Testing Decisions
 
 - Test observable behavior through the highest useful seam: authenticated public game commands followed by each Seat's authorized state. Use this seam for rules, scoring, invitations, history, reconnection, access control, and concurrent or repeated commands. Assert the result a player can observe, not private helper calls or document layout.
-- Make the game rules deterministic under a supplied deck order and random choice for testing. This lets the public command seam reproduce first plays, recycles, ties, penalties, and rare deadlocks without depending on chance.
+- Make the game rules deterministic under a supplied deck order and random choice for testing. This lets the public command seam reproduce first plays, recycles, ties, draw effects, and rare deadlocks without depending on chance.
 - Cover two-player defaults, every configurable rule, and four-player next-seat effects. Include exact-cutoff reset, negative scores, multiple simultaneous losses, administrative removal, host transfer, and unfinished-game recovery.
 - Verify that one Seat cannot query another active hand, and that stale or simultaneous moves cannot both commit.
 - Use a small number of browser checks for email-code sign-in, Seat recovery, PWA installation, cached offline view, Railway cold-start recovery, and mobile layout. Run them on Pixel Chrome and Firefox-family browsers and iPhone Safari and Chrome, then desktop.
