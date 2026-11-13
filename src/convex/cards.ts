@@ -17,8 +17,7 @@ export const orderedDeck: readonly Card[] = suits.flatMap((suit) =>
 
 export const openingValidator = v.union(
 	v.object({ kind: v.literal('none') }),
-	v.object({ kind: v.literal('choose-suit'), seatId: v.id('seats') }),
-	v.object({ kind: v.literal('cover-six'), seatId: v.id('seats') })
+	v.object({ kind: v.literal('choose-suit'), seatId: v.id('seats') })
 );
 
 // A draw or skip waiting on its target Seat, from the opening card or a play. The target

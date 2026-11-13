@@ -103,7 +103,7 @@ test.each([
 	{
 		rank: '6',
 		suit: 'diamonds',
-		opening: { kind: 'cover-six', seatId: seats[1]._id },
+		opening: { kind: 'none' },
 		effect: null,
 		current: 1
 	},
@@ -151,6 +151,7 @@ test.each([
 		expect(round.effect).toEqual(effect);
 		expect(round.currentSeatId).toBe(seats[current]._id);
 		expect(round.activeSuit).toBe(rank === 'J' ? null : suit);
+		expect(round.mustCover).toBe(rank === '6');
 	}
 );
 

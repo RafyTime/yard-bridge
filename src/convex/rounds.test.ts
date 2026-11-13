@@ -489,7 +489,7 @@ test('an opening 6 is covered through Draw, and a cover that cannot be drawn is 
 	let [view, guest] = await views();
 	for (const seat of [view, guest])
 		expect(seat).toMatchObject({
-			opening: { kind: 'cover-six', seatId: seatIds[0] },
+			opening: { kind: 'none' },
 			mustCover: true,
 			activeSuit: 'hearts',
 			currentSeatId: seatIds[0]

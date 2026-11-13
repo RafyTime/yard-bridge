@@ -29,9 +29,10 @@ export function initializeRound({
 	const topCard = hands[starterIndex].pop()!;
 	let opening: Infer<typeof openingValidator> = { kind: 'none' };
 	let effect: Effect | null = null;
+	// An opening 6 leaves the starter to cover it, as a played 6 does.
+	const mustCover = rules.openingEffects && topCard.rank === '6';
 	if (rules.openingEffects) {
 		if (topCard.rank === 'J') opening = { kind: 'choose-suit', seatId: starter._id };
-		else if (topCard.rank === '6') opening = { kind: 'cover-six', seatId: starter._id };
 		// An opening Ace is a zero-draw skip that its target accepts.
 		const pending =
 			topCard.rank === 'A' ? { drawCount: 0, skip: true } : drawEffect([topCard], rules);
@@ -42,13 +43,12 @@ export function initializeRound({
 		drawPile: deck.slice(dealt),
 		playedPile: [topCard],
 		starterSeatId: starter._id,
-		currentSeatId:
-			opening.kind === 'choose-suit' || opening.kind === 'cover-six' ? starter._id : next._id,
+		currentSeatId: opening.kind === 'choose-suit' || mustCover ? starter._id : next._id,
 		activeSuit: opening.kind === 'choose-suit' ? null : topCard.suit,
 		opening,
 		effect,
 		drawnCard: null,
-		mustCover: opening.kind === 'cover-six',
+		mustCover,
 		recycles: 0,
 		version: 0,
 		handCounts: seats.map((seat, index) => ({ seatId: seat._id, cardCount: hands[index].length })),

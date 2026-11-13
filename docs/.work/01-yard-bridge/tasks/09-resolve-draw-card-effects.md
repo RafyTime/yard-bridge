@@ -21,7 +21,7 @@ Playing a 7, 8, Queen of Spades, or enabled King of Spades applies its draw and 
 A 7, 8, Q♠, or enabled K♠ on top of a play leaves a pending effect on the next Seat in
 table order. The Round stores it in a new `effect` field, which records the target Seat,
 the draw count, and whether the target is skipped. Opening effects now use the same field,
-and `opening` keeps only the Jack suit choice and the 6 cover. While an effect is pending,
+and `opening` keeps only the Jack suit choice; an opening 6 sets `mustCover`. While an effect is pending,
 the target cannot Play or Draw. They use a new version-checked `accept` command instead,
 which draws the cards and clears the effect. After a 7 the target then takes a normal
 turn, and after an 8, Q♠ or K♠ play passes to the following Seat. Same-rank 7s and 8s add

@@ -214,7 +214,6 @@ export const play = mutation({
 			mustCover,
 			effect: effect && { targetSeatId: next, ...effect },
 			drawnCard: null,
-			opening: { kind: 'none' },
 			handCounts: withCardCount(round, hand.seatId, cards.length),
 			version: round.version + 1
 		});
@@ -239,7 +238,6 @@ export const draw = mutation({
 			currentSeatId: playable ? round.currentSeatId : nextSeatId(round),
 			drawnCard: playable,
 			mustCover: playable ? round.mustCover : false,
-			opening: playable ? round.opening : { kind: 'none' },
 			handCounts: withCardCount(round, hand.seatId, cards.length),
 			version: round.version + 1
 		});
