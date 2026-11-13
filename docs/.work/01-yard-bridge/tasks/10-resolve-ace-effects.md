@@ -15,3 +15,7 @@ An Ace skips the next player by default. Under the alternative rule, a targeted 
 - [ ] With the alternative rule enabled, a targeted player can use an Ace from hand to cancel an entire pending effect, including a stacked 7 or 8.
 - [ ] A cancellation places the Ace on top, uses that player's turn, and passes play onward. A player who is not targeted cannot use the reaction.
 - [ ] Command-and-view tests cover both Ace modes with two and four players.
+
+## Comments
+
+- 2026-11-13 (from ticket 09 review): An opening Ace with opening effects on already records a pending zero-draw skip on the next Seat, and `accept` resolves it as a plain skip (the default Ace rule). The browser table shows the target a "miss this turn" prompt with an Accept control. Played-Ace effects and the alternative cancellation rule are still this ticket's work.
