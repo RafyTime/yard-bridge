@@ -18,6 +18,8 @@ import type * as games from "../games.js";
 import type * as health from "../health.js";
 import type * as http from "../http.js";
 import type * as players from "../players.js";
+import type * as roundInitialization from "../roundInitialization.js";
+import type * as roundTurns from "../roundTurns.js";
 import type * as rounds from "../rounds.js";
 import type * as rules from "../rules.js";
 
@@ -38,6 +40,8 @@ declare const fullApi: ApiFromModules<{
   health: typeof health;
   http: typeof http;
   players: typeof players;
+  roundInitialization: typeof roundInitialization;
+  roundTurns: typeof roundTurns;
   rounds: typeof rounds;
   rules: typeof rules;
 }>;
