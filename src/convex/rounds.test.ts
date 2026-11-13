@@ -361,9 +361,44 @@ test('a pending opening effect blocks ordinary moves until its target accepts it
 		[],
 		{ openingEffects: false }
 	);
-	const [, open] = await disabled.views();
+	const [inert, open] = await disabled.views();
+	for (const seat of [inert, open])
+		expect(seat).toMatchObject({ effect: null, currentSeatId: disabled.seatIds[1] });
 	expect(open.playable).toEqual(cards('10h 7d'));
 });
+
+test.each(['6h', 'Jh'])(
+	'with opening effects off, an opening %s sets no obligation and the next Seat plays on',
+	async (top) => {
+		const { players, views, seatIds } = await opened(
+			[cards('10c 10d Ks Kd'), cards('10h 9s Qc Ac 7d')],
+			card(top),
+			[],
+			{ openingEffects: false }
+		);
+		let [host, guest] = await views();
+		for (const seat of [host, guest])
+			expect(seat).toMatchObject({
+				openingEffects: false,
+				opening: { kind: 'none' },
+				mustCover: false,
+				effect: null,
+				activeSuit: 'hearts',
+				currentSeatId: seatIds[1]
+			});
+		expect(host).toMatchObject({ playable: [], canDraw: false });
+		expect(guest).toMatchObject({ playable: cards('10h'), canDraw: false });
+		await players[1].mutation(api.rounds.play, {
+			roundId: guest.id,
+			expectedVersion: guest.version,
+			cards: cards('10h')
+		});
+		[host, guest] = await views();
+		for (const seat of [host, guest])
+			expect(seat).toMatchObject({ topCard: card('10h'), currentSeatId: seatIds[0] });
+		expect(host.playable).toEqual(cards('10c 10d'));
+	}
+);
 
 test('a 6 or Jack plays regardless of the table, and a Jack sets the suit every Seat sees', async () => {
 	const { players, views, seatIds } = await opened(
