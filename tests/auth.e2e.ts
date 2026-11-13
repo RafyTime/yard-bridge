@@ -804,7 +804,10 @@ test('a stacked 8 effect waits on its target, who accepts the draw and is skippe
 		page.getByRole('status').filter({ hasText: 'Візьміть з колоди 4 шт. і пропустіть хід.' })
 	).toBeVisible();
 	expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-	await page.screenshot({ path: test.info().outputPath('draw-effect-uk-phone.png'), fullPage: true });
+	await page.screenshot({
+		path: test.info().outputPath('draw-effect-uk-phone.png'),
+		fullPage: true
+	});
 	await page.getByRole('button', { name: 'Прийняти й узяти 4 шт.', exact: true }).click();
 	await expect(page.getByText('Зараз ходить гравець на місці 2.', { exact: true })).toBeVisible();
 	await expect(page.getByText('Місце 1: 8 карт', { exact: false })).toBeVisible();
