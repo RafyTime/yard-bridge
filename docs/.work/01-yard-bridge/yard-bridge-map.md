@@ -108,6 +108,7 @@ Planning status: approved on 28 September 2026. The user confirmed the shared sp
 17. [Complete English and Ukrainian UI](tasks/17-complete-english-and-ukrainian-ui.md)
 18. [Release the private Game](tasks/18-release-private-game.md)
 19. [Set up a reusable domain for sign-in emails](tasks/19-reusable-sender-domain.md) — blocks release ticket 18; schedule before inviting other players.
+20. [Record moves and show recent play](tasks/20-record-moves-and-recent-play.md) — blocks ticket 10; persists accepted events and shows a recent-moves feed.
 
 ## Fog
 

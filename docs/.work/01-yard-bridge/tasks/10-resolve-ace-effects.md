@@ -2,7 +2,7 @@
 
 Type: task
 Status: ready-for-agent
-Blocked by: 09 (Resolve draw-card effects)
+Blocked by: 09 (Resolve draw-card effects), 20 (Record moves and show recent play)
 Spec: [Approved Yard Bridge spec](../spec.md)
 
 ## What to build
