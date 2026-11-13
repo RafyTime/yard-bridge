@@ -670,7 +670,7 @@ test('a played 7 leaves one card pending on the next Seat, who accepts it and th
 			]
 		});
 	expect(hostView).toMatchObject({ hand: cards('10c 10d Ks Kd 7c'), playable: cards('7c') });
-	// The accepted penalty is spent; a new 7 starts a fresh one-card effect.
+	// The accepted effect is spent; a new 7 starts a fresh one-card effect.
 	await host.mutation(api.rounds.play, {
 		roundId,
 		expectedVersion: hostView.version,
@@ -875,7 +875,7 @@ test('an opening Ace skips the next Seat once they accept it', async () => {
 	expect(host.playable).toEqual(cards('9h'));
 });
 
-test('a stale, repeated, or simultaneous accept draws the penalty only once', async () => {
+test('a stale, repeated, or simultaneous accept draws the pending effect only once', async () => {
 	const { players, views, seatIds } = await opened(
 		[cards('10c 10d Ks Kd'), cards('7h 9s Qc Ac 8d')],
 		card('9h'),
@@ -907,7 +907,7 @@ test('a stale, repeated, or simultaneous accept draws the penalty only once', as
 	});
 });
 
-test('a penalty larger than the piles draws what remains after recycling', async () => {
+test('a pending effect larger than the draw pile recycles, then draws what remains', async () => {
 	const { players, views, seatIds } = await opened(
 		[
 			cards('Kc Ks Kd 9c 9s 9d 10c 10s'),

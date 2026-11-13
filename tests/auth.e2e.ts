@@ -762,7 +762,7 @@ test('a stacked 8 effect waits on its target, who accepts the draw and is skippe
 	await page.goto('/');
 	await signInAs(page, backend, 'host@example.com');
 	await page.getByRole('button', { name: 'New game', exact: true }).click();
-	await page.getByLabel('Game name').fill('Penalty table');
+	await page.getByLabel('Game name').fill('Draw effect table');
 	await page.getByRole('button', { name: 'Create private game' }).click();
 	const invitation = await invitationLink(page);
 	const gameURL = page.url();
@@ -797,14 +797,14 @@ test('a stacked 8 effect waits on its target, who accepts the draw and is skippe
 	).toBeVisible();
 	await expect(hand.getByRole('button', { disabled: false })).toHaveCount(0);
 	await expect(page.getByRole('button', { name: 'Draw', exact: true })).toHaveCount(0);
-	await page.screenshot({ path: test.info().outputPath('penalty-phone.png'), fullPage: true });
+	await page.screenshot({ path: test.info().outputPath('draw-effect-phone.png'), fullPage: true });
 	await page.goto(`/uk${new URL(page.url()).search}`);
 	await page.setViewportSize({ width: 320, height: 640 });
 	await expect(
 		page.getByRole('status').filter({ hasText: 'Візьміть з колоди 4 шт. і пропустіть хід.' })
 	).toBeVisible();
 	expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-	await page.screenshot({ path: test.info().outputPath('penalty-uk-phone.png'), fullPage: true });
+	await page.screenshot({ path: test.info().outputPath('draw-effect-uk-phone.png'), fullPage: true });
 	await page.getByRole('button', { name: 'Прийняти й узяти 4 шт.', exact: true }).click();
 	await expect(page.getByText('Зараз ходить гравець на місці 2.', { exact: true })).toBeVisible();
 	await expect(page.getByText('Місце 1: 8 карт', { exact: false })).toBeVisible();
