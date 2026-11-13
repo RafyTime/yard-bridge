@@ -2,7 +2,7 @@ import type { Infer } from 'convex/values';
 import type { Doc, Id } from './_generated/dataModel';
 import { openingValidator } from './cards';
 import type { Card, Effect } from './cards';
-import { drawEffect } from './round-turns';
+import { drawEffect } from './roundTurns';
 import type { RulesConfiguration } from './rules';
 
 // Initialize the complete deal and pending opening effect from server-selected inputs.

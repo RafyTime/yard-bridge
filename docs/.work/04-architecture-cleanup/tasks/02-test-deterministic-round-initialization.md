@@ -29,7 +29,7 @@ first but does not technically block this work.
 
 ## Answer
 
-Implemented `src/convex/round-initialization.ts` as the internal deterministic
+Implemented `src/convex/roundInitialization.ts` as the internal deterministic
 boundary for the complete deal and opening state. The public start mutation still
 shuffles and selects the starter on the server, validates authorization/readiness,
 and persists every Round write atomically. No public command or schema changed.

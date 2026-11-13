@@ -1,7 +1,7 @@
 import { expect, test } from 'vite-plus/test';
 import type { Id } from './_generated/dataModel';
 import { ranks, suits, type Card } from './cards';
-import { initializeRound } from './round-initialization';
+import { initializeRound } from './roundInitialization';
 import { defaultRules } from './rules';
 
 const seats = ['host', 'guest', 'third', 'fourth'].map((id) => ({
