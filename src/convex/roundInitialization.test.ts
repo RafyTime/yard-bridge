@@ -1,7 +1,7 @@
 import { expect, test } from 'vite-plus/test';
 import type { Id } from './_generated/dataModel';
 import { ranks, suits, type Card } from './cards';
-import { initializeRound } from './round-initialization';
+import { initializeRound } from './roundInitialization';
 import { defaultRules } from './rules';
 
 const seats = ['host', 'guest', 'third', 'fourth'].map((id) => ({
@@ -92,38 +92,54 @@ function openingDeck(topCard: Card) {
 }
 
 test.each([
-	{ rank: '9', suit: 'hearts', opening: { kind: 'none' }, current: 0 },
-	{ rank: 'J', suit: 'clubs', opening: { kind: 'choose-suit', seatId: seats[1]._id }, current: 1 },
-	{ rank: '6', suit: 'diamonds', opening: { kind: 'cover-six', seatId: seats[1]._id }, current: 1 },
+	{ rank: '9', suit: 'hearts', opening: { kind: 'none' }, effect: null, current: 0 },
+	{
+		rank: 'J',
+		suit: 'clubs',
+		opening: { kind: 'choose-suit', seatId: seats[1]._id },
+		effect: null,
+		current: 1
+	},
+	{
+		rank: '6',
+		suit: 'diamonds',
+		opening: { kind: 'none' },
+		effect: null,
+		current: 1
+	},
 	{
 		rank: '7',
 		suit: 'hearts',
-		opening: { kind: 'effect', targetSeatId: seats[0]._id, drawCount: 1, skip: false },
+		opening: { kind: 'none' },
+		effect: { targetSeatId: seats[0]._id, drawCount: 1, skip: false },
 		current: 0
 	},
 	{
 		rank: '8',
 		suit: 'clubs',
-		opening: { kind: 'effect', targetSeatId: seats[0]._id, drawCount: 2, skip: true },
+		opening: { kind: 'none' },
+		effect: { targetSeatId: seats[0]._id, drawCount: 2, skip: true },
 		current: 0
 	},
 	{
 		rank: 'A',
 		suit: 'diamonds',
-		opening: { kind: 'effect', targetSeatId: seats[0]._id, drawCount: 0, skip: true },
+		opening: { kind: 'none' },
+		effect: { targetSeatId: seats[0]._id, drawCount: 0, skip: true },
 		current: 0
 	},
 	{
 		rank: 'Q',
 		suit: 'spades',
-		opening: { kind: 'effect', targetSeatId: seats[0]._id, drawCount: 5, skip: false },
+		opening: { kind: 'none' },
+		effect: { targetSeatId: seats[0]._id, drawCount: 5, skip: true },
 		current: 0
 	},
-	{ rank: 'Q', suit: 'hearts', opening: { kind: 'none' }, current: 0 },
-	{ rank: 'K', suit: 'spades', opening: { kind: 'none' }, current: 0 }
+	{ rank: 'Q', suit: 'hearts', opening: { kind: 'none' }, effect: null, current: 0 },
+	{ rank: 'K', suit: 'spades', opening: { kind: 'none' }, effect: null, current: 0 }
 ] as const)(
 	'an opening $rank of $suit records its obligation, next Seat and active suit',
-	({ rank, suit, opening, current }) => {
+	({ rank, suit, opening, effect, current }) => {
 		const round = initializeRound({
 			deck: openingDeck({ rank, suit }),
 			seats: seats.slice(0, 2),
@@ -132,8 +148,10 @@ test.each([
 		});
 		expect(round.playedPile).toEqual([{ rank, suit }]);
 		expect(round.opening).toEqual(opening);
+		expect(round.effect).toEqual(effect);
 		expect(round.currentSeatId).toBe(seats[current]._id);
 		expect(round.activeSuit).toBe(rank === 'J' ? null : suit);
+		expect(round.mustCover).toBe(rank === '6');
 	}
 );
 
@@ -144,12 +162,7 @@ test('the optional King of Spades records seven pending draws', () => {
 		starterSeatId: seats[1]._id,
 		rules: { ...defaultRules, handSize: 2, kingOfSpades: true }
 	});
-	expect(round.opening).toEqual({
-		kind: 'effect',
-		targetSeatId: seats[0]._id,
-		drawCount: 7,
-		skip: false
-	});
+	expect(round.effect).toEqual({ targetSeatId: seats[0]._id, drawCount: 7, skip: true });
 	expect(round.currentSeatId).toBe(seats[0]._id);
 	expect(round.activeSuit).toBe('spades');
 });
@@ -164,6 +177,7 @@ test.each(['J', '6', '7', '8', 'A', 'Q', 'K'] as const)(
 			rules: { ...defaultRules, handSize: 2, kingOfSpades: true, openingEffects: false }
 		});
 		expect(round.opening).toEqual({ kind: 'none' });
+		expect(round.effect).toBeNull();
 		expect(round.currentSeatId).toBe(seats[0]._id);
 		expect(round.activeSuit).toBe('spades');
 	}

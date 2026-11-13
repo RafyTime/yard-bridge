@@ -16,6 +16,12 @@ Planning status: approved on 28 September 2026. The user confirmed the shared sp
 
 ## Decisions-so-far
 
+- [Ticket 09](tasks/09-resolve-draw-card-effects.md) stores one pending `effect` per Round (target Seat, draw count, skip) for both opening and played 7, 8, Q♠ and enabled K♠ cards. The target resolves it with a version-checked `accept`, then plays after a 7, or is skipped after an 8, Q♠ or K♠. Same-rank 7s and 8s add their draws, and other groups fire only the top card. A draw larger than the draw pile recycles first, then draws whatever remains, and play continues without a draw pile. An opening Ace records a zero-draw skip that `accept` resolves as a plain skip.
+
+- [Ticket 08](tasks/08-play-wild-and-ordered-cards.md) makes 6s and Jacks wild. Play takes an ordered same-rank group, and its last card is the top card. A Jack on top carries the chosen suit. A 6 on top sets `mustCover` and keeps the turn until the 6 is covered by its suit or another 6. An off-suit Jack cannot cover; a Jack of the 6's suit covers. Draw continues until a cover appears, and the cover is waived when nothing can be drawn or recycled. An opening Jack is resolved by `chooseSuit`, and an opening 6 starts with the cover obligation already set.
+
+- [Ticket 07](tasks/07-play-ordinary-turns.md) adds version-checked Play and Draw commands. Draw continues on the server until a card matches, recycling the played pile below its top card, and the player must then play that card alone. With nothing to draw or recycle, the turn passes. The Round records a turn version, a pending drawn card, and its recycle count. Pending opening states block ordinary moves until later tickets resolve them.
+
 - [Ticket 06](tasks/06-open-round-with-private-hands.md) starts one durable Round from a ready table, with a server-shuffled 36-card deck, random starter, frozen rules, and separate private hands. Authorized views expose only the viewer's hand and shared table counts and opening state. Pending opening obligations and effects remain recorded for later turn commands.
 
 - [Ticket 05](tasks/05-configure-rules-and-ready.md) keeps Rules configurations as Game values and private saved snapshots. Host edits atomically clear readiness; version-checked reviews acknowledge the current rules, and two to four ready Seats make the table ready to start. All approved players can inspect defaults, deviations, and the base rules before reviewing.
@@ -51,16 +57,16 @@ Planning status: approved on 28 September 2026. The user confirmed the shared sp
 - An opening Jack lets that player choose the active suit. An opening 6 must be covered before the next player acts. A 6 can be covered by a card of its suit or another 6; another 6 continues the cover obligation. A covering card fires its own effect; a player cannot end the round with an uncovered 6.
 - A player must immediately play a playable card drawn during their turn.
 - A 6 or Jack may be played regardless of the current suit or rank. Other cards, including the Queen and King of Spades, follow ordinary suit-or-rank matching.
-- In group play, the effect of a 7, 8, or Queen of Spades applies to the next player in table order.
+- In group play, the effect of a 7, 8, Queen of Spades, or enabled King of Spades applies to the next player in table order.
 - Playing four cards of one rank declares Bridge and immediately ends the round, even if the declarer holds other cards. Everyone, including the declarer, scores their remaining cards. The Bridge rule can be disabled.
 - Resolve final-card effects before scoring a round.
 - When a player crosses the score limit in a group game, ask every remaining player whether to continue. Continue only if all agree; otherwise end and rank everyone by points. If play continues, the losing player leaves. Surviving players rank above eliminated players; later eliminations rank above earlier ones; points break ties within an elimination round. Tied scores share a rank when the game ends. If one active player remains, end automatically. If all active players cross together, end and rank them by score.
 - Use a configurable score limit of 200 by default. The King of Spades draw effect is a separate toggle. Hitting the limit exactly resets that player's score to zero.
 - Default remaining-card points: 6–9 = 0; 10, ordinary Queen, ordinary King = 10; Ace = 15; Jack = 20; Queen of Spades = 50; special King of Spades = 80. When King of Spades is disabled, it is an ordinary King worth 10; enabling it activates both the seven-card draw and the 80-point hand penalty.
-- Ace skips the next player's turn by default, with an alternative effect available as a rule choice. When the host enables the King of Spades effect, it makes the next player draw seven cards without skipping; Queen of Spades remains five cards.
+- Ace skips the next player's turn by default, with an alternative effect available as a rule choice. When the host enables the King of Spades effect, it makes the next player draw seven cards and skip their turn; the Queen of Spades makes them draw five and skip.
 - Once a round's draw pile needs recycling, multiply the remaining-card points scored at the end of that round. The host chooses ×1, ×2, or ×3, with ×2 as default; later recycles in the same round do not multiply again. Apply the multiplier before Jack finish deductions; allow negative game scores.
 - Finishing a hand with two Jacks deducts 40 points, 20 per Jack; the played group must be the player's last cards. A four-Jack Bridge declaration with cards still in hand gets no Jack finish bonus.
-- Players arrange same-rank cards before placing them. Normally only the top card's special action fires, but paired 7s and paired 8s add their draw effects in that play. Two 7s make the next player draw two and still play; two 8s make them draw four and skip once. Draw penalties do not pass between players' turns.
+- Players arrange same-rank cards before placing them. Normally only the top card's special action fires, but paired 7s and paired 8s add their draw effects in that play. Two 7s make the next player draw two and still play; two 8s make them draw four and skip once. Draw effects do not pass between players' turns.
 - Under the optional Ace cancellation rule, a targeted player can play an Ace from hand immediately to cancel a whole incoming draw or skip effect, including a stacked effect. The Ace becomes the top card, uses that player's turn, and play passes to the next player.
 - If no card can be drawn or recycled while a player must cover a 6, end that cover obligation and pass play to the next player.
 - If the draw pile is empty, nothing can be recycled, and every active player has passed once without a legal play, end the round. Everyone scores their remaining hand; nobody receives a Jack finish deduction.
@@ -102,6 +108,7 @@ Planning status: approved on 28 September 2026. The user confirmed the shared sp
 17. [Complete English and Ukrainian UI](tasks/17-complete-english-and-ukrainian-ui.md)
 18. [Release the private Game](tasks/18-release-private-game.md)
 19. [Set up a reusable domain for sign-in emails](tasks/19-reusable-sender-domain.md) — blocks release ticket 18; schedule before inviting other players.
+20. [Record moves and show recent play](tasks/20-record-moves-and-recent-play.md) — blocks ticket 10; persists accepted events and shows a recent-moves feed.
 
 ## Fog
 
