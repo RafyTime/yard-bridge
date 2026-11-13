@@ -852,24 +852,27 @@ test.each([
 	}
 );
 
-test('an opening Ace skip stays pending and cannot be accepted until Ace effects arrive', async () => {
+test('an opening Ace skips the next Seat once they accept it', async () => {
 	const { players, views, seatIds } = await opened(
-		[cards('10c 10d 9c 9d'), cards('10h 9s Qc Ac 7d')],
+		[cards('10c 9h 9c 9d'), cards('10h 9s Qc Ac 7d')],
 		card('Ah')
 	);
-	const [, guest] = await views();
+	let [host, guest] = await views();
 	expect(guest).toMatchObject({
 		effect: { targetSeatId: seatIds[1], drawCount: 0, skip: true },
 		playable: [],
 		canDraw: false
 	});
 	const turn = { roundId: guest.id, expectedVersion: guest.version };
-	await expect(players[1].mutation(api.rounds.accept, turn)).rejects.toThrow(
-		'Ace effects are not available yet'
-	);
 	await expect(
 		players[1].mutation(api.rounds.play, { ...turn, cards: cards('Ac') })
 	).rejects.toThrow('Accept the pending effect first');
+	await players[1].mutation(api.rounds.accept, turn);
+	[host, guest] = await views();
+	for (const seat of [host, guest])
+		expect(seat).toMatchObject({ effect: null, currentSeatId: seatIds[0], drawCount: 26 });
+	expect(guest.hand).toEqual(cards('10h 9s Qc Ac 7d'));
+	expect(host.playable).toEqual(cards('9h'));
 });
 
 test('a stale, repeated, or simultaneous accept draws the penalty only once', async () => {

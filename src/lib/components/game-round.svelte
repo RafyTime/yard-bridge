@@ -163,15 +163,21 @@
 			{:else if isTurn && table.mustCover && table.activeSuit}<p role="status">
 					{m.round_cover_prompt({ suit: suitNames[table.activeSuit] })}
 				</p>
-			{:else if isTurn && table.effect?.drawCount}
+			{:else if isTurn && table.effect}
 				{@const count = table.effect.drawCount}
 				<p role="status">
-					{table.effect.skip
-						? m.round_effect_incoming_skip({ count })
-						: m.round_effect_incoming_play({ count })}
+					{!count
+						? m.round_effect_incoming_miss()
+						: table.effect.skip
+							? m.round_effect_incoming_skip({ count })
+							: m.round_effect_incoming_play({ count })}
 				</p>
 				<Button class="min-h-11" onclick={() => move(table, 'accept')} disabled={moving}
-					>{moving ? m.auth_working() : m.round_effect_accept({ count })}</Button
+					>{moving
+						? m.auth_working()
+						: count
+							? m.round_effect_accept({ count })
+							: m.round_effect_accept_miss()}</Button
 				>
 			{:else if table.playable.length || table.canDraw}<p role="status">{m.round_your_turn()}</p>
 			{:else if isTurn && table.opening.kind !== 'choose-suit'}<p role="status">

@@ -32,7 +32,7 @@ export function initializeRound({
 	if (rules.openingEffects) {
 		if (topCard.rank === 'J') opening = { kind: 'choose-suit', seatId: starter._id };
 		else if (topCard.rank === '6') opening = { kind: 'cover-six', seatId: starter._id };
-		// An opening Ace's skip stays pending until ticket 10 resolves Aces.
+		// An opening Ace is a zero-draw skip that its target accepts.
 		const pending =
 			topCard.rank === 'A' ? { drawCount: 0, skip: true } : drawEffect([topCard], rules);
 		if (pending) effect = { targetSeatId: next._id, ...pending };

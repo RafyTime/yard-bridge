@@ -253,7 +253,7 @@ export const draw = mutation({
 });
 
 // The target of a pending effect draws its cards, or what remains after recycling, then plays
-// on unless the effect skips them.
+// on unless the effect skips them. A zero-draw skip, such as an opening Ace, is a plain skip.
 export const accept = mutation({
 	args: turnArgs,
 	returns: v.null(),
@@ -261,7 +261,6 @@ export const accept = mutation({
 		const round = await currentTurn(ctx, turn);
 		const { effect } = round;
 		if (!effect) throw new ConvexError('No effect to accept');
-		if (!effect.drawCount) throw new ConvexError('Ace effects are not available yet');
 		const hand = await currentHand(ctx, round);
 		const { drawn, ...piles } = drawCards(round, effect.drawCount);
 		const cards = [...hand.cards, ...drawn];

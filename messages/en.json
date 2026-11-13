@@ -167,6 +167,8 @@
 	"round_effect_incoming_play": "Draw {count}, then take your turn.",
 	"round_effect_incoming_skip": "Draw {count} and miss this turn.",
 	"round_effect_accept": "Accept and draw {count}",
+	"round_effect_incoming_miss": "Miss this turn.",
+	"round_effect_accept_miss": "Accept and miss this turn",
 	"round_move_error": "That move did not go through. The table may have changed, so check it and try again.",
 	"rules_conflict": "Applied rules changed elsewhere. Your edits are preserved. Load the latest rules before applying changes.",
 	"rules_load_latest": "Load latest rules",
