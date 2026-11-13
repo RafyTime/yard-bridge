@@ -892,18 +892,18 @@ test('an opening Ace skips the next Seat once they accept it', async () => {
 		[cards('10c 9h 9c 9d'), cards('10h 9s Qc Ac 7d')],
 		card('Ah')
 	);
-	let [host, guest] = await views();
-	expect(guest).toMatchObject({
+	const [, target] = await views();
+	expect(target).toMatchObject({
 		effect: { targetSeatId: seatIds[1], drawCount: 0, skip: true },
 		playable: [],
 		canDraw: false
 	});
-	const turn = { roundId: guest.id, expectedVersion: guest.version };
+	const turn = { roundId: target.id, expectedVersion: target.version };
 	await expect(
 		players[1].mutation(api.rounds.play, { ...turn, cards: cards('Ac') })
 	).rejects.toThrow('Accept the pending effect first');
 	await players[1].mutation(api.rounds.accept, turn);
-	[host, guest] = await views();
+	const [host, guest] = await views();
 	for (const seat of [host, guest])
 		expect(seat).toMatchObject({ effect: null, currentSeatId: seatIds[0], drawCount: 26 });
 	expect(guest.hand).toEqual(cards('10h 9s Qc Ac 7d'));
