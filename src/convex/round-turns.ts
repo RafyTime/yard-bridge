@@ -37,7 +37,14 @@ export function blockedReason(round: Pick<Round, 'opening' | 'effect'>) {
 }
 
 // Cards the Seat may play now: only the drawn card after a Draw, otherwise every match in hand.
-export function playableCards(round: Round, seatId: Id<'seats'>, hand: readonly Card[]) {
+export function playableCards(
+	round: Pick<
+		Round,
+		'currentSeatId' | 'drawnCard' | 'opening' | 'effect' | 'playedPile' | 'activeSuit' | 'mustCover'
+	>,
+	seatId: Id<'seats'>,
+	hand: readonly Card[]
+) {
 	if (round.currentSeatId !== seatId || blockedReason(round)) return [];
 	if (round.drawnCard) return [round.drawnCard];
 	return hand.filter((card) => canPlay(round, card));
@@ -68,11 +75,15 @@ function takeCard({ drawPile, playedPile, recycles }: Piles) {
 	return { card, drawPile: rest, playedPile, recycles };
 }
 
-// Draw up to `count` cards. A short pile yields only what can be drawn after recycling.
-export function drawCards({ drawPile, playedPile, recycles }: Piles, count: number) {
+// Draw while `more` accepts the cards drawn so far. Stops early when nothing more can be drawn
+// or recycled.
+function drawWhile(
+	{ drawPile, playedPile, recycles }: Piles,
+	more: (drawn: readonly Card[]) => boolean
+) {
 	let piles: Piles = { drawPile, playedPile, recycles };
 	const drawn: Card[] = [];
-	while (drawn.length < count) {
+	while (more(drawn)) {
 		const { card, ...next } = takeCard(piles);
 		if (!card) break;
 		piles = next;
@@ -81,16 +92,16 @@ export function drawCards({ drawPile, playedPile, recycles }: Piles, count: numb
 	return { drawn, ...piles };
 }
 
+// Draw up to `count` cards. A short pile yields only what can be drawn after recycling.
+export function drawCards(piles: Piles, count: number) {
+	return drawWhile(piles, (drawn) => drawn.length < count);
+}
+
 // Draw until a playable card appears. `playable` is null when nothing more can be drawn or recycled.
-export function drawUntilPlayable(round: Round) {
-	const { drawPile, playedPile, recycles } = round;
-	let piles: Piles = { drawPile, playedPile, recycles };
-	const drawn: Card[] = [];
-	for (;;) {
-		const { card, ...next } = takeCard(piles);
-		if (!card) return { drawn, ...piles, playable: null };
-		piles = next;
-		drawn.push(card);
-		if (canPlay(round, card)) return { drawn, ...piles, playable: card };
-	}
+export function drawUntilPlayable(
+	round: Piles & Pick<Round, 'playedPile' | 'activeSuit' | 'mustCover'>
+) {
+	const playable = (card?: Card) => (card && canPlay(round, card) ? card : null);
+	const result = drawWhile(round, (drawn) => !playable(drawn.at(-1)));
+	return { ...result, playable: playable(result.drawn.at(-1)) };
 }
