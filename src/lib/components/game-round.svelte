@@ -2,7 +2,7 @@
 	import { useConvexClient, useQuery } from 'convex-svelte';
 	import type { FunctionReturnType } from 'convex/server';
 	import { api } from '../../convex/_generated/api';
-	import { suits } from '../../convex/cards';
+	import { sameCard, suits } from '../../convex/cards';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as m from '#lib/paraglide/messages.js';
 	let { game }: { game: FunctionReturnType<typeof api.games.view> } = $props();
@@ -44,26 +44,35 @@
 	const chosen = $derived(
 		round.data && selection.version === round.data.version ? selection.cards : []
 	);
-	const sameCard = (left: Card, right: Card) =>
-		left.rank === right.rank && left.suit === right.suit;
+	type Command =
+		| { kind: 'play'; suit?: Suit }
+		| { kind: 'chooseSuit'; suit: Suit }
+		| { kind: 'draw' }
+		| { kind: 'accept' };
 	// Turn commands carry the viewed version, so a move chosen from an outdated table is rejected.
-	async function move(
-		table: Round,
-		command: 'play' | 'draw' | 'chooseSuit' | 'accept',
-		suit?: Suit
-	) {
+	async function move(table: Round, command: Command) {
 		if (moving) return;
 		moving = true;
 		moveError = false;
 		const turn = { roundId: table.id, expectedVersion: table.version };
 		try {
-			if (command === 'play')
-				await client.mutation(api.rounds.play, { ...turn, cards: chosen, suit });
-			else if (command === 'chooseSuit' && suit)
-				await client.mutation(api.rounds.chooseSuit, { ...turn, suit });
-			else if (command === 'accept') await client.mutation(api.rounds.accept, turn);
-			else await client.mutation(api.rounds.draw, turn);
-		} catch {
+			switch (command.kind) {
+				case 'play':
+					await client.mutation(api.rounds.play, { ...turn, cards: chosen, suit: command.suit });
+					break;
+				case 'chooseSuit':
+					await client.mutation(api.rounds.chooseSuit, { ...turn, suit: command.suit });
+					break;
+				case 'accept':
+					await client.mutation(api.rounds.accept, turn);
+					break;
+				case 'draw':
+					await client.mutation(api.rounds.draw, turn);
+					break;
+			}
+		} catch (failure) {
+			// Server reasons are English-only, so players see a localized generic message.
+			console.error(`Round ${command.kind} failed`, failure);
 			moveError = true;
 		} finally {
 			moving = false;
@@ -98,7 +107,7 @@
 					variant="outline"
 					class="min-h-11"
 					disabled={moving || !ready}
-					onclick={() => move(table, command, suit)}
+					onclick={() => move(table, { kind: command, suit })}
 					><span aria-hidden="true">{suitSymbols[suit]}</span>{suitNames[suit]}</Button
 				>
 			{/each}
@@ -172,7 +181,7 @@
 							? m.round_effect_incoming_skip({ count })
 							: m.round_effect_incoming_play({ count })}
 				</p>
-				<Button class="min-h-11" onclick={() => move(table, 'accept')} disabled={moving}
+				<Button class="min-h-11" onclick={() => move(table, { kind: 'accept' })} disabled={moving}
 					>{moving
 						? m.auth_working()
 						: count
@@ -185,7 +194,7 @@
 				</p>{/if}
 			{#if table.canDraw}<Button
 					class="min-h-11"
-					onclick={() => move(table, 'draw')}
+					onclick={() => move(table, { kind: 'draw' })}
 					disabled={moving}>{moving ? m.auth_working() : m.round_draw()}</Button
 				>{/if}
 			{#if moveError}<p role="alert">{m.round_move_error()}</p>{/if}
@@ -235,7 +244,7 @@
 					{#if chosen.at(-1)?.rank === 'J'}{@render suitPicker(table, 'play', ready)}
 					{:else}<Button
 							class="min-h-11"
-							onclick={() => move(table, 'play')}
+							onclick={() => move(table, { kind: 'play' })}
 							disabled={moving || !ready}
 							>{moving ? m.auth_working() : m.round_play_selected()}</Button
 						>{/if}
