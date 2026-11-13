@@ -1,5 +1,6 @@
 import { ConvexError, v } from 'convex/values';
-import type { Doc, Id } from './_generated/dataModel';
+import type { ObjectType } from 'convex/values';
+import type { Doc } from './_generated/dataModel';
 import { mutation, query } from './_generated/server';
 import type { MutationCtx } from './_generated/server';
 import { requirePlayer } from './access';
@@ -7,10 +8,9 @@ import {
 	cardValidator,
 	effectValidator,
 	openingValidator,
-	ranks,
+	orderedDeck,
 	sameCard,
 	shuffle,
-	suits,
 	suitValidator
 } from './cards';
 import { initializeRound } from './round-initialization';
@@ -41,7 +41,7 @@ export const start = mutation({
 			.take(5);
 		if (seats.length < 2 || seats.length > 4 || seats.some((seat) => !seat.ready))
 			throw new ConvexError('Every player must review the rules');
-		const deck = shuffle(suits.flatMap((suit) => ranks.map((rank) => ({ suit, rank }))));
+		const deck = shuffle(orderedDeck);
 		const starterIndex = Math.floor(Math.random() * seats.length);
 		const { hands, ...round } = initializeRound({
 			deck,
@@ -121,12 +121,10 @@ export const view = query({
 });
 
 const turnArgs = { roundId: v.id('rounds'), expectedVersion: v.number() };
+type Turn = ObjectType<typeof turnArgs>;
 
 // Load the Round for the caller's turn, rejecting outsiders, stale versions, and other Seats.
-async function currentTurn(
-	ctx: MutationCtx,
-	{ roundId, expectedVersion }: { roundId: Id<'rounds'>; expectedVersion: number }
-) {
+async function currentTurn(ctx: MutationCtx, { roundId, expectedVersion }: Turn) {
 	const player = await requirePlayer(ctx);
 	const round = await ctx.db.get('rounds', roundId);
 	const seat =
@@ -157,10 +155,7 @@ async function currentHand(ctx: MutationCtx, round: Doc<'rounds'>) {
 }
 
 // Load the turn for Play or Draw, rejecting pending states these moves cannot resolve.
-async function ordinaryTurn(
-	ctx: MutationCtx,
-	turn: { roundId: Id<'rounds'>; expectedVersion: number }
-) {
+async function ordinaryTurn(ctx: MutationCtx, turn: Turn) {
 	const round = await currentTurn(ctx, turn);
 	const blocked = blockedReason(round);
 	if (blocked) throw new ConvexError(blocked);

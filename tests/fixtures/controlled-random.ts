@@ -1,9 +1,8 @@
-import { ranks, suits, type Card } from '../../src/convex/cards';
+import { orderedDeck, ranks, suits, type Card } from '../../src/convex/cards';
+
+export { orderedDeck };
 
 const key = (card: Card) => `${card.rank}:${card.suit}`;
-
-// The unshuffled deck the server starts from.
-export const orderedDeck: Card[] = suits.flatMap((suit) => ranks.map((rank) => ({ suit, rank })));
 
 // Math.random values that make the server's Fisher-Yates shuffle turn `from` into `to`.
 export function shuffleValues(from: readonly Card[], to: readonly Card[]) {

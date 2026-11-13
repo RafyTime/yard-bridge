@@ -10,6 +10,11 @@ export const cardValidator = v.object({
 });
 export type Card = Infer<typeof cardValidator>;
 
+// The unshuffled 36-card deck, suit by suit, that every Round shuffles.
+export const orderedDeck: readonly Card[] = suits.flatMap((suit) =>
+	ranks.map((rank) => ({ suit, rank }))
+);
+
 export const openingValidator = v.union(
 	v.object({ kind: v.literal('none') }),
 	v.object({ kind: v.literal('choose-suit'), seatId: v.id('seats') }),
