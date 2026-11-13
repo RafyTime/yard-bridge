@@ -14,7 +14,8 @@ export function canPlay(round: Pick<Round, 'playedPile' | 'activeSuit' | 'mustCo
 }
 
 // The draw effect of a played group's top card. Same-rank 7s and 8s add their draws; any other
-// group fires only its top card. Aces arrive with ticket 10.
+// group fires only its top card. The Queen and enabled King of Spades also skip their target.
+// Played Aces arrive with ticket 10.
 export function drawEffect(
 	group: readonly Card[],
 	rules: Pick<RulesConfiguration, 'kingOfSpades'>
@@ -22,9 +23,9 @@ export function drawEffect(
 	const top = group[group.length - 1];
 	if (top.rank === '7') return { drawCount: group.length, skip: false };
 	if (top.rank === '8') return { drawCount: 2 * group.length, skip: true };
-	if (top.suit === 'spades' && top.rank === 'Q') return { drawCount: 5, skip: false };
+	if (top.suit === 'spades' && top.rank === 'Q') return { drawCount: 5, skip: true };
 	if (top.suit === 'spades' && top.rank === 'K' && rules.kingOfSpades)
-		return { drawCount: 7, skip: false };
+		return { drawCount: 7, skip: true };
 	return null;
 }
 

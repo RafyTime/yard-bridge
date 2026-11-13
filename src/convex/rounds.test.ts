@@ -784,7 +784,7 @@ test.each([
 	{ group: 'Kh Ks', top: 'Kd', rules: { kingOfSpades: true }, drawCount: 7 },
 	{ group: 'Kh Ks', top: 'Kd', rules: { kingOfSpades: false }, drawCount: 0 }
 ])(
-	'playing $group with $rules fires only the top card: $drawCount to draw without a skip',
+	'playing $group with $rules fires only the top card: $drawCount to draw and a skip',
 	async ({ group, top, rules, drawCount }) => {
 		const { players, views, seatIds } = await opened(
 			[cards('10c 10d 9c 9d'), cards(`${group} 9s 7c Ac`)],
@@ -801,13 +801,13 @@ test.each([
 		});
 		[view] = await views();
 		expect(view).toMatchObject({
-			effect: drawCount ? { targetSeatId: seatIds[0], drawCount, skip: false } : null,
+			effect: drawCount ? { targetSeatId: seatIds[0], drawCount, skip: true } : null,
 			currentSeatId: seatIds[0]
 		});
 		if (!drawCount) return;
 		await host.mutation(api.rounds.accept, { roundId: view.id, expectedVersion: view.version });
 		[view] = await views();
-		expect(view).toMatchObject({ effect: null, currentSeatId: seatIds[0] });
+		expect(view).toMatchObject({ effect: null, currentSeatId: seatIds[1] });
 		expect(view.hand).toHaveLength(4 + drawCount);
 	}
 );
@@ -816,9 +816,9 @@ test.each([
 	{ top: '7h', rules: {}, effect: { drawCount: 1, skip: false } },
 	{ top: '8h', rules: {}, effect: { drawCount: 2, skip: true } },
 	{ top: '8h', rules: { openingEffects: false }, effect: null },
-	{ top: 'Qs', rules: {}, effect: { drawCount: 5, skip: false } },
+	{ top: 'Qs', rules: {}, effect: { drawCount: 5, skip: true } },
 	{ top: 'Qs', rules: { openingEffects: false }, effect: null },
-	{ top: 'Ks', rules: { kingOfSpades: true }, effect: { drawCount: 7, skip: false } },
+	{ top: 'Ks', rules: { kingOfSpades: true }, effect: { drawCount: 7, skip: true } },
 	{ top: 'Ks', rules: { kingOfSpades: false }, effect: null },
 	{ top: 'Ks', rules: { kingOfSpades: true, openingEffects: false }, effect: null }
 ])(
@@ -930,7 +930,7 @@ test('a penalty larger than the piles draws what remains after recycling', async
 	[view] = await views();
 	expect(view).toMatchObject({
 		drawCount: 0,
-		effect: { targetSeatId: seatIds[3], drawCount: 5, skip: false }
+		effect: { targetSeatId: seatIds[3], drawCount: 5, skip: true }
 	});
 	const recycled = cards('9h Qh');
 	vi.stubGlobal('Math', scriptedMath(shuffleValues(recycled, recycled)));
@@ -942,7 +942,7 @@ test('a penalty larger than the piles draws what remains after recycling', async
 			effect: null,
 			drawCount: 0,
 			topCard: card('Qs'),
-			currentSeatId: seatIds[3]
+			currentSeatId: seatIds[0]
 		});
 	expect(after[3].hand.slice(-2)).toEqual(recycled);
 	expect(after[3].hand).toHaveLength(11);

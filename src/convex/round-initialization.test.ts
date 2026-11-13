@@ -132,7 +132,7 @@ test.each([
 		rank: 'Q',
 		suit: 'spades',
 		opening: { kind: 'none' },
-		effect: { targetSeatId: seats[0]._id, drawCount: 5, skip: false },
+		effect: { targetSeatId: seats[0]._id, drawCount: 5, skip: true },
 		current: 0
 	},
 	{ rank: 'Q', suit: 'hearts', opening: { kind: 'none' }, effect: null, current: 0 },
@@ -161,7 +161,7 @@ test('the optional King of Spades records seven pending draws', () => {
 		starterSeatId: seats[1]._id,
 		rules: { ...defaultRules, handSize: 2, kingOfSpades: true }
 	});
-	expect(round.effect).toEqual({ targetSeatId: seats[0]._id, drawCount: 7, skip: false });
+	expect(round.effect).toEqual({ targetSeatId: seats[0]._id, drawCount: 7, skip: true });
 	expect(round.currentSeatId).toBe(seats[0]._id);
 	expect(round.activeSuit).toBe('spades');
 });
