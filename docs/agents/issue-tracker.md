@@ -5,6 +5,11 @@ Specs, tasks, and wayfinding maps live in GitHub Issues for
 
 ## Conventions
 
+Use GitHub CLI 2.94.0 or newer. Check `gh --version` before tracker operations
+and upgrade older installations. The sub-issue flags below were
+[introduced in 2.94.0](https://github.blog/changelog/2026-06-10-manage-sub-issues-types-and-dependencies-from-github-cli/);
+the migration verified them with 2.102.0.
+
 Run commands inside the clone so `gh` infers the repository. For multiline bodies
 and comments, write the text to a temporary UTF-8 file and pass `--body-file`.
 
