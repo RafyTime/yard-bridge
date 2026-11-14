@@ -1,13 +1,15 @@
 # Triage labels
 
-The engineering skills use five triage roles. For this local tracker, record the matching value in each task's `Status:` line.
+The engineering skills use five canonical triage roles. Use the matching GitHub
+label whenever a skill names a role.
 
-| Role              | Status value      | Meaning                      |
-| ----------------- | ----------------- | ---------------------------- |
-| `needs-triage`    | `needs-triage`    | Needs evaluation             |
-| `needs-info`      | `needs-info`      | Waiting for more information |
-| `ready-for-agent` | `ready-for-agent` | Ready for an agent           |
-| `ready-for-human` | `ready-for-human` | Needs human implementation   |
-| `wontfix`         | `wontfix`         | Will not be actioned         |
+| Role              | GitHub label      | Meaning                                  |
+| ----------------- | ----------------- | ---------------------------------------- |
+| `needs-triage`    | `needs-triage`    | Needs maintainer evaluation              |
+| `needs-info`      | `needs-info`      | Waiting for more information             |
+| `ready-for-agent` | `ready-for-agent` | Fully specified for agent implementation |
+| `ready-for-human` | `ready-for-human` | Requires human implementation            |
+| `wontfix`         | `wontfix`         | Will not be actioned                     |
 
-When a skill mentions a triage role, use its status value from this table.
+Labels describe triage disposition. Assignment records ownership; GitHub's
+open/closed state records whether work remains.

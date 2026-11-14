@@ -14,17 +14,21 @@ Frontend checks generate Paraglide before Svelte diagnostics; backend and worker
 checks use separate TypeScript projects. See README's Quality checks and CI for
 runtime pins, tool configuration ownership, and isolated validation.
 
-## Issue tracker
+## Agent skills
 
-Specs and tasks are local Markdown files under `docs/.work/`. See `docs/agents/issue-tracker.md`.
+### Issue tracker
 
-## Triage labels
+Specs, tasks, and wayfinding maps live in GitHub Issues.
+Read `docs/agents/issue-tracker.md` before tracker operations.
 
-Use the default five triage roles as task statuses. See `docs/agents/triage-labels.md`.
+### Triage labels
 
-## Domain docs
+Use the five default triage roles. See `docs/agents/triage-labels.md`.
 
-Use a single root `CONTEXT.md` and `docs/adr/`. See `docs/agents/domain.md`.
+### Domain docs
+
+Use a single root `GLOSSARY.md` and `docs/adr/`.
+Read `docs/agents/domain.md` before exploring domain code.
 
 ## Convex
 

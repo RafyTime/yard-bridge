@@ -4,7 +4,7 @@ Updated 2026-11-08. The next agent should implement the working UI using the app
 
 ## Start here
 
-1. Read the repository's `AGENTS.md`, [domain vocabulary](../CONTEXT.md), and [implementation map](.work/01-yard-bridge/yard-bridge-map.md). Check the current working tree before editing.
+1. Read the repository's `AGENTS.md`, [domain vocabulary](../GLOSSARY.md), and [implementation map](https://github.com/RafyTime/yard-bridge/issues/26). Check the current working tree before editing.
 2. Inspect the prototype visually at `http://127.0.0.1:5173/?prototype` after starting the local dev server. Open the sample lobby, then Players and Rules. Inspect Invite friends and Review and start. The route is development-only; see [the page entry](../src/routes/+page.svelte).
 3. Compare each proposed UI action with the working components below. Carry over presentation and flow while preserving the existing commands, permissions, version checks, and failure handling. If a prototype behavior requires a new backend capability or product decision, keep the existing working behavior and flag the difference for review.
 
@@ -47,11 +47,11 @@ The implementation entry points are [games.svelte](../src/lib/components/games.s
 
 Use the current code and these artifacts to determine what is implemented:
 
-- [Create/resume games](.work/01-yard-bridge/tasks/03-create-and-resume-game.md).
-- [Real invitations and approved seats](.work/01-yard-bridge/tasks/04-invite-and-approve-seats.md).
-- [Rules, saved configurations, and readiness](.work/01-yard-bridge/tasks/05-configure-rules-and-ready.md).
-- [Round initialization and private hands](.work/01-yard-bridge/tasks/06-open-round-with-private-hands.md).
-- [Draft preservation and conflict requirements](.work/04-architecture-cleanup/tasks/01-preserve-rules-configuration-drafts.md). This is especially important when reorganizing the Rules tab.
+- [Create/resume games](https://github.com/RafyTime/yard-bridge/issues/8).
+- [Real invitations and approved seats](https://github.com/RafyTime/yard-bridge/issues/9).
+- [Rules, saved configurations, and readiness](https://github.com/RafyTime/yard-bridge/issues/10).
+- [Round initialization and private hands](https://github.com/RafyTime/yard-bridge/issues/11).
+- [Draft preservation and conflict requirements](https://github.com/RafyTime/yard-bridge/issues/35). This is especially important when reorganizing the Rules tab.
 - [Browser behavior tests](../tests/auth.e2e.ts), including multiple sessions, stale versions, rules conflicts, and configuration reuse.
 
 Specific integration traps:
