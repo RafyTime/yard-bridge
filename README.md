@@ -2,6 +2,9 @@
 
 A private, phone-friendly card game built with SvelteKit, TypeScript, Bun, and Convex.
 
+Specs and tasks live in [GitHub Issues](https://github.com/RafyTime/yard-bridge/issues).
+See the [migration index](docs/issue-tracker-migration.md) for former local tracker paths.
+
 Architecture reports live in [docs/architecture-reviews/](docs/architecture-reviews/).
 See the [review conventions](docs/agents/domain.md#architecture-reviews).
 
@@ -124,7 +127,7 @@ The hosted app is at `https://yard-bridge.rafy.dev`. Resend sends through the
 verified `mail.rafy.dev` subdomain of the Porkbun-registered `rafy.dev` domain.
 The owner configured the existing Convex development deployment's sender and key
 and confirmed real email-code sign-in works on 29 October 2026. See
-[task 19](docs/.work/01-yard-bridge/tasks/19-reusable-sender-domain.md) for the
+[the sender-domain task](https://github.com/RafyTime/yard-bridge/issues/24) for the
 remaining account-recovery and key-permission confirmations and future-project
 reuse guidance.
 
@@ -192,7 +195,7 @@ bunx playwright test tests/auth.e2e.ts
 The adapter's peer ranges do not include the current SvelteKit 3, Convex Auth,
 or convex-svelte versions. Keep it pinned and rerun the auth browser checks when
 upgrading. The owner verified hosted email delivery and session return in
-[ticket 02](docs/.work/01-yard-bridge/tasks/02-email-code-sign-in.md).
+[the sign-in task](https://github.com/RafyTime/yard-bridge/issues/7).
 Setup follows the [Convex Auth manual setup](https://labs.convex.dev/auth/setup/manual),
 [email OTP guide](https://labs.convex.dev/auth/config/otps), and the
 [adapter's client-only guide](https://github.com/mmailaender/convex-auth-svelte/blob/main/src/lib/svelte/README.md).
