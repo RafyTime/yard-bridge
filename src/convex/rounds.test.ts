@@ -985,3 +985,177 @@ test('a pending effect larger than the draw pile recycles, then draws what remai
 	expect(after[3].hand.slice(-2)).toEqual(recycled);
 	expect(after[3].hand).toHaveLength(11);
 });
+
+test('starting a Round and playing a group record public events every Seat sees', async () => {
+	const { players, views, seatIds } = await opened(
+		[cards('10c 10d Kc Kd'), cards('10h 10s Jc 9s 7d')],
+		card('9h')
+	);
+	const [view] = await views();
+	expect(view.recentMoves).toEqual([
+		{
+			version: 0,
+			seatId: seatIds[0],
+			event: { kind: 'start', starterSeatId: seatIds[0], topCard: card('9h') }
+		}
+	]);
+	await players[1].mutation(api.rounds.play, {
+		roundId: view.id,
+		expectedVersion: view.version,
+		cards: cards('10h 10s')
+	});
+	const after = await views();
+	for (const seat of after)
+		expect(seat.recentMoves[0]).toEqual({
+			version: 1,
+			seatId: seatIds[1],
+			event: { kind: 'play', cards: cards('10h 10s'), activeSuit: 'spades' }
+		});
+	expect(after[0].recentMoves).toEqual(after[1].recentMoves);
+});
+
+test('a draw and an accepted effect record only counts, and rejected commands record nothing', async () => {
+	const { players, views, seatIds } = await opened(
+		[cards('10c 10d Ks Kd'), cards('Qc Ac 7d 8s Qd')],
+		card('9h'),
+		cards('7c 8c 7h Jd')
+	);
+	const [host, guest] = players;
+	const [view] = await views();
+	const roundId = view.id;
+	await guest.mutation(api.rounds.draw, { roundId, expectedVersion: view.version });
+	await expect(guest.mutation(api.rounds.draw, { roundId, expectedVersion: 0 })).rejects.toThrow(
+		'Round changed'
+	);
+	await expect(guest.mutation(api.rounds.draw, { roundId, expectedVersion: 1 })).rejects.toThrow(
+		'Play the card you drew'
+	);
+	await guest.mutation(api.rounds.play, { roundId, expectedVersion: 1, cards: cards('7h') });
+	await expect(
+		host.mutation(api.rounds.play, { roundId, expectedVersion: 2, cards: cards('10c') })
+	).rejects.toThrow('Accept the pending effect first');
+	const accepts = await Promise.allSettled([
+		host.mutation(api.rounds.accept, { roundId, expectedVersion: 2 }),
+		host.mutation(api.rounds.accept, { roundId, expectedVersion: 2 })
+	]);
+	expect(accepts.map((result) => result.status).sort()).toEqual(['fulfilled', 'rejected']);
+	const all = await views();
+	// The drawn 7♣, 8♣, and J♦ stay private: the shared events carry only how many moved.
+	for (const seat of all)
+		expect(seat.recentMoves).toEqual([
+			{
+				version: 3,
+				seatId: seatIds[0],
+				event: { kind: 'accept', count: 1, recycles: 0, skipped: false }
+			},
+			{
+				version: 2,
+				seatId: seatIds[1],
+				event: { kind: 'play', cards: cards('7h'), activeSuit: 'hearts' }
+			},
+			{
+				version: 1,
+				seatId: seatIds[1],
+				event: { kind: 'draw', count: 3, recycles: 0, passed: false, coverWaived: false }
+			},
+			{
+				version: 0,
+				seatId: seatIds[0],
+				event: { kind: 'start', starterSeatId: seatIds[0], topCard: card('9h') }
+			}
+		]);
+	expect(all[0].hand).toContainEqual(card('Jd'));
+});
+
+test('an empty draw records a pass, a recycle, and a waived 6 cover', async () => {
+	const pass = await opened(
+		[
+			cards('7c 7h 8h Qh Kh Ah 9c 9d'),
+			cards('Kc Kd Ks Ac Ad As Qc Qd Qs'),
+			cards('10h 6h 7d 10c 8c 8d 10d 6c 6d'),
+			cards('10s Jc Jd Js 6s 9s 7s 8s Jh')
+		],
+		card('9h')
+	);
+	const [host, second, third, fourth] = pass.players;
+	const roundId = (await pass.views())[0].id;
+	await second.mutation(api.rounds.draw, { roundId, expectedVersion: 0 });
+	await third.mutation(api.rounds.play, { roundId, expectedVersion: 1, cards: [card('10h')] });
+	await fourth.mutation(api.rounds.play, { roundId, expectedVersion: 2, cards: [card('10s')] });
+	const recycled = cards('9h 10h');
+	vi.stubGlobal('Math', scriptedMath(shuffleValues(recycled, recycled)));
+	await host.mutation(api.rounds.draw, { roundId, expectedVersion: 3 });
+	vi.unstubAllGlobals();
+	const [view] = await pass.views();
+	expect(view.recentMoves.map(({ seatId, event }) => ({ seatId, event }))).toEqual([
+		{
+			seatId: pass.seatIds[0],
+			event: { kind: 'draw', count: 2, recycles: 1, passed: false, coverWaived: false }
+		},
+		{
+			seatId: pass.seatIds[3],
+			event: { kind: 'play', cards: cards('10s'), activeSuit: 'spades' }
+		},
+		{
+			seatId: pass.seatIds[2],
+			event: { kind: 'play', cards: cards('10h'), activeSuit: 'hearts' }
+		},
+		{
+			seatId: pass.seatIds[1],
+			event: { kind: 'draw', count: 0, recycles: 0, passed: true, coverWaived: false }
+		},
+		{
+			seatId: pass.seatIds[0],
+			event: { kind: 'start', starterSeatId: pass.seatIds[0], topCard: card('9h') }
+		}
+	]);
+
+	const waived = await opened(
+		[
+			cards('Kc Ks Kd 9c 9s 9d 10c 10s'),
+			cards('7h 8h 9h 10h Jh Qh Kh Ah 6c'),
+			cards('6d 6s 7c 8c Jc Qc Ac 7s 8s'),
+			cards('Js Qs As 7d 8d 10d Jd Qd Ad')
+		],
+		card('6h')
+	);
+	await waived.players[0].mutation(api.rounds.draw, {
+		roundId: (await waived.views())[0].id,
+		expectedVersion: 0
+	});
+	const [, next] = await waived.views();
+	expect(next.recentMoves[0]).toEqual({
+		version: 1,
+		seatId: waived.seatIds[0],
+		event: { kind: 'draw', count: 0, recycles: 0, passed: true, coverWaived: true }
+	});
+});
+
+test('choosing an opening Jack suit and accepting an opening skip record their events', async () => {
+	const jack = await opened([cards('Kc Ks Kd Ad'), cards('Qc Ac 7d 8s 10s')], card('Jh'));
+	const [jackView] = await jack.views();
+	await jack.players[0].mutation(api.rounds.chooseSuit, {
+		roundId: jackView.id,
+		expectedVersion: jackView.version,
+		suit: 'spades'
+	});
+	const [, guest] = await jack.views();
+	expect(guest.recentMoves[0]).toEqual({
+		version: 1,
+		seatId: jack.seatIds[0],
+		event: { kind: 'chooseSuit', suit: 'spades' }
+	});
+
+	const ace = await opened([cards('10c 9h 9c 9d'), cards('10h 9s Qc Ac 7d')], card('Ah'));
+	const [aceView] = await ace.views();
+	await ace.players[1].mutation(api.rounds.accept, {
+		roundId: aceView.id,
+		expectedVersion: aceView.version
+	});
+	const [host] = await ace.views();
+	expect(host.recentMoves[0]).toEqual({
+		version: 1,
+		seatId: ace.seatIds[1],
+		event: { kind: 'accept', count: 0, recycles: 0, skipped: true }
+	});
+});

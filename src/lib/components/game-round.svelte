@@ -5,6 +5,7 @@
 	import { sameCard, suits } from '../../convex/cards';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as m from '#lib/paraglide/messages.js';
+	import { getLocale } from '#lib/paraglide/runtime.js';
 	let { game }: { game: FunctionReturnType<typeof api.games.view> } = $props();
 	const client = useConvexClient();
 	const gameId = $derived(game.id);
@@ -95,6 +96,37 @@
 	}
 	function seatNumber(id: string) {
 		return game.seats.findIndex((seat) => seat.id === id) + 1;
+	}
+	type Move = Round['recentMoves'][number];
+	// One line per public event; a new event kind fails to compile here until it is described.
+	function describeMove({ seatId, event }: Move) {
+		const number = seatNumber(seatId);
+		switch (event.kind) {
+			case 'start':
+				return m.round_event_start({ number, card: cardLabel(event.topCard) });
+			case 'chooseSuit':
+				return m.round_event_choose_suit({ number, suit: suitNames[event.suit] });
+			case 'play': {
+				const cards = new Intl.ListFormat(getLocale()).format(event.cards.map(cardLabel));
+				return event.cards.at(-1)?.rank === 'J'
+					? m.round_event_play_jack({ number, cards, suit: suitNames[event.activeSuit] })
+					: m.round_event_play({ number, cards });
+			}
+			case 'draw': {
+				const { count } = event;
+				if (event.coverWaived) return m.round_event_waive({ number, count });
+				return event.passed
+					? m.round_event_pass({ number, count })
+					: m.round_event_draw({ number, count });
+			}
+			case 'accept': {
+				const { count } = event;
+				if (!event.skipped) return m.round_event_draw({ number, count });
+				return count ? m.round_event_skip({ number, count }) : m.round_event_miss({ number });
+			}
+			default:
+				return event satisfies never;
+		}
 	}
 </script>
 
@@ -206,6 +238,17 @@
 						})}{seat.seatId === game.viewerSeatId ? ` · ${m.invite_you()}` : ''}
 					</li>{/each}
 			</ul>
+			<section class="flex flex-col gap-2" aria-labelledby="recent-heading">
+				<h4 id="recent-heading" class="font-semibold">{m.round_recent()}</h4>
+				<ol class="flex flex-col gap-1 text-sm" aria-labelledby="recent-heading">
+					{#each table.recentMoves as move (move.version)}<li>
+							{describeMove(move)}
+							{#if 'recycles' in move.event && move.event.recycles}
+								<span class="text-muted-foreground">{m.round_event_recycled()}</span>
+							{/if}
+						</li>{/each}
+				</ol>
+			</section>
 			<h4 class="font-semibold">{m.round_hand()}</h4>
 			<ul class="flex flex-wrap gap-2" aria-label={m.round_hand()}>
 				{#each table.hand as card (`${card.rank}:${card.suit}`)}

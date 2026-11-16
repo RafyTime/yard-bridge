@@ -13,6 +13,9 @@ Another name for a game.
 **Round**:
 One deal of cards, ending when a player goes out or another selected ending condition occurs.
 
+**Round event**:
+The saved public record of one accepted move in a round: who acted, which cards were played, how many were drawn, and any skip, recycle, or chosen suit. Drawn cards and hands never appear in it. The table shows the latest few as recent moves.
+
 **Bridge declaration**:
 Playing all four cards of one rank to end a round, even if the declaring player still holds other cards.
 
