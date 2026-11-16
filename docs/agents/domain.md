@@ -19,6 +19,10 @@ Use the glossary's terms in issues, proposals, tests, and code. If a needed term
 missing, determine whether it reflects a gap in the model. Surface conflicts with
 existing ADRs explicitly.
 
+Round commands record public Round events. Read
+[ADR 0002](../adr/0002-round-events.md) before adding a Round command or changing
+what an event records.
+
 ## Architecture reviews
 
 Store dated HTML reports in `docs/architecture-reviews/`, named
