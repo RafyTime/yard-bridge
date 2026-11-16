@@ -986,17 +986,17 @@ test('a pending effect larger than the draw pile recycles, then draws what remai
 	expect(after[3].hand).toHaveLength(11);
 });
 
-test('starting a Round and playing a group record public events every Seat sees', async () => {
+test('starting a Round and playing a group or a Jack record public events every Seat sees', async () => {
 	const { players, views, seatIds } = await opened(
 		[cards('10c 10d Kc Kd'), cards('10h 10s Jc 9s 7d')],
 		card('9h')
 	);
-	const [view] = await views();
+	let [view] = await views();
 	expect(view.recentMoves).toEqual([
 		{
 			version: 0,
 			seatId: seatIds[0],
-			event: { kind: 'start', starterSeatId: seatIds[0], topCard: card('9h') }
+			event: { kind: 'start', topCard: card('9h') }
 		}
 	]);
 	await players[1].mutation(api.rounds.play, {
@@ -1012,6 +1012,23 @@ test('starting a Round and playing a group record public events every Seat sees'
 			event: { kind: 'play', cards: cards('10h 10s'), activeSuit: 'spades' }
 		});
 	expect(after[0].recentMoves).toEqual(after[1].recentMoves);
+	await players[0].mutation(api.rounds.play, {
+		roundId: view.id,
+		expectedVersion: 1,
+		cards: cards('10c')
+	});
+	await players[1].mutation(api.rounds.play, {
+		roundId: view.id,
+		expectedVersion: 2,
+		cards: cards('Jc'),
+		suit: 'hearts'
+	});
+	[view] = await views();
+	expect(view.recentMoves[0]).toEqual({
+		version: 3,
+		seatId: seatIds[1],
+		event: { kind: 'play', cards: cards('Jc'), activeSuit: 'hearts' }
+	});
 });
 
 test('a draw and an accepted effect record only counts, and rejected commands record nothing', async () => {
@@ -1061,13 +1078,13 @@ test('a draw and an accepted effect record only counts, and rejected commands re
 			{
 				version: 0,
 				seatId: seatIds[0],
-				event: { kind: 'start', starterSeatId: seatIds[0], topCard: card('9h') }
+				event: { kind: 'start', topCard: card('9h') }
 			}
 		]);
 	expect(all[0].hand).toContainEqual(card('Jd'));
 });
 
-test('an empty draw records a pass, a recycle, and a waived 6 cover', async () => {
+test('an empty draw records a pass, then a recycle', async () => {
 	const pass = await opened(
 		[
 			cards('7c 7h 8h Qh Kh Ah 9c 9d'),
@@ -1106,10 +1123,12 @@ test('an empty draw records a pass, a recycle, and a waived 6 cover', async () =
 		},
 		{
 			seatId: pass.seatIds[0],
-			event: { kind: 'start', starterSeatId: pass.seatIds[0], topCard: card('9h') }
+			event: { kind: 'start', topCard: card('9h') }
 		}
 	]);
+});
 
+test('a 6 cover that cannot be drawn records a waived cover and a pass', async () => {
 	const waived = await opened(
 		[
 			cards('Kc Ks Kd 9c 9s 9d 10c 10s'),

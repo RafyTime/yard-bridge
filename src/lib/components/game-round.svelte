@@ -121,7 +121,7 @@
 			}
 			case 'accept': {
 				const { count } = event;
-				if (!event.skipped) return m.round_event_draw({ number, count });
+				if (!event.skipped) return m.round_event_accept({ number, count });
 				return count ? m.round_event_skip({ number, count }) : m.round_event_miss({ number });
 			}
 			default:

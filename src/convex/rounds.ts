@@ -43,6 +43,8 @@ export const start = mutation({
 			.take(5);
 		if (seats.length < 2 || seats.length > 4 || seats.some((seat) => !seat.ready))
 			throw new ConvexError('Every player must review the rules');
+		const hostSeat = seats.find((seat) => seat.userId === player.id);
+		if (!hostSeat) throw new ConvexError('The Host has no Seat at this table');
 		const deck = shuffle(orderedDeck);
 		const starterIndex = Math.floor(Math.random() * seats.length);
 		const { hands, ...round } = initializeRound({
@@ -53,21 +55,11 @@ export const start = mutation({
 		});
 		const roundId = await ctx.db.insert('rounds', { gameId, number: 1, ...round });
 		for (const hand of hands) await ctx.db.insert('roundHands', { roundId, ...hand });
-		const hostSeat = seats.find((seat) => seat.userId === player.id);
-		if (!hostSeat) throw new ConvexError('Host only');
-		await recordEvent(
-			ctx,
-			{ _id: roundId },
-			{
-				version: round.version,
-				seatId: hostSeat._id,
-				event: {
-					kind: 'start',
-					starterSeatId: round.starterSeatId,
-					topCard: round.playedPile[0]
-				}
-			}
-		);
+		await recordEvent(ctx, roundId, {
+			version: round.version,
+			seatId: hostSeat._id,
+			event: { kind: 'start', topCard: round.playedPile[0] }
+		});
 		await ctx.db.patch('games', gameId, { status: 'active', version: game.version + 1 });
 		return null;
 	}
@@ -186,7 +178,7 @@ async function commitTurn(
 ) {
 	const version = round.version + 1;
 	await ctx.db.patch('rounds', round._id, { ...patch, version });
-	await recordEvent(ctx, round, { version, seatId: round.currentSeatId, event });
+	await recordEvent(ctx, round._id, { version, seatId: round.currentSeatId, event });
 }
 
 // Load the turn for Play or Draw, rejecting pending states these moves cannot resolve.

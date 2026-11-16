@@ -178,6 +178,7 @@
 	"round_event_draw": "Місце {number}: узято з колоди {count} шт.",
 	"round_event_pass": "Місце {number}: узято з колоди {count} шт., хід передано.",
 	"round_event_waive": "Місце {number}: узято з колоди {count} шт., шістку не накрито, хід передано.",
+	"round_event_accept": "Місце {number}: узято штрафні карти, {count} шт.",
 	"round_event_skip": "Місце {number}: узято з колоди {count} шт., хід пропущено.",
 	"round_event_miss": "Місце {number}: хід пропущено.",
 	"round_event_recycled": "Зіграні карти перемішано й повернуто в колоду.",

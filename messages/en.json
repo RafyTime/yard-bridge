@@ -178,6 +178,7 @@
 	"round_event_draw": "Seat {number} drew {count}.",
 	"round_event_pass": "Seat {number} drew {count} and passed.",
 	"round_event_waive": "Seat {number} drew {count}, could not cover the 6, and passed.",
+	"round_event_accept": "Seat {number} took the pending {count}.",
 	"round_event_skip": "Seat {number} drew {count} and missed a turn.",
 	"round_event_miss": "Seat {number} missed a turn.",
 	"round_event_recycled": "The played pile was shuffled into the draw pile.",

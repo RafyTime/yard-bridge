@@ -1,6 +1,6 @@
 import { v } from 'convex/values';
 import type { Infer } from 'convex/values';
-import type { Doc } from './_generated/dataModel';
+import type { Doc, Id } from './_generated/dataModel';
 import type { MutationCtx, QueryCtx } from './_generated/server';
 import { cardValidator, suitValidator } from './cards';
 
@@ -11,7 +11,7 @@ import { cardValidator, suitValidator } from './cards';
 // rounds.ts (or `recordEvent` for a command outside a turn), and describe the new kind in the
 // recent-moves feed in game-round.svelte, whose exhaustive switch fails to compile until it does.
 export const roundEventValidator = v.union(
-	v.object({ kind: v.literal('start'), starterSeatId: v.id('seats'), topCard: cardValidator }),
+	v.object({ kind: v.literal('start'), topCard: cardValidator }),
 	v.object({ kind: v.literal('chooseSuit'), suit: suitValidator }),
 	v.object({ kind: v.literal('play'), cards: v.array(cardValidator), activeSuit: suitValidator }),
 	v.object({
@@ -44,10 +44,10 @@ const recentMoveLimit = 5;
 // or stale command records nothing.
 export async function recordEvent(
 	ctx: MutationCtx,
-	round: Pick<Doc<'rounds'>, '_id'>,
+	roundId: Id<'rounds'>,
 	move: Infer<typeof recentMoveValidator>
 ) {
-	await ctx.db.insert('roundEvents', { roundId: round._id, ...move });
+	await ctx.db.insert('roundEvents', { roundId, ...move });
 }
 
 // The latest moves of the Round, newest first.
