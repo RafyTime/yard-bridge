@@ -1084,7 +1084,7 @@ test('a draw and an accepted effect record only counts, and rejected commands re
 	expect(all[0].hand).toContainEqual(card('Jd'));
 });
 
-test('an empty draw records a pass, then a recycle', async () => {
+test('an empty draw records a pass, then a recycle, and the feed keeps the latest five', async () => {
 	const pass = await opened(
 		[
 			cards('7c 7h 8h Qh Kh Ah 9c 9d'),
@@ -1126,6 +1126,15 @@ test('an empty draw records a pass, then a recycle', async () => {
 			event: { kind: 'start', topCard: card('9h') }
 		}
 	]);
+	// A sixth move pushes the start event out of the five-move feed.
+	await host.mutation(api.rounds.play, { roundId, expectedVersion: 4, cards: [card('10h')] });
+	const [after] = await pass.views();
+	expect(after.recentMoves.map(({ version }) => version)).toEqual([5, 4, 3, 2, 1]);
+	expect(after.recentMoves[0].event).toEqual({
+		kind: 'play',
+		cards: cards('10h'),
+		activeSuit: 'hearts'
+	});
 });
 
 test('a 6 cover that cannot be drawn records a waived cover and a pass', async () => {
