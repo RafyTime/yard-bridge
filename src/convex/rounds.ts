@@ -14,6 +14,8 @@ import {
 	suitValidator
 } from './cards';
 import { initializeRound } from './roundInitialization';
+import { recentMoveValidator, recentMoves, recordEvent } from './roundEvents';
+import type { RoundEvent } from './roundEvents';
 import {
 	blockedReason,
 	canPlay,
@@ -41,6 +43,8 @@ export const start = mutation({
 			.take(5);
 		if (seats.length < 2 || seats.length > 4 || seats.some((seat) => !seat.ready))
 			throw new ConvexError('Every player must review the rules');
+		const hostSeat = seats.find((seat) => seat.userId === player.id);
+		if (!hostSeat) throw new ConvexError('The Host has no Seat at this table');
 		const deck = shuffle(orderedDeck);
 		const starterIndex = Math.floor(Math.random() * seats.length);
 		const { hands, ...round } = initializeRound({
@@ -51,6 +55,11 @@ export const start = mutation({
 		});
 		const roundId = await ctx.db.insert('rounds', { gameId, number: 1, ...round });
 		for (const hand of hands) await ctx.db.insert('roundHands', { roundId, ...hand });
+		await recordEvent(ctx, roundId, {
+			version: round.version,
+			seatId: hostSeat._id,
+			event: { kind: 'start', topCard: round.playedPile[0] }
+		});
 		await ctx.db.patch('games', gameId, { status: 'active', version: game.version + 1 });
 		return null;
 	}
@@ -76,7 +85,9 @@ export const view = query({
 		effect: v.union(effectValidator, v.null()),
 		mustCover: v.boolean(),
 		openingEffects: v.boolean(),
-		seats: v.array(v.object({ seatId: v.id('seats'), cardCount: v.number() }))
+		seats: v.array(v.object({ seatId: v.id('seats'), cardCount: v.number() })),
+		// The latest public moves, newest first, identical for every Seat.
+		recentMoves: v.array(recentMoveValidator)
 	}),
 	handler: async (ctx, { gameId }) => {
 		const player = await requirePlayer(ctx);
@@ -115,7 +126,8 @@ export const view = query({
 			opening: round.opening,
 			effect: round.effect,
 			openingEffects: round.rules.openingEffects,
-			seats: round.handCounts
+			seats: round.handCounts,
+			recentMoves: await recentMoves(ctx, round)
 		};
 	}
 });
@@ -154,6 +166,21 @@ async function currentHand(ctx: MutationCtx, round: Doc<'rounds'>) {
 	return hand;
 }
 
+type RoundPatch = Partial<Omit<Doc<'rounds'>, '_id' | '_creationTime' | 'version'>>;
+
+// Commit the current Seat's accepted command: advance the Round version so stale or repeated
+// moves are rejected, and record the command's public event in the same mutation.
+async function commitTurn(
+	ctx: MutationCtx,
+	round: Doc<'rounds'>,
+	patch: RoundPatch,
+	event: RoundEvent
+) {
+	const version = round.version + 1;
+	await ctx.db.patch('rounds', round._id, { ...patch, version });
+	await recordEvent(ctx, round._id, { version, seatId: round.currentSeatId, event });
+}
+
 // Load the turn for Play or Draw, rejecting pending states these moves cannot resolve.
 async function ordinaryTurn(ctx: MutationCtx, turn: Turn) {
 	const round = await currentTurn(ctx, turn);
@@ -169,12 +196,12 @@ export const chooseSuit = mutation({
 	handler: async (ctx, { suit, ...turn }) => {
 		const round = await currentTurn(ctx, turn);
 		if (round.opening.kind !== 'choose-suit') throw new ConvexError('No suit to choose');
-		await ctx.db.patch('rounds', round._id, {
-			activeSuit: suit,
-			opening: { kind: 'none' },
-			currentSeatId: nextSeatId(round),
-			version: round.version + 1
-		});
+		await commitTurn(
+			ctx,
+			round,
+			{ activeSuit: suit, opening: { kind: 'none' }, currentSeatId: nextSeatId(round) },
+			{ kind: 'chooseSuit', suit }
+		);
 		return null;
 	}
 });
@@ -207,16 +234,21 @@ export const play = mutation({
 		const next = nextSeatId(round);
 		const effect = drawEffect(group, round.rules);
 		await ctx.db.patch('roundHands', hand._id, { cards });
-		await ctx.db.patch('rounds', round._id, {
-			playedPile: [...round.playedPile, ...group],
-			activeSuit: suit ?? top.suit,
-			currentSeatId: mustCover ? round.currentSeatId : next,
-			mustCover,
-			effect: effect && { targetSeatId: next, ...effect },
-			drawnCard: null,
-			handCounts: withCardCount(round, hand.seatId, cards.length),
-			version: round.version + 1
-		});
+		const activeSuit = suit ?? top.suit;
+		await commitTurn(
+			ctx,
+			round,
+			{
+				playedPile: [...round.playedPile, ...group],
+				activeSuit,
+				currentSeatId: mustCover ? round.currentSeatId : next,
+				mustCover,
+				effect: effect && { targetSeatId: next, ...effect },
+				drawnCard: null,
+				handCounts: withCardCount(round, hand.seatId, cards.length)
+			},
+			{ kind: 'play', cards: group, activeSuit }
+		);
 		return null;
 	}
 });
@@ -232,15 +264,25 @@ export const draw = mutation({
 		const { drawn, playable, ...piles } = drawUntilPlayable(round);
 		const cards = [...hand.cards, ...drawn];
 		await ctx.db.patch('roundHands', hand._id, { cards });
-		await ctx.db.patch('rounds', round._id, {
-			...piles,
-			// With nothing left to draw or recycle, the turn passes and any 6 cover is waived.
-			currentSeatId: playable ? round.currentSeatId : nextSeatId(round),
-			drawnCard: playable,
-			mustCover: playable ? round.mustCover : false,
-			handCounts: withCardCount(round, hand.seatId, cards.length),
-			version: round.version + 1
-		});
+		await commitTurn(
+			ctx,
+			round,
+			{
+				...piles,
+				// With nothing left to draw or recycle, the turn passes and any 6 cover is waived.
+				currentSeatId: playable ? round.currentSeatId : nextSeatId(round),
+				drawnCard: playable,
+				mustCover: playable ? round.mustCover : false,
+				handCounts: withCardCount(round, hand.seatId, cards.length)
+			},
+			{
+				kind: 'draw',
+				count: drawn.length,
+				recycles: piles.recycles - round.recycles,
+				passed: !playable,
+				coverWaived: !playable && round.mustCover
+			}
+		);
 		return null;
 	}
 });
@@ -258,13 +300,22 @@ export const accept = mutation({
 		const { drawn, ...piles } = drawCards(round, effect.drawCount);
 		const cards = [...hand.cards, ...drawn];
 		await ctx.db.patch('roundHands', hand._id, { cards });
-		await ctx.db.patch('rounds', round._id, {
-			...piles,
-			effect: null,
-			currentSeatId: effect.skip ? nextSeatId(round) : round.currentSeatId,
-			handCounts: withCardCount(round, hand.seatId, cards.length),
-			version: round.version + 1
-		});
+		await commitTurn(
+			ctx,
+			round,
+			{
+				...piles,
+				effect: null,
+				currentSeatId: effect.skip ? nextSeatId(round) : round.currentSeatId,
+				handCounts: withCardCount(round, hand.seatId, cards.length)
+			},
+			{
+				kind: 'accept',
+				count: drawn.length,
+				recycles: piles.recycles - round.recycles,
+				skipped: effect.skip
+			}
+		);
 		return null;
 	}
 });

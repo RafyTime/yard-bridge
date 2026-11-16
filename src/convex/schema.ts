@@ -3,6 +3,7 @@ import { v } from 'convex/values';
 import { authTables } from '@convex-dev/auth/server';
 import { rulesValidator } from './rules';
 import { cardValidator, effectValidator, openingValidator, suitValidator } from './cards';
+import { recentMoveValidator } from './roundEvents';
 
 export default defineSchema({
 	...authTables,
@@ -44,6 +45,11 @@ export default defineSchema({
 		seatId: v.id('seats'),
 		cards: v.array(cardValidator)
 	}).index('by_roundId_and_seatId', ['roundId', 'seatId']),
+	// One public event per accepted Round command, saved with the move it describes.
+	roundEvents: defineTable({
+		roundId: v.id('rounds'),
+		...recentMoveValidator.fields
+	}).index('by_roundId_and_version', ['roundId', 'version']),
 	savedRules: defineTable({
 		ownerId: v.id('users'),
 		name: v.string(),

@@ -657,6 +657,12 @@ test('players take ordinary turns, drawing until the drawn card must be played',
 	await expect(page.getByText('Seat 2: 8 cards', { exact: false })).toBeVisible();
 	await expect(hand.getByRole('button', { disabled: false })).toHaveCount(1);
 	await page.reload();
+	// The feed survives the reload and shows how many cards moved, never which.
+	const recent = page.getByRole('list', { name: 'Recent moves', exact: true });
+	await expect(recent.getByRole('listitem')).toHaveText([
+		'Seat 2 drew 3.',
+		'Seat 1 started the round with the 9 of hearts on top.'
+	]);
 	await page.getByRole('button', { name: 'Select 10 of hearts', exact: true }).click();
 	await page.getByRole('button', { name: 'Play selected cards', exact: true }).click();
 	await expect(page.getByText('Current player: seat 1.', { exact: true })).toBeVisible();
@@ -669,6 +675,8 @@ test('players take ordinary turns, drawing until the drawn card must be played',
 	await page.getByRole('button', { name: 'Play selected cards', exact: true }).click();
 	await expect(page.getByText('Current player: seat 2.', { exact: true })).toBeVisible();
 	await expect(page.getByText('Seat 1: 3 cards', { exact: false })).toBeVisible();
+	await expect(recent.getByRole('listitem').first()).toHaveText('Seat 1 played 10 of clubs.');
+	await expect(recent.getByRole('listitem')).toHaveCount(4);
 	await page.screenshot({
 		path: test.info().outputPath('ordinary-turn-phone.png'),
 		fullPage: true
@@ -676,6 +684,9 @@ test('players take ordinary turns, drawing until the drawn card must be played',
 	await page.goto(`/uk${new URL(page.url()).search}`);
 	await page.setViewportSize({ width: 320, height: 640 });
 	await expect(page.getByText('Зараз ходить гравець на місці 2.', { exact: true })).toBeVisible();
+	await expect(
+		page.getByRole('list', { name: 'Останні ходи', exact: true }).getByRole('listitem').first()
+	).toHaveText('Місце 1: покладено 10, трефи.');
 	expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 	await page.screenshot({
 		path: test.info().outputPath('ordinary-turn-uk-phone.png'),
