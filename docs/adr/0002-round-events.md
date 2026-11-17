@@ -12,5 +12,5 @@ A player returning after a break needs to see what happened, and the approved sp
 ## Consequences
 
 - An event is tied to the Round version that its move produced, so each version has at most one event and the feed is ordered by version.
-- A new command or outcome needs its own event kind. The steps are in the header comment of `src/convex/roundEvents.ts`: add the kind, commit through `commitTurn` in `src/convex/rounds.ts` (or `recordEvent` outside a turn), and describe it in the feed in `src/lib/components/game-round.svelte`, which does not compile until the new kind is handled.
+- A new command or outcome needs its own event kind. The steps are in the header comment of `src/convex/roundEvents.ts`: add the kind, commit through `commitTurn` in `src/convex/rounds.ts` (or `recordEvent` outside a turn), and describe it in the feed in `src/lib/components/game-round.svelte`, which does not compile until the new kind is handled. A Round ending has no event of its own: the final move's event records it, and the Round result shows that the Round ended.
 - Adding a field to an event means checking that it is public to every Seat.

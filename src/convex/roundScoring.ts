@@ -4,7 +4,7 @@ import type { Card } from './cards';
 import { cardValidator } from './cards';
 import type { RulesConfiguration } from './rules';
 
-// A completed Round's final hands, net Penalty points, and accumulated Game scores, shown to
+// A completed Round's final hands, Penalty points, and accumulated Game scores, shown to
 // every Seat once the Round ends.
 export const roundResultValidator = v.object({
 	hands: v.array(
