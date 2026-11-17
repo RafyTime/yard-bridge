@@ -49,7 +49,8 @@
 		| { kind: 'play'; suit?: Suit }
 		| { kind: 'chooseSuit'; suit: Suit }
 		| { kind: 'draw' }
-		| { kind: 'accept' };
+		| { kind: 'accept' }
+		| { kind: 'cancel'; card: Card };
 	// Turn commands carry the viewed version, so a move chosen from an outdated table is rejected.
 	async function move(table: Round, command: Command) {
 		if (moving) return;
@@ -69,6 +70,9 @@
 					break;
 				case 'draw':
 					await client.mutation(api.rounds.draw, turn);
+					break;
+				case 'cancel':
+					await client.mutation(api.rounds.cancel, { ...turn, card: command.card });
 					break;
 			}
 		} catch (failure) {
@@ -124,6 +128,8 @@
 				if (!event.skipped) return m.round_event_accept({ number, count });
 				return count ? m.round_event_skip({ number, count }) : m.round_event_miss({ number });
 			}
+			case 'cancel':
+				return m.round_event_cancel({ number, card: cardLabel(event.card) });
 			default:
 				return event satisfies never;
 		}
@@ -192,7 +198,7 @@
 					number: seatNumber(table.effect.targetSeatId),
 					count: table.effect.drawCount
 				}}
-				{#if !effect.count}<p>{m.round_skip_effect()}</p>
+				{#if !effect.count}<p>{m.round_skip_effect(effect)}</p>
 				{:else if table.effect.skip}<p>{m.round_effect_skip(effect)}</p>
 				{:else}<p>{m.round_effect_play(effect)}</p>{/if}
 			{:else if !table.openingEffects}<p class="text-muted-foreground">
@@ -220,6 +226,12 @@
 							? m.round_effect_accept({ count })
 							: m.round_effect_accept_miss()}</Button
 				>
+				{#each table.cancelWith as ace (`${ace.rank}:${ace.suit}`)}<Button
+						variant="outline"
+						class="min-h-11"
+						onclick={() => move(table, { kind: 'cancel', card: ace })}
+						disabled={moving}>{m.round_cancel_with({ card: cardLabel(ace) })}</Button
+					>{/each}
 			{:else if table.playable.length || table.canDraw}<p role="status">{m.round_your_turn()}</p>
 			{:else if isTurn && table.opening.kind !== 'choose-suit'}<p role="status">
 					{m.round_waiting_opening()}

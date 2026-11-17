@@ -855,7 +855,8 @@ test.each([
 	{ top: 'Qs', rules: { openingEffects: false }, effect: null },
 	{ top: 'Ks', rules: { kingOfSpades: true }, effect: { drawCount: 7, skip: true } },
 	{ top: 'Ks', rules: { kingOfSpades: false }, effect: null },
-	{ top: 'Ks', rules: { kingOfSpades: true, openingEffects: false }, effect: null }
+	{ top: 'Ks', rules: { kingOfSpades: true, openingEffects: false }, effect: null },
+	{ top: 'Ah', rules: { aceBehavior: 'cancel' as const }, effect: null }
 ])(
 	'an opening $top under $rules leaves $effect on the next Seat',
 	async ({ top, rules, effect }) => {
@@ -1227,3 +1228,84 @@ test.each([
 		expect(after[skipped].hand).toEqual(hands[skipped]);
 	}
 );
+
+test.each([
+	{ count: 2, target: 0, ace: 'As', next: 1 },
+	{ count: 4, target: 2, ace: 'Ah', next: 3 }
+])(
+	'with Ace cancellation the targeted Seat of $count cancels a stacked 8 with the $ace',
+	async ({ count, target, ace, next }) => {
+		const hands = [
+			cards('10c Ks Qc As'),
+			cards('8c 8d Kc Kd 9d'),
+			cards('9s Qh Ah 10s 10d'),
+			cards('7c 7d 7s Js Jh')
+		];
+		const { players, views, seatIds } = await opened(hands.slice(0, count), card('9c'), [], {
+			aceBehavior: 'cancel'
+		});
+		let all = await views();
+		const roundId = all[0].id;
+		await players[1].mutation(api.rounds.play, {
+			roundId,
+			expectedVersion: all[0].version,
+			cards: cards('8c 8d')
+		});
+		all = await views();
+		expect(all[target]).toMatchObject({
+			effect: { targetSeatId: seatIds[target], drawCount: 4, skip: true },
+			cancelWith: cards(ace)
+		});
+		for (const seat of all.filter((_, index) => index !== target))
+			expect(seat.cancelWith).toEqual([]);
+		const turn = { roundId, expectedVersion: all[0].version };
+		await expect(
+			players[next].mutation(api.rounds.cancel, { ...turn, card: card('Ac') })
+		).rejects.toThrow('Not your turn');
+		await expect(
+			players[target].mutation(api.rounds.cancel, { ...turn, card: hands[target][0] })
+		).rejects.toThrow('Cancel with an Ace from your hand');
+		await players[target].mutation(api.rounds.cancel, { ...turn, card: card(ace) });
+		const after = await views();
+		for (const seat of after)
+			expect(seat).toMatchObject({
+				effect: null,
+				topCard: card(ace),
+				activeSuit: card(ace).suit,
+				currentSeatId: seatIds[next],
+				drawCount: all[0].drawCount,
+				recentMoves: [
+					{
+						version: turn.expectedVersion + 1,
+						seatId: seatIds[target],
+						event: { kind: 'cancel', card: card(ace) }
+					},
+					expect.anything(),
+					expect.anything()
+				]
+			});
+		expect(after[target].hand).toEqual(hands[target].filter((held) => held.rank !== 'A'));
+	}
+);
+
+test('the default Ace rule offers no cancellation', async () => {
+	const { players, views } = await opened(
+		[cards('10c Ks Qc As'), cards('8c Kc Kd 9d 10d')],
+		card('9c')
+	);
+	let [view] = await views();
+	await players[1].mutation(api.rounds.play, {
+		roundId: view.id,
+		expectedVersion: view.version,
+		cards: cards('8c')
+	});
+	[view] = await views();
+	expect(view.cancelWith).toEqual([]);
+	await expect(
+		players[0].mutation(api.rounds.cancel, {
+			roundId: view.id,
+			expectedVersion: view.version,
+			card: card('As')
+		})
+	).rejects.toThrow('Ace cancellation is off');
+});

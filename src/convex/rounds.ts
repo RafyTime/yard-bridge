@@ -19,6 +19,7 @@ import type { RoundEvent } from './roundEvents';
 import {
 	blockedReason,
 	canPlay,
+	cancelAces,
 	drawCards,
 	drawEffect,
 	drawUntilPlayable,
@@ -75,6 +76,8 @@ export const view = query({
 		// Server-decided moves for this viewer; both stay empty outside the viewer's turn.
 		playable: v.array(cardValidator),
 		canDraw: v.boolean(),
+		// Aces the viewer may play to cancel the effect aimed at them; empty for everyone else.
+		cancelWith: v.array(cardValidator),
 		drawnCard: v.union(cardValidator, v.null()),
 		topCard: cardValidator,
 		drawCount: v.number(),
@@ -116,6 +119,7 @@ export const view = query({
 			hand: hand.cards,
 			playable,
 			canDraw: isTurn && !blockedReason(round) && !playable.length,
+			cancelWith: cancelAces(round, seat._id, hand.cards),
 			drawnCard: isTurn ? round.drawnCard : null,
 			topCard: round.playedPile[round.playedPile.length - 1],
 			drawCount: round.drawPile.length,
@@ -315,6 +319,36 @@ export const accept = mutation({
 				recycles: piles.recycles - round.recycles,
 				skipped: effect.skip
 			}
+		);
+		return null;
+	}
+});
+
+// Under the cancellation rule, the target of a pending effect plays an Ace from hand instead of
+// accepting. The Ace goes on top, the whole effect is dropped, and play passes onward.
+export const cancel = mutation({
+	args: { ...turnArgs, card: cardValidator },
+	returns: v.null(),
+	handler: async (ctx, { card, ...turn }) => {
+		const round = await currentTurn(ctx, turn);
+		if (round.rules.aceBehavior !== 'cancel') throw new ConvexError('Ace cancellation is off');
+		if (!round.effect) throw new ConvexError('No effect to cancel');
+		const hand = await currentHand(ctx, round);
+		if (!cancelAces(round, hand.seatId, hand.cards).some((ace) => sameCard(ace, card)))
+			throw new ConvexError('Cancel with an Ace from your hand');
+		const cards = hand.cards.filter((held) => !sameCard(held, card));
+		await ctx.db.patch('roundHands', hand._id, { cards });
+		await commitTurn(
+			ctx,
+			round,
+			{
+				playedPile: [...round.playedPile, card],
+				activeSuit: card.suit,
+				effect: null,
+				currentSeatId: nextSeatId(round),
+				handCounts: withCardCount(round, hand.seatId, cards.length)
+			},
+			{ kind: 'cancel', card }
 		);
 		return null;
 	}

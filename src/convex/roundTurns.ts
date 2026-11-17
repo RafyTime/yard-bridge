@@ -52,6 +52,16 @@ export function playableCards(
 	return hand.filter((card) => canPlay(round, card));
 }
 
+// Aces the Seat may play to cancel the pending effect aimed at it, under the cancellation rule.
+export function cancelAces(
+	round: Pick<Round, 'rules' | 'effect'>,
+	seatId: Id<'seats'>,
+	hand: readonly Card[]
+) {
+	if (round.rules.aceBehavior !== 'cancel' || round.effect?.targetSeatId !== seatId) return [];
+	return hand.filter((card) => card.rank === 'A');
+}
+
 // Table order follows the Round's Seat list.
 export function nextSeatId(round: Pick<Round, 'handCounts' | 'currentSeatId'>) {
 	const index = round.handCounts.findIndex((seat) => seat.seatId === round.currentSeatId);
