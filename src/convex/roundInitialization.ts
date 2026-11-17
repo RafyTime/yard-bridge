@@ -49,6 +49,7 @@ export function initializeRound({
 		mustCover,
 		recycles: 0,
 		version: 0,
+		result: null,
 		handCounts: seats.map((seat, index) => ({ seatId: seat._id, cardCount: hands[index].length })),
 		hands: seats.map((seat, index) => ({ seatId: seat._id, cards: hands[index] }))
 	};

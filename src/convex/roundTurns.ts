@@ -32,7 +32,8 @@ export function drawEffect(
 }
 
 // Pending states that Play and Draw cannot resolve, with the reason shown to the mover.
-export function blockedReason(round: Pick<Round, 'opening' | 'effect'>) {
+export function blockedReason(round: Pick<Round, 'opening' | 'effect' | 'result'>) {
+	if (round.result) return 'The Round is over';
 	if (round.opening.kind === 'choose-suit') return 'The opening card must be resolved first';
 	if (round.effect) return 'Accept the pending effect first';
 	return null;
@@ -42,7 +43,7 @@ export function blockedReason(round: Pick<Round, 'opening' | 'effect'>) {
 export function playableCards(
 	round: Pick<
 		Round,
-		'currentSeatId' | 'drawnCard' | 'opening' | 'effect' | 'playedPile' | 'activeSuit' | 'mustCover'
+		'currentSeatId' | 'drawnCard' | 'opening' | 'effect' | 'result' | 'playedPile' | 'activeSuit' | 'mustCover'
 	>,
 	seatId: Id<'seats'>,
 	hand: readonly Card[]

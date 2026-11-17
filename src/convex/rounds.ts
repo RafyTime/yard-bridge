@@ -16,6 +16,8 @@ import {
 import { initializeRound } from './roundInitialization';
 import { recentMoveValidator, recentMoves, recordEvent } from './roundEvents';
 import type { RoundEvent } from './roundEvents';
+import { handPoints, roundResultValidator } from './roundScoring';
+import type { RoundResult } from './roundScoring';
 import {
 	blockedReason,
 	canPlay,
@@ -90,7 +92,9 @@ export const view = query({
 		openingEffects: v.boolean(),
 		seats: v.array(v.object({ seatId: v.id('seats'), cardCount: v.number() })),
 		// The latest public moves, newest first, identical for every Seat.
-		recentMoves: v.array(recentMoveValidator)
+		recentMoves: v.array(recentMoveValidator),
+		// Every Seat's final hand and points once the Round ends; hands stay private until then.
+		result: v.union(roundResultValidator, v.null())
 	}),
 	handler: async (ctx, { gameId }) => {
 		const player = await requirePlayer(ctx);
@@ -131,7 +135,8 @@ export const view = query({
 			effect: round.effect,
 			openingEffects: round.rules.openingEffects,
 			seats: round.handCounts,
-			recentMoves: await recentMoves(ctx, round)
+			recentMoves: await recentMoves(ctx, round),
+			result: round.result
 		};
 	}
 });
@@ -152,6 +157,7 @@ async function currentTurn(ctx: MutationCtx, { roundId, expectedVersion }: Turn)
 			)
 			.unique());
 	if (!round || !seat) throw new ConvexError('Game unavailable');
+	if (round.result) throw new ConvexError('The Round is over');
 	if (round.version !== expectedVersion)
 		throw new ConvexError('Round changed. Review the latest table');
 	if (round.currentSeatId !== seat._id) throw new ConvexError('Not your turn');
@@ -170,10 +176,11 @@ async function currentHand(ctx: MutationCtx, round: Doc<'rounds'>) {
 	return hand;
 }
 
-type RoundPatch = Partial<Omit<Doc<'rounds'>, '_id' | '_creationTime' | 'version'>>;
+type RoundPatch = Partial<Omit<Doc<'rounds'>, '_id' | '_creationTime' | 'version' | 'result'>>;
 
 // Commit the current Seat's accepted command: advance the Round version so stale or repeated
-// moves are rejected, and record the command's public event in the same mutation.
+// moves are rejected, and record the command's public event in the same mutation. Call it after
+// saving the mover's hand, since a command that leaves a hand empty may end the Round here.
 async function commitTurn(
 	ctx: MutationCtx,
 	round: Doc<'rounds'>,
@@ -181,8 +188,39 @@ async function commitTurn(
 	event: RoundEvent
 ) {
 	const version = round.version + 1;
-	await ctx.db.patch('rounds', round._id, { ...patch, version });
+	const next = { ...round, ...patch, version };
+	const result = isOver(next) ? await scoreRound(ctx, next) : null;
+	await ctx.db.patch('rounds', round._id, { ...patch, version, result });
 	await recordEvent(ctx, round._id, { version, seatId: round.currentSeatId, event });
+}
+
+// A hand is empty and its final card has resolved: no 6 still waits for a cover and no draw or
+// skip still waits on its target.
+function isOver(round: Doc<'rounds'>) {
+	return (
+		!round.mustCover && !round.effect && round.handCounts.some((seat) => seat.cardCount === 0)
+	);
+}
+
+// Score every remaining hand into the Game and reveal the final hands.
+async function scoreRound(ctx: MutationCtx, round: Doc<'rounds'>): Promise<RoundResult> {
+	const hands = await Promise.all(
+		round.handCounts.map(async ({ seatId }) => {
+			const [seat, hand] = await Promise.all([
+				ctx.db.get('seats', seatId),
+				ctx.db
+					.query('roundHands')
+					.withIndex('by_roundId_and_seatId', (q) => q.eq('roundId', round._id).eq('seatId', seatId))
+					.unique()
+			]);
+			if (!seat || !hand) throw new ConvexError('Game unavailable');
+			const points = handPoints(hand.cards, round.rules);
+			const score = seat.score + points;
+			await ctx.db.patch('seats', seatId, { score });
+			return { seatId, cards: hand.cards, points, score };
+		})
+	);
+	return { hands };
 }
 
 // Load the turn for Play or Draw, rejecting pending states these moves cannot resolve.

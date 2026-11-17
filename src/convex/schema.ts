@@ -4,6 +4,7 @@ import { authTables } from '@convex-dev/auth/server';
 import { rulesValidator } from './rules';
 import { cardValidator, effectValidator, openingValidator, suitValidator } from './cards';
 import { recentMoveValidator } from './roundEvents';
+import { roundResultValidator } from './roundScoring';
 
 export default defineSchema({
 	...authTables,
@@ -38,7 +39,9 @@ export default defineSchema({
 		recycles: v.number(),
 		// Increases with every accepted turn command so stale or repeated moves cannot commit.
 		version: v.number(),
-		handCounts: v.array(v.object({ seatId: v.id('seats'), cardCount: v.number() }))
+		handCounts: v.array(v.object({ seatId: v.id('seats'), cardCount: v.number() })),
+		// Set once the Round ends; every later turn command is rejected.
+		result: v.union(roundResultValidator, v.null())
 	}).index('by_gameId', ['gameId']),
 	roundHands: defineTable({
 		roundId: v.id('rounds'),
