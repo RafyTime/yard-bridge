@@ -1380,6 +1380,65 @@ test('a final draw effect resolves on its target before the Round is scored, and
 		});
 });
 
+test('a final draw effect at a four-player table resolves on the next Seat, then scores all four hands', async () => {
+	const { players, views, seatIds, gameId } = await opened(
+		[cards('Kc'), cards('8h 8d'), cards('Qd Jc'), cards('10s 9c')],
+		card('9h'),
+		cards('Qs 10c 9d 7s Kd')
+	);
+	const [, second, third, fourth] = players;
+	const roundId = (await views())[0].id;
+	await second.mutation(api.rounds.play, { roundId, expectedVersion: 0, cards: cards('8h 8d') });
+	for (const seat of await views())
+		expect(seat).toMatchObject({
+			result: null,
+			effect: { targetSeatId: seatIds[2], drawCount: 4, skip: true }
+		});
+	const accepts = await Promise.allSettled([
+		third.mutation(api.rounds.accept, { roundId, expectedVersion: 1 }),
+		third.mutation(api.rounds.accept, { roundId, expectedVersion: 1 })
+	]);
+	expect(accepts.map((result) => result.status).sort()).toEqual(['fulfilled', 'rejected']);
+	await expect(fourth.mutation(api.rounds.draw, { roundId, expectedVersion: 2 })).rejects.toThrow(
+		'The Round is over'
+	);
+	const result = {
+		hands: [
+			{ seatId: seatIds[0], cards: cards('Kc'), points: 10, score: 10 },
+			{ seatId: seatIds[1], cards: [], points: 0, score: 0 },
+			{ seatId: seatIds[2], cards: cards('Qd Jc Qs 10c 9d 7s'), points: 90, score: 90 },
+			{ seatId: seatIds[3], cards: cards('10s 9c'), points: 10, score: 10 }
+		]
+	};
+	for (const seat of await views()) expect(seat).toMatchObject({ result, drawCount: 24 });
+	const game = await second.query(api.games.view, { gameId });
+	expect(game.seats.map((seat) => seat.score)).toEqual([10, 0, 90, 10]);
+});
+
+test('a final 6 cannot finish a Round uncovered, so its player draws a cover first', async () => {
+	const { players, views, seatIds } = await opened(
+		[cards('Kc'), cards('6d 6h')],
+		card('9h'),
+		cards('Qh 10c')
+	);
+	const [, guest] = players;
+	const roundId = (await views())[0].id;
+	await guest.mutation(api.rounds.play, { roundId, expectedVersion: 0, cards: cards('6d 6h') });
+	for (const seat of await views())
+		expect(seat).toMatchObject({ result: null, mustCover: true, currentSeatId: seatIds[1] });
+	expect((await views())[1]).toMatchObject({ hand: [], playable: [], canDraw: true });
+	await guest.mutation(api.rounds.draw, { roundId, expectedVersion: 1 });
+	for (const seat of await views()) expect(seat.result).toBeNull();
+	await guest.mutation(api.rounds.play, { roundId, expectedVersion: 2, cards: cards('Qh') });
+	for (const seat of await views())
+		expect(seat.result).toEqual({
+			hands: [
+				{ seatId: seatIds[0], cards: cards('Kc'), points: 10, score: 10 },
+				{ seatId: seatIds[1], cards: [], points: 0, score: 0 }
+			]
+		});
+});
+
 test.each([
 	{ kingOfSpades: false, points: 10 },
 	{ kingOfSpades: true, points: 80 }
