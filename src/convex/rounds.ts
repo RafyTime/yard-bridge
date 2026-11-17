@@ -1,6 +1,6 @@
 import { ConvexError, v } from 'convex/values';
 import type { ObjectType } from 'convex/values';
-import type { Doc } from './_generated/dataModel';
+import type { Doc, Id } from './_generated/dataModel';
 import { mutation, query } from './_generated/server';
 import type { MutationCtx } from './_generated/server';
 import { requirePlayer } from './access';
@@ -13,7 +13,7 @@ import {
 	shuffle,
 	suitValidator
 } from './cards';
-import { initializeRound } from './roundInitialization';
+import { initializeRound, laterStarter } from './roundInitialization';
 import { recentMoveValidator, recentMoves, recordEvent } from './roundEvents';
 import type { RoundEvent } from './roundEvents';
 import { handPoints, roundResultValidator } from './roundScoring';
@@ -50,23 +50,92 @@ export const start = mutation({
 		if (!hostSeat) throw new ConvexError('The Host has no Seat at this table');
 		const deck = shuffle(orderedDeck);
 		const starterIndex = Math.floor(Math.random() * seats.length);
-		const { hands, ...round } = initializeRound({
+		await deal(ctx, {
+			gameId,
+			number: 1,
 			deck,
-			seats,
+			seats: seats.map((seat) => seat._id),
 			starterSeatId: seats[starterIndex]._id,
-			rules: game.rules
-		});
-		const roundId = await ctx.db.insert('rounds', { gameId, number: 1, ...round });
-		for (const hand of hands) await ctx.db.insert('roundHands', { roundId, ...hand });
-		await recordEvent(ctx, roundId, {
-			version: round.version,
-			seatId: hostSeat._id,
-			event: { kind: 'start', topCard: round.playedPile[0] }
+			rules: game.rules,
+			callerSeatId: hostSeat._id
 		});
 		await ctx.db.patch('games', gameId, { status: 'active', version: game.version + 1 });
 		return null;
 	}
 });
+
+// Any Seat continues a finished Round into the next one. The finished Round's version guards
+// against a stale or repeated request dealing twice.
+export const next = mutation({
+	args: { roundId: v.id('rounds'), expectedVersion: v.number() },
+	returns: v.null(),
+	handler: async (ctx, { roundId, expectedVersion }) => {
+		const player = await requirePlayer(ctx);
+		const round = await ctx.db.get('rounds', roundId);
+		const seat =
+			round &&
+			(await ctx.db
+				.query('seats')
+				.withIndex('by_gameId_and_userId', (q) =>
+					q.eq('gameId', round.gameId).eq('userId', player.id)
+				)
+				.unique());
+		if (!round || !seat) throw new ConvexError('Game unavailable');
+		if (!round.result) throw new ConvexError('The Round is still in play');
+		const latest = await ctx.db
+			.query('rounds')
+			.withIndex('by_gameId', (q) => q.eq('gameId', round.gameId))
+			.order('desc')
+			.first();
+		if (latest?._id !== round._id || round.version !== expectedVersion)
+			throw new ConvexError('Round changed. Review the latest table');
+		const deck = shuffle(orderedDeck);
+		const starterSeatId = laterStarter(
+			round.rules.starterPolicy,
+			round.starterSeatId,
+			round.result.hands
+		);
+		await deal(ctx, {
+			gameId: round.gameId,
+			number: round.number + 1,
+			deck,
+			seats: round.handCounts.map((held) => held.seatId),
+			starterSeatId,
+			rules: round.rules,
+			callerSeatId: seat._id
+		});
+		return null;
+	}
+});
+
+// Save a new Round's deal and its public start event.
+async function deal(
+	ctx: MutationCtx,
+	{
+		gameId,
+		number,
+		seats,
+		callerSeatId,
+		...setup
+	}: Omit<Parameters<typeof initializeRound>[0], 'seats'> & {
+		gameId: Id<'games'>;
+		number: number;
+		seats: readonly Id<'seats'>[];
+		callerSeatId: Id<'seats'>;
+	}
+) {
+	const { hands, ...round } = initializeRound({
+		...setup,
+		seats: seats.map((_id) => ({ _id }))
+	});
+	const roundId = await ctx.db.insert('rounds', { gameId, number, ...round });
+	for (const hand of hands) await ctx.db.insert('roundHands', { roundId, ...hand });
+	await recordEvent(ctx, roundId, {
+		version: round.version,
+		seatId: callerSeatId,
+		event: { kind: 'start', topCard: round.playedPile[0] }
+	});
+}
 
 export const view = query({
 	args: { gameId: v.id('games') },
@@ -197,9 +266,7 @@ async function commitTurn(
 // A hand is empty and its final card has resolved: no 6 still waits for a cover and no draw or
 // skip still waits on its target.
 function isOver(round: Doc<'rounds'>) {
-	return (
-		!round.mustCover && !round.effect && round.handCounts.some((seat) => seat.cardCount === 0)
-	);
+	return !round.mustCover && !round.effect && round.handCounts.some((seat) => seat.cardCount === 0);
 }
 
 // Score every remaining hand into the Game and reveal the final hands.
@@ -210,7 +277,9 @@ async function scoreRound(ctx: MutationCtx, round: Doc<'rounds'>): Promise<Round
 				ctx.db.get('seats', seatId),
 				ctx.db
 					.query('roundHands')
-					.withIndex('by_roundId_and_seatId', (q) => q.eq('roundId', round._id).eq('seatId', seatId))
+					.withIndex('by_roundId_and_seatId', (q) =>
+						q.eq('roundId', round._id).eq('seatId', seatId)
+					)
 					.unique()
 			]);
 			if (!seat || !hand) throw new ConvexError('Game unavailable');

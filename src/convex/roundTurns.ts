@@ -43,7 +43,14 @@ export function blockedReason(round: Pick<Round, 'opening' | 'effect' | 'result'
 export function playableCards(
 	round: Pick<
 		Round,
-		'currentSeatId' | 'drawnCard' | 'opening' | 'effect' | 'result' | 'playedPile' | 'activeSuit' | 'mustCover'
+		| 'currentSeatId'
+		| 'drawnCard'
+		| 'opening'
+		| 'effect'
+		| 'result'
+		| 'playedPile'
+		| 'activeSuit'
+		| 'mustCover'
 	>,
 	seatId: Id<'seats'>,
 	hand: readonly Card[]

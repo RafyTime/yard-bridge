@@ -2,6 +2,7 @@
 import { convexTest } from 'convex-test';
 import { afterEach, expect, test, vi } from 'vite-plus/test';
 import { api } from './_generated/api';
+import type { Id } from './_generated/dataModel';
 import type { Card } from './cards';
 import type { RulesConfiguration } from './rules';
 import schema from './schema';
@@ -1395,5 +1396,104 @@ test.each([
 		});
 		const [view] = await views();
 		expect(view.result?.hands[0]).toMatchObject({ cards: cards('Ks'), points, score: points });
+	}
+);
+
+// Deals the next Round from `deck`, then answers any starter tie with `choices`.
+async function nextRound(
+	caller: Awaited<ReturnType<typeof createPlayer>>,
+	{ id, version }: { id: Id<'rounds'>; version: number },
+	deck: readonly Card[],
+	choices: number[] = []
+) {
+	vi.stubGlobal('Math', scriptedMath([...shuffleValues(orderedDeck, deck), ...choices]));
+	try {
+		await caller.mutation(api.rounds.next, { roundId: id, expectedVersion: version });
+	} finally {
+		vi.unstubAllGlobals();
+	}
+}
+
+test('the default starter policy picks the highest score, then previous-Round points, then at random', async () => {
+	const { players, views, seatIds, gameId, player } = await opened(
+		[cards('Kh'), cards('10h 10s'), cards('10c 9c')],
+		card('9h')
+	);
+	const [, second, third] = players;
+	let [view] = await views();
+	await second.mutation(api.rounds.play, {
+		roundId: view.id,
+		expectedVersion: 0,
+		cards: cards('10h 10s')
+	});
+	[view] = await views();
+	const finished = view;
+	// Seats 1 and 3 tie on 10 points overall and in the previous Round, so a random choice decides.
+	await nextRound(
+		third,
+		finished,
+		dealDeck([cards('Kd'), cards('10h 10s'), cards('Jc 9d')], card('9h')),
+		[choice(1, 2)]
+	);
+	const round2 = await views();
+	for (const seat of round2)
+		expect(seat).toMatchObject({
+			number: 2,
+			starterSeatId: seatIds[2],
+			currentSeatId: seatIds[0],
+			result: null,
+			recentMoves: [
+				{ version: 0, seatId: seatIds[2], event: { kind: 'start', topCard: card('9h') } }
+			]
+		});
+	expect(round2.map((seat) => seat.hand)).toEqual([cards('10h 10s'), cards('Jc 9d'), cards('Kd')]);
+	await expect(nextRound(second, finished, orderedDeck)).rejects.toThrow('Round changed');
+	await expect(nextRound(await player(9), finished, orderedDeck)).rejects.toThrow(
+		'Game unavailable'
+	);
+	await expect(nextRound(second, round2[0], orderedDeck)).rejects.toThrow(
+		'The Round is still in play'
+	);
+	await players[0].mutation(api.rounds.play, {
+		roundId: round2[0].id,
+		expectedVersion: 0,
+		cards: cards('10h 10s')
+	});
+	[view] = await views();
+	expect(view.result?.hands.map(({ points, score }) => ({ points, score }))).toEqual([
+		{ points: 0, score: 10 },
+		{ points: 20, score: 20 },
+		{ points: 10, score: 20 }
+	]);
+	// Seats 2 and 3 tie on 20 overall; Seat 2 scored more last Round, so no random choice is needed.
+	await nextRound(players[0], view, orderedDeck);
+	[view] = await views();
+	expect(view).toMatchObject({ number: 3, starterSeatId: seatIds[1] });
+	const game = await players[0].query(api.games.view, { gameId });
+	expect(game.seats.map((seat) => seat.score)).toEqual([10, 20, 20]);
+});
+
+test.each([
+	{ starterPolicy: 'previous-starter', choices: [], starter: 0 },
+	{ starterPolicy: 'random', choices: [choice(1, 2)], starter: 1 }
+] as const)(
+	'the $starterPolicy starter policy picks Seat $starter for the next Round',
+	async ({ starterPolicy, choices, starter }) => {
+		const { players, views, seatIds } = await opened(
+			[cards('Kh'), cards('10h 10s')],
+			card('9h'),
+			[],
+			{ starterPolicy }
+		);
+		let [view] = await views();
+		await players[1].mutation(api.rounds.play, {
+			roundId: view.id,
+			expectedVersion: 0,
+			cards: cards('10h 10s')
+		});
+		[view] = await views();
+		await nextRound(players[1], view, orderedDeck, [...choices]);
+		[view] = await views();
+		expect(view).toMatchObject({ number: 2, starterSeatId: seatIds[starter] });
 	}
 );

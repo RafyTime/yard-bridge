@@ -5,6 +5,28 @@ import type { Card, Effect } from './cards';
 import { drawEffect } from './roundTurns';
 import type { RulesConfiguration } from './rules';
 
+// The starter of a later Round under the frozen policy. The default picks the highest
+// accumulated score, then the most points in the finished Round, then at random. `seats` follows
+// table order, so a random tie-break is reproducible under a supplied random choice.
+export function laterStarter(
+	policy: RulesConfiguration['starterPolicy'],
+	previousStarterId: Id<'seats'>,
+	seats: readonly { seatId: Id<'seats'>; score: number; points: number }[]
+) {
+	if (policy === 'previous-starter') return previousStarterId;
+	const tied = policy === 'highest-score' ? highest(highest(seats, 'score'), 'points') : seats;
+	if (tied.length === 1) return tied[0].seatId;
+	return tied[Math.floor(Math.random() * tied.length)].seatId;
+}
+
+function highest<Seat extends Record<Key, number>, Key extends string>(
+	seats: readonly Seat[],
+	key: Key
+) {
+	const best = Math.max(...seats.map((seat) => seat[key]));
+	return seats.filter((seat) => seat[key] === best);
+}
+
 // Initialize the complete deal and pending opening effect from server-selected inputs.
 export function initializeRound({
 	deck,

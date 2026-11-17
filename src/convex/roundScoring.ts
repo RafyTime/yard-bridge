@@ -39,6 +39,9 @@ export function cardPoints(card: Card, rules: Pick<RulesConfiguration, 'kingOfSp
 	}
 }
 
-export function handPoints(cards: readonly Card[], rules: Pick<RulesConfiguration, 'kingOfSpades'>) {
+export function handPoints(
+	cards: readonly Card[],
+	rules: Pick<RulesConfiguration, 'kingOfSpades'>
+) {
 	return cards.reduce((total, card) => total + cardPoints(card, rules), 0);
 }
