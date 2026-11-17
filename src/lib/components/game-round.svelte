@@ -332,9 +332,7 @@
 					>
 						<h4 id="selection-heading" class="font-semibold">{m.round_selection()}</h4>
 						<ol class="flex flex-wrap gap-2" aria-labelledby="selection-heading">
-							{#each chosen as card (cardKey(card))}<li
-									class="rounded-md border bg-card px-2 py-1"
-								>
+							{#each chosen as card (cardKey(card))}<li class="rounded-md border bg-card px-2 py-1">
 									{cardLabel(card)}
 								</li>{/each}
 						</ol>
