@@ -2,7 +2,7 @@
 	import { useConvexClient, useQuery } from 'convex-svelte';
 	import type { FunctionReturnType } from 'convex/server';
 	import { api } from '../../convex/_generated/api';
-	import { sameCard, suits } from '../../convex/cards';
+	import { cardKey, sameCard, suits } from '../../convex/cards';
 	import { cardPoints } from '../../convex/roundScoring';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as m from '#lib/paraglide/messages.js';
@@ -203,7 +203,7 @@
 										: ''}
 								</p>
 								{#if hand.cards.length}<ul class="flex flex-wrap gap-2 text-sm">
-										{#each hand.cards as card (`${card.rank}:${card.suit}`)}<li
+										{#each hand.cards as card (cardKey(card))}<li
 												class="rounded-md border bg-card px-2 py-1"
 											>
 												{m.round_result_card({
@@ -267,7 +267,7 @@
 								? m.round_effect_accept({ count })
 								: m.round_effect_accept_miss()}</Button
 					>
-					{#each table.cancelWith as ace (`${ace.rank}:${ace.suit}`)}<Button
+					{#each table.cancelWith as ace (cardKey(ace))}<Button
 							variant="outline"
 							class="min-h-11"
 							onclick={() => move(table, { kind: 'cancel', card: ace })}
@@ -306,7 +306,7 @@
 			{#if !table.result}
 				<h4 class="font-semibold">{m.round_hand()}</h4>
 				<ul class="flex flex-wrap gap-2" aria-label={m.round_hand()}>
-					{#each table.hand as card (`${card.rank}:${card.suit}`)}
+					{#each table.hand as card (cardKey(card))}
 						{@const selected = chosen.some((item) => sameCard(item, card))}
 						{@const selectable = selected || canSelect(table, card)}
 						<li>
@@ -332,7 +332,7 @@
 					>
 						<h4 id="selection-heading" class="font-semibold">{m.round_selection()}</h4>
 						<ol class="flex flex-wrap gap-2" aria-labelledby="selection-heading">
-							{#each chosen as card (`${card.rank}:${card.suit}`)}<li
+							{#each chosen as card (cardKey(card))}<li
 									class="rounded-md border bg-card px-2 py-1"
 								>
 									{cardLabel(card)}
