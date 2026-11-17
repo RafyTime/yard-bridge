@@ -64,23 +64,29 @@ export const start = mutation({
 	}
 });
 
+// Load a Round and the caller's Seat in its Game, rejecting outsiders.
+async function seatedRound(ctx: MutationCtx, roundId: Id<'rounds'>) {
+	const player = await requirePlayer(ctx);
+	const round = await ctx.db.get('rounds', roundId);
+	const seat =
+		round &&
+		(await ctx.db
+			.query('seats')
+			.withIndex('by_gameId_and_userId', (q) =>
+				q.eq('gameId', round.gameId).eq('userId', player.id)
+			)
+			.unique());
+	if (!round || !seat) throw new ConvexError('Game unavailable');
+	return { round, seat };
+}
+
 // Any Seat continues a finished Round into the next one. The finished Round's version guards
 // against a stale or repeated request dealing twice.
 export const next = mutation({
 	args: { roundId: v.id('rounds'), expectedVersion: v.number() },
 	returns: v.null(),
 	handler: async (ctx, { roundId, expectedVersion }) => {
-		const player = await requirePlayer(ctx);
-		const round = await ctx.db.get('rounds', roundId);
-		const seat =
-			round &&
-			(await ctx.db
-				.query('seats')
-				.withIndex('by_gameId_and_userId', (q) =>
-					q.eq('gameId', round.gameId).eq('userId', player.id)
-				)
-				.unique());
-		if (!round || !seat) throw new ConvexError('Game unavailable');
+		const { round, seat } = await seatedRound(ctx, roundId);
 		if (!round.result) throw new ConvexError('The Round is still in play');
 		const latest = await ctx.db
 			.query('rounds')
@@ -114,20 +120,15 @@ async function deal(
 	{
 		gameId,
 		number,
-		seats,
 		callerSeatId,
 		...setup
-	}: Omit<Parameters<typeof initializeRound>[0], 'seats'> & {
+	}: Parameters<typeof initializeRound>[0] & {
 		gameId: Id<'games'>;
 		number: number;
-		seats: readonly Id<'seats'>[];
 		callerSeatId: Id<'seats'>;
 	}
 ) {
-	const { hands, ...round } = initializeRound({
-		...setup,
-		seats: seats.map((_id) => ({ _id }))
-	});
+	const { hands, ...round } = initializeRound(setup);
 	const roundId = await ctx.db.insert('rounds', { gameId, number, ...round });
 	for (const hand of hands) await ctx.db.insert('roundHands', { roundId, ...hand });
 	await recordEvent(ctx, roundId, {
@@ -215,17 +216,7 @@ type Turn = ObjectType<typeof turnArgs>;
 
 // Load the Round for the caller's turn, rejecting outsiders, stale versions, and other Seats.
 async function currentTurn(ctx: MutationCtx, { roundId, expectedVersion }: Turn) {
-	const player = await requirePlayer(ctx);
-	const round = await ctx.db.get('rounds', roundId);
-	const seat =
-		round &&
-		(await ctx.db
-			.query('seats')
-			.withIndex('by_gameId_and_userId', (q) =>
-				q.eq('gameId', round.gameId).eq('userId', player.id)
-			)
-			.unique());
-	if (!round || !seat) throw new ConvexError('Game unavailable');
+	const { round, seat } = await seatedRound(ctx, roundId);
 	if (round.result) throw new ConvexError('The Round is over');
 	if (round.version !== expectedVersion)
 		throw new ConvexError('Round changed. Review the latest table');
@@ -257,8 +248,8 @@ async function commitTurn(
 	event: RoundEvent
 ) {
 	const version = round.version + 1;
-	const next = { ...round, ...patch, version };
-	const result = isOver(next) ? await scoreRound(ctx, next) : null;
+	const updated = { ...round, ...patch, version };
+	const result = isOver(updated) ? await scoreRound(ctx, updated) : null;
 	await ctx.db.patch('rounds', round._id, { ...patch, version, result });
 	await recordEvent(ctx, round._id, { version, seatId: round.currentSeatId, event });
 }

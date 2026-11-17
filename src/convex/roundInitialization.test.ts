@@ -4,34 +4,32 @@ import { ranks, suits, type Card } from './cards';
 import { initializeRound } from './roundInitialization';
 import { defaultRules } from './rules';
 
-const seats = ['host', 'guest', 'third', 'fourth'].map((id) => ({
-	_id: id as Id<'seats'>
-}));
+const seats = ['host', 'guest', 'third', 'fourth'].map((id) => id as Id<'seats'>);
 const deck = suits.flatMap((suit) => ranks.map((rank) => ({ suit, rank })));
 
 test('the chosen starter opens their last dealt card and the complete deal preserves every card', () => {
 	const round = initializeRound({
 		deck,
 		seats: seats.slice(0, 2),
-		starterSeatId: seats[1]._id,
+		starterSeatId: seats[1],
 		rules: { ...defaultRules, handSize: 2 }
 	});
 	expect(round.hands).toEqual([
 		{
-			seatId: seats[0]._id,
+			seatId: seats[0],
 			cards: [
 				{ suit: 'clubs', rank: '7' },
 				{ suit: 'clubs', rank: '9' }
 			]
 		},
-		{ seatId: seats[1]._id, cards: [{ suit: 'clubs', rank: '6' }] }
+		{ seatId: seats[1], cards: [{ suit: 'clubs', rank: '6' }] }
 	]);
 	expect(round.playedPile).toEqual([{ suit: 'clubs', rank: '8' }]);
 	expect(round.drawPile).toEqual(deck.slice(4));
-	expect(round.starterSeatId).toBe(seats[1]._id);
+	expect(round.starterSeatId).toBe(seats[1]);
 	expect(round.handCounts).toEqual([
-		{ seatId: seats[0]._id, cardCount: 2 },
-		{ seatId: seats[1]._id, cardCount: 1 }
+		{ seatId: seats[0], cardCount: 2 },
+		{ seatId: seats[1], cardCount: 1 }
 	]);
 });
 
@@ -66,7 +64,7 @@ test.each([
 		const round = initializeRound({
 			deck,
 			seats: seats.slice(0, count),
-			starterSeatId: seats[starter]._id,
+			starterSeatId: seats[starter],
 			rules: { ...defaultRules, handSize }
 		});
 		expect(round.hands.map((hand) => hand.cards.length)).toEqual(lengths);
@@ -96,7 +94,7 @@ test.each([
 	{
 		rank: 'J',
 		suit: 'clubs',
-		opening: { kind: 'choose-suit', seatId: seats[1]._id },
+		opening: { kind: 'choose-suit', seatId: seats[1] },
 		effect: null,
 		current: 1
 	},
@@ -111,28 +109,28 @@ test.each([
 		rank: '7',
 		suit: 'hearts',
 		opening: { kind: 'none' },
-		effect: { targetSeatId: seats[0]._id, drawCount: 1, skip: false },
+		effect: { targetSeatId: seats[0], drawCount: 1, skip: false },
 		current: 0
 	},
 	{
 		rank: '8',
 		suit: 'clubs',
 		opening: { kind: 'none' },
-		effect: { targetSeatId: seats[0]._id, drawCount: 2, skip: true },
+		effect: { targetSeatId: seats[0], drawCount: 2, skip: true },
 		current: 0
 	},
 	{
 		rank: 'A',
 		suit: 'diamonds',
 		opening: { kind: 'none' },
-		effect: { targetSeatId: seats[0]._id, drawCount: 0, skip: true },
+		effect: { targetSeatId: seats[0], drawCount: 0, skip: true },
 		current: 0
 	},
 	{
 		rank: 'Q',
 		suit: 'spades',
 		opening: { kind: 'none' },
-		effect: { targetSeatId: seats[0]._id, drawCount: 5, skip: true },
+		effect: { targetSeatId: seats[0], drawCount: 5, skip: true },
 		current: 0
 	},
 	{ rank: 'Q', suit: 'hearts', opening: { kind: 'none' }, effect: null, current: 0 },
@@ -143,13 +141,13 @@ test.each([
 		const round = initializeRound({
 			deck: openingDeck({ rank, suit }),
 			seats: seats.slice(0, 2),
-			starterSeatId: seats[1]._id,
+			starterSeatId: seats[1],
 			rules: { ...defaultRules, handSize: 2 }
 		});
 		expect(round.playedPile).toEqual([{ rank, suit }]);
 		expect(round.opening).toEqual(opening);
 		expect(round.effect).toEqual(effect);
-		expect(round.currentSeatId).toBe(seats[current]._id);
+		expect(round.currentSeatId).toBe(seats[current]);
 		expect(round.activeSuit).toBe(rank === 'J' ? null : suit);
 		expect(round.mustCover).toBe(rank === '6');
 	}
@@ -159,11 +157,11 @@ test('the optional King of Spades records seven pending draws', () => {
 	const round = initializeRound({
 		deck: openingDeck({ rank: 'K', suit: 'spades' }),
 		seats: seats.slice(0, 2),
-		starterSeatId: seats[1]._id,
+		starterSeatId: seats[1],
 		rules: { ...defaultRules, handSize: 2, kingOfSpades: true }
 	});
-	expect(round.effect).toEqual({ targetSeatId: seats[0]._id, drawCount: 7, skip: true });
-	expect(round.currentSeatId).toBe(seats[0]._id);
+	expect(round.effect).toEqual({ targetSeatId: seats[0], drawCount: 7, skip: true });
+	expect(round.currentSeatId).toBe(seats[0]);
 	expect(round.activeSuit).toBe('spades');
 });
 
@@ -173,12 +171,12 @@ test.each(['J', '6', '7', '8', 'A', 'Q', 'K'] as const)(
 		const round = initializeRound({
 			deck: openingDeck({ rank, suit: 'spades' }),
 			seats: seats.slice(0, 2),
-			starterSeatId: seats[1]._id,
+			starterSeatId: seats[1],
 			rules: { ...defaultRules, handSize: 2, kingOfSpades: true, openingEffects: false }
 		});
 		expect(round.opening).toEqual({ kind: 'none' });
 		expect(round.effect).toBeNull();
-		expect(round.currentSeatId).toBe(seats[0]._id);
+		expect(round.currentSeatId).toBe(seats[0]);
 		expect(round.activeSuit).toBe('spades');
 	}
 );

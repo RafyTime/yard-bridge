@@ -1,5 +1,5 @@
 import type { Infer } from 'convex/values';
-import type { Doc, Id } from './_generated/dataModel';
+import type { Id } from './_generated/dataModel';
 import { openingValidator } from './cards';
 import type { Card, Effect } from './cards';
 import { drawEffect } from './roundTurns';
@@ -35,11 +35,12 @@ export function initializeRound({
 	rules
 }: {
 	deck: readonly Card[];
-	seats: readonly Pick<Doc<'seats'>, '_id'>[];
+	seats: readonly Id<'seats'>[];
 	starterSeatId: Id<'seats'>;
 	rules: RulesConfiguration;
 }) {
-	const starterIndex = seats.findIndex((seat) => seat._id === starterSeatId);
+	const starterIndex = seats.indexOf(starterSeatId);
+	if (starterIndex < 0) throw new Error('The starter has no Seat at this table');
 	const starter = seats[starterIndex];
 	const next = seats[(starterIndex + 1) % seats.length];
 	const hands = seats.map<Card[]>(() => []);
@@ -54,16 +55,16 @@ export function initializeRound({
 	// An opening 6 leaves the starter to cover it, as a played 6 does.
 	const mustCover = rules.openingEffects && topCard.rank === '6';
 	if (rules.openingEffects) {
-		if (topCard.rank === 'J') opening = { kind: 'choose-suit', seatId: starter._id };
+		if (topCard.rank === 'J') opening = { kind: 'choose-suit', seatId: starter };
 		const pending = drawEffect([topCard], rules);
-		if (pending) effect = { targetSeatId: next._id, ...pending };
+		if (pending) effect = { targetSeatId: next, ...pending };
 	}
 	return {
 		rules,
 		drawPile: deck.slice(dealt),
 		playedPile: [topCard],
-		starterSeatId: starter._id,
-		currentSeatId: opening.kind === 'choose-suit' || mustCover ? starter._id : next._id,
+		starterSeatId: starter,
+		currentSeatId: opening.kind === 'choose-suit' || mustCover ? starter : next,
 		activeSuit: opening.kind === 'choose-suit' ? null : topCard.suit,
 		opening,
 		effect,
@@ -72,7 +73,7 @@ export function initializeRound({
 		recycles: 0,
 		version: 0,
 		result: null,
-		handCounts: seats.map((seat, index) => ({ seatId: seat._id, cardCount: hands[index].length })),
-		hands: seats.map((seat, index) => ({ seatId: seat._id, cards: hands[index] }))
+		handCounts: seats.map((seatId, index) => ({ seatId, cardCount: hands[index].length })),
+		hands: seats.map((seatId, index) => ({ seatId, cards: hands[index] }))
 	};
 }
