@@ -15,12 +15,14 @@ export function canPlay(round: Pick<Round, 'playedPile' | 'activeSuit' | 'mustCo
 
 // The draw effect of a played group's top card. Same-rank 7s and 8s add their draws; any other
 // group fires only its top card. The Queen and enabled King of Spades also skip their target.
-// Played Aces arrive with ticket 10.
+// Under the default Ace rule an Ace is a zero-draw skip; under cancellation it has no effect of
+// its own and serves only as the target's reaction (see `cancel` in rounds.ts).
 export function drawEffect(
 	group: readonly Card[],
-	rules: Pick<RulesConfiguration, 'kingOfSpades'>
+	rules: Pick<RulesConfiguration, 'kingOfSpades' | 'aceBehavior'>
 ) {
 	const top = group[group.length - 1];
+	if (top.rank === 'A') return rules.aceBehavior === 'skip' ? { drawCount: 0, skip: true } : null;
 	if (top.rank === '7') return { drawCount: group.length, skip: false };
 	if (top.rank === '8') return { drawCount: 2 * group.length, skip: true };
 	if (top.suit === 'spades' && top.rank === 'Q') return { drawCount: 5, skip: true };

@@ -1187,3 +1187,43 @@ test('choosing an opening Jack suit and accepting an opening skip record their e
 		event: { kind: 'accept', count: 0, recycles: 0, skipped: true }
 	});
 });
+
+test.each([
+	{ count: 2, skipped: 0, next: 1 },
+	{ count: 4, skipped: 2, next: 3 }
+])(
+	'a played Ace skips exactly the next Seat of $count once they accept it',
+	async ({ count, skipped, next }) => {
+		const hands = [
+			cards('10c Ks Qc 9s'),
+			cards('Ah 9d Kc Kd Ac'),
+			cards('9c Qh Qs 10s 10d'),
+			cards('8c 8d 7s Js Jh')
+		];
+		const { players, views, seatIds } = await opened(hands.slice(0, count), card('9h'));
+		let [view] = await views();
+		await players[1].mutation(api.rounds.play, {
+			roundId: view.id,
+			expectedVersion: view.version,
+			cards: cards('Ah')
+		});
+		[view] = await views();
+		expect(view).toMatchObject({
+			topCard: card('Ah'),
+			effect: { targetSeatId: seatIds[skipped], drawCount: 0, skip: true },
+			currentSeatId: seatIds[skipped]
+		});
+		await players[skipped].mutation(api.rounds.accept, {
+			roundId: view.id,
+			expectedVersion: view.version
+		});
+		const after = await views();
+		for (const seat of after)
+			expect(seat).toMatchObject({
+				effect: null,
+				currentSeatId: seatIds[next],
+				drawCount: view.drawCount
+			});
+		expect(after[skipped].hand).toEqual(hands[skipped]);
+	}
+);

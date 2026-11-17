@@ -33,9 +33,7 @@ export function initializeRound({
 	const mustCover = rules.openingEffects && topCard.rank === '6';
 	if (rules.openingEffects) {
 		if (topCard.rank === 'J') opening = { kind: 'choose-suit', seatId: starter._id };
-		// An opening Ace is a zero-draw skip that its target accepts.
-		const pending =
-			topCard.rank === 'A' ? { drawCount: 0, skip: true } : drawEffect([topCard], rules);
+		const pending = drawEffect([topCard], rules);
 		if (pending) effect = { targetSeatId: next._id, ...pending };
 	}
 	return {
