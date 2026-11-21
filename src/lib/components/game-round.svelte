@@ -41,10 +41,17 @@
 	type Suit = Card['suit'];
 	let moving = $state(false);
 	let moveError = $state(false);
-	// The ordered group being arranged; it belongs to one table version and clears on any change.
-	let selection = $state<{ version: number; cards: Card[] }>({ version: -1, cards: [] });
+	// The ordered group being arranged; it belongs to one Round version and clears on any change.
+	// Each Round restarts at version 0, so the Round id is part of the key.
+	let selection = $state<{ roundId: Round['id'] | null; version: number; cards: Card[] }>({
+		roundId: null,
+		version: -1,
+		cards: []
+	});
 	const chosen = $derived(
-		round.data && selection.version === round.data.version ? selection.cards : []
+		round.data && selection.roundId === round.data.id && selection.version === round.data.version
+			? selection.cards
+			: []
 	);
 	type Command =
 		| { kind: 'play'; suit?: Suit }
@@ -101,7 +108,7 @@
 		const cards = chosen.some((item) => sameCard(item, card))
 			? chosen.filter((item) => !sameCard(item, card))
 			: [...chosen, card];
-		selection = { version: table.version, cards };
+		selection = { roundId: table.id, version: table.version, cards };
 	}
 	function seatNumber(id: string) {
 		return game.seats.findIndex((seat) => seat.id === id) + 1;
@@ -349,7 +356,7 @@
 						<Button
 							variant="ghost"
 							class="min-h-11"
-							onclick={() => (selection = { version: -1, cards: [] })}
+							onclick={() => (selection = { roundId: null, version: -1, cards: [] })}
 							>{m.round_clear_selection()}</Button
 						>
 					</section>
