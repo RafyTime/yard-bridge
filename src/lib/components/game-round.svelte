@@ -218,9 +218,11 @@
 								</p>
 							</li>{/each}
 					</ul>
-					<Button class="min-h-11" onclick={() => move(table, { kind: 'next' })} disabled={moving}
-						>{moving ? m.auth_working() : m.round_next()}</Button
-					>
+					{#if game.isHost}
+						<Button class="min-h-11" onclick={() => move(table, { kind: 'next' })} disabled={moving}
+							>{moving ? m.auth_working() : m.round_next()}</Button
+						>
+					{:else}<p>{m.round_next_waiting()}</p>{/if}
 					{#if moveError}<p role="alert">{m.round_move_error()}</p>{/if}
 				</section>
 			{:else}

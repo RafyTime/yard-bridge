@@ -191,6 +191,7 @@
 	"round_result_card": "{card}: {points}",
 	"round_result_points": "{points} points this round · Game score {score}",
 	"round_next": "Start next round",
+	"round_next_waiting": "Waiting for the host to start the next round.",
 	"rules_conflict": "Applied rules changed elsewhere. Your edits are preserved. Load the latest rules before applying changes.",
 	"rules_load_latest": "Load latest rules",
 	"lobby_players": "Players",

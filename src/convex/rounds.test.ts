@@ -1488,8 +1488,9 @@ test('the default starter policy picks the highest score, then previous-Round po
 	[view] = await views();
 	const finished = view;
 	// Seats 1 and 3 tie on 10 points overall and in the previous Round, so a random choice decides.
+	await expect(nextRound(third, finished, orderedDeck)).rejects.toThrow('Host only');
 	await nextRound(
-		third,
+		players[0],
 		finished,
 		dealDeck([cards('Kd'), cards('10h 10s'), cards('Jc 9d')], card('9h')),
 		[choice(1, 2)]
@@ -1502,15 +1503,15 @@ test('the default starter policy picks the highest score, then previous-Round po
 			currentSeatId: seatIds[0],
 			result: null,
 			recentMoves: [
-				{ version: 0, seatId: seatIds[2], event: { kind: 'start', topCard: card('9h') } }
+				{ version: 0, seatId: seatIds[0], event: { kind: 'start', topCard: card('9h') } }
 			]
 		});
 	expect(round2.map((seat) => seat.hand)).toEqual([cards('10h 10s'), cards('Jc 9d'), cards('Kd')]);
-	await expect(nextRound(second, finished, orderedDeck)).rejects.toThrow('Round changed');
+	await expect(nextRound(players[0], finished, orderedDeck)).rejects.toThrow('Round changed');
 	await expect(nextRound(await player(9), finished, orderedDeck)).rejects.toThrow(
 		'Game unavailable'
 	);
-	await expect(nextRound(second, round2[0], orderedDeck)).rejects.toThrow(
+	await expect(nextRound(players[0], round2[0], orderedDeck)).rejects.toThrow(
 		'The Round is still in play'
 	);
 	await players[0].mutation(api.rounds.play, {
@@ -1551,7 +1552,7 @@ test.each([
 			cards: cards('10h 10s')
 		});
 		[view] = await views();
-		await nextRound(players[1], view, orderedDeck, [...choices]);
+		await nextRound(players[0], view, orderedDeck, [...choices]);
 		[view] = await views();
 		expect(view).toMatchObject({ number: 2, starterSeatId: seatIds[starter] });
 	}

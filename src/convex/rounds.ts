@@ -80,13 +80,15 @@ async function seatedRound(ctx: MutationCtx, roundId: Id<'rounds'>) {
 	return { round, seat };
 }
 
-// Any Seat continues a finished Round into the next one. The finished Round's version guards
+// The Host continues a finished Round into the next one. The finished Round's version guards
 // against a stale or repeated request dealing twice.
 export const next = mutation({
 	args: { roundId: v.id('rounds'), expectedVersion: v.number() },
 	returns: v.null(),
 	handler: async (ctx, { roundId, expectedVersion }) => {
 		const { round, seat } = await seatedRound(ctx, roundId);
+		const game = await ctx.db.get('games', round.gameId);
+		if (game?.hostId !== seat.userId) throw new ConvexError('Host only');
 		if (!round.result) throw new ConvexError('The Round is still in play');
 		const latest = await ctx.db
 			.query('rounds')
