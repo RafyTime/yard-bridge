@@ -664,6 +664,7 @@ test('players draw once on ordinary turns and play a drawn card only when it can
 		page.getByText('Seat 2 drew a playable card and must play it.', { exact: true })
 	).toBeVisible();
 	await expect(page.getByText('10 of hearts', { exact: false })).toHaveCount(0);
+	await expect(page.getByLabel('10 of hearts', { exact: false })).toHaveCount(0);
 
 	await switchAccount(page, backend, gameURL, 'guest@example.com');
 	await page.getByRole('button', { name: 'Select 10 of hearts', exact: true }).click();
