@@ -16,8 +16,11 @@ One deal of cards, ending when a player goes out or another selected ending cond
 **Round event**:
 The saved public record of one accepted move in a round, which every Seat sees the same way. Drawn cards and hands never appear in it. See [ADR 0002](docs/adr/0002-round-events.md).
 
+**Batch**:
+An ordered group of cards played together as one move.
+
 **Bridge declaration**:
-Playing all four cards of one rank to end a round, even if the declaring player still holds other cards.
+Ending a Round by finishing a batch with all four cards of an eligible rank, even if the declaring player still holds other cards.
 
 **Penalty points**:
 The net points assigned to a player's game score at the end of a round. A finish bonus can make that round's net points negative. The accumulated score helps determine losses and ranking.
