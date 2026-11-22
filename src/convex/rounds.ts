@@ -24,7 +24,7 @@ import {
 	cancelAces,
 	drawCards,
 	drawEffect,
-	drawUntilPlayable,
+	drawForTurn,
 	nextSeatId,
 	playableCards,
 	withCardCount
@@ -153,6 +153,8 @@ export const view = query({
 		// Aces the viewer may play to cancel the effect aimed at them; empty for everyone else.
 		cancelWith: v.array(cardValidator),
 		drawnCard: v.union(cardValidator, v.null()),
+		// Public: the current Seat drew a playable card and must play it. Only that Seat sees the card.
+		mustPlayDrawn: v.boolean(),
 		topCard: cardValidator,
 		drawCount: v.number(),
 		starterSeatId: v.id('seats'),
@@ -197,6 +199,7 @@ export const view = query({
 			canDraw: isTurn && !blockedReason(round) && !playable.length,
 			cancelWith: cancelAces(round, seat._id, hand.cards),
 			drawnCard: isTurn ? round.drawnCard : null,
+			mustPlayDrawn: !!round.drawnCard,
 			topCard: round.playedPile[round.playedPile.length - 1],
 			drawCount: round.drawPile.length,
 			starterSeatId: round.starterSeatId,
@@ -365,7 +368,7 @@ export const draw = mutation({
 		if (round.drawnCard) throw new ConvexError('Play the card you drew');
 		if (hand.cards.some((card) => canPlay(round, card)))
 			throw new ConvexError('You already have a playable card');
-		const { drawn, playable, ...piles } = drawUntilPlayable(round);
+		const { drawn, playable, ...piles } = drawForTurn(round);
 		const cards = [...hand.cards, ...drawn];
 		await ctx.db.patch('roundHands', hand._id, { cards });
 		await commitTurn(
@@ -373,7 +376,8 @@ export const draw = mutation({
 			round,
 			{
 				...piles,
-				// With nothing left to draw or recycle, the turn passes and any 6 cover is waived.
+				// An unplayable draw passes the turn. A 6 cover is waived only when nothing more could be
+				// drawn or recycled, because an owed cover keeps drawing until one appears.
 				currentSeatId: playable ? round.currentSeatId : nextSeatId(round),
 				drawnCard: playable,
 				mustCover: playable ? round.mustCover : false,

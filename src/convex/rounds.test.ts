@@ -247,11 +247,11 @@ test('a stale, repeated, or simultaneous move commits only once', async () => {
 	expect(host.currentSeatId).toBe(seatIds[0]);
 });
 
-test('a player without a match draws until one appears and must play that card alone', async () => {
+test('a player without a match draws one playable card, sees it privately, and must play it alone', async () => {
 	const { players, views, seatIds } = await opened(
 		[cards('10c 10d Ks Kd'), cards('Qc Ac 7d 8s Qd')],
 		card('9h'),
-		cards('7c 8c 10h Kh')
+		cards('10h 7c 8c Kh')
 	);
 	const [host, guest] = players;
 	const [before, guestBefore] = await views();
@@ -259,29 +259,31 @@ test('a player without a match draws until one appears and must play that card a
 	const { id: roundId } = before;
 	await guest.mutation(api.rounds.draw, { roundId, expectedVersion: before.version });
 	const [hostView, guestView] = await views();
-	expect(guestView.hand).toEqual(cards('Qc Ac 7d 8s Qd 7c 8c 10h'));
+	expect(guestView.hand).toEqual(cards('Qc Ac 7d 8s Qd 10h'));
 	expect(guestView).toMatchObject({
 		drawnCard: card('10h'),
 		playable: [card('10h')],
 		canDraw: false,
 		currentSeatId: seatIds[1],
-		drawCount: before.drawCount - 3
+		drawCount: before.drawCount - 1,
+		mustPlayDrawn: true
 	});
 	expect(hostView).toMatchObject({
 		drawnCard: null,
 		playable: [],
-		drawCount: before.drawCount - 3
+		drawCount: before.drawCount - 1,
+		mustPlayDrawn: true
 	});
 	expect(hostView.seats).toEqual([
 		{ seatId: seatIds[0], cardCount: 4 },
-		{ seatId: seatIds[1], cardCount: 8 }
+		{ seatId: seatIds[1], cardCount: 6 }
 	]);
 	const expectedVersion = guestView.version;
 	await expect(guest.mutation(api.rounds.draw, { roundId, expectedVersion })).rejects.toThrow(
 		'Play the card you drew'
 	);
 	await expect(
-		guest.mutation(api.rounds.play, { roundId, expectedVersion, cards: [card('7c')] })
+		guest.mutation(api.rounds.play, { roundId, expectedVersion, cards: [card('Qd')] })
 	).rejects.toThrow('Play the card you drew');
 	await guest.mutation(api.rounds.play, { roundId, expectedVersion, cards: [card('10h')] });
 	await expect(
@@ -292,9 +294,43 @@ test('a player without a match draws until one appears and must play that card a
 		topCard: card('10h'),
 		currentSeatId: seatIds[0],
 		playable: cards('10c 10d'),
-		drawnCard: null
+		drawnCard: null,
+		mustPlayDrawn: false
 	});
-	expect(after.seats[1].cardCount).toBe(7);
+	expect(after.seats[1].cardCount).toBe(5);
+});
+
+test('an unplayable ordinary draw takes one card, keeps it, and passes the turn', async () => {
+	const { players, views, seatIds } = await opened(
+		[cards('9c 10d Ks Kd'), cards('Qc Ac 7d 8s Qd')],
+		card('9h'),
+		cards('7c 10h')
+	);
+	const [before] = await views();
+	await players[1].mutation(api.rounds.draw, { roundId: before.id, expectedVersion: 0 });
+	const [host, guest] = await views();
+	expect(guest).toMatchObject({
+		hand: cards('Qc Ac 7d 8s Qd 7c'),
+		drawnCard: null,
+		playable: [],
+		canDraw: false,
+		drawCount: before.drawCount - 1
+	});
+	for (const seat of [host, guest])
+		expect(seat).toMatchObject({
+			currentSeatId: seatIds[0],
+			topCard: card('9h'),
+			mustPlayDrawn: false,
+			recentMoves: [
+				{
+					version: 1,
+					seatId: seatIds[1],
+					event: { kind: 'draw', count: 1, recycles: 0, passed: true, coverWaived: false }
+				},
+				expect.anything()
+			]
+		});
+	expect(host.playable).toEqual(cards('9c'));
 });
 
 test('an empty draw pile passes the turn, then recycles the played pile below its top card', async () => {
@@ -327,19 +363,18 @@ test('an empty draw pile passes the turn, then recycles the played pile below it
 	});
 	[view] = await views();
 	expect(view).toMatchObject({ currentSeatId: seatIds[0], canDraw: true });
-	const recycled = cards('9h 10h');
-	vi.stubGlobal('Math', scriptedMath(shuffleValues(recycled, recycled)));
+	vi.stubGlobal('Math', scriptedMath(shuffleValues(cards('9h 10h'), cards('10h 9h'))));
 	await host.mutation(api.rounds.draw, { roundId, expectedVersion: view.version });
 	vi.unstubAllGlobals();
 	const [hostView, ...others] = await views();
 	expect(hostView).toMatchObject({
 		topCard: card('10s'),
-		drawCount: 0,
+		drawCount: 1,
 		drawnCard: card('10h'),
 		currentSeatId: seatIds[0]
 	});
-	expect(hostView.hand.slice(-2)).toEqual(recycled);
-	for (const other of others) expect(other.seats[0].cardCount).toBe(10);
+	expect(hostView.hand.at(-1)).toEqual(card('10h'));
+	for (const other of others) expect(other.seats[0].cardCount).toBe(9);
 });
 
 test('a pending opening effect blocks ordinary moves until its target accepts it', async () => {
@@ -515,7 +550,7 @@ test('a played 6 keeps the turn until it is covered by its suit or another 6', a
 	expect(host.playable).toEqual(cards('Kd Ad'));
 });
 
-test('an opening 6 is covered through Draw, and a cover that cannot be drawn is waived', async () => {
+test('a Seat that owes a 6 cover keeps drawing past an unplayable card, and a cover that cannot be drawn is waived', async () => {
 	const { players, views, seatIds } = await opened(
 		[cards('Kc Ks Kd 9c'), cards('Qc Ac 7d 8s Qd')],
 		card('6h'),
@@ -534,7 +569,11 @@ test('an opening 6 is covered through Draw, and a cover that cannot be drawn is 
 	expect(guest).toMatchObject({ playable: [], canDraw: false });
 	await host.mutation(api.rounds.draw, { roundId: view.id, expectedVersion: view.version });
 	[view] = await views();
-	expect(view).toMatchObject({ drawnCard: card('8h'), mustCover: true });
+	expect(view).toMatchObject({
+		hand: cards('Kc Ks Kd 9c 7c 8h'),
+		drawnCard: card('8h'),
+		mustCover: true
+	});
 	await host.mutation(api.rounds.play, {
 		roundId: view.id,
 		expectedVersion: view.version,
@@ -579,7 +618,7 @@ test('a drawn card is played alone, and a drawn 6 still must be covered', async 
 	const { players, views, seatIds } = await opened(
 		[cards('Kc Ks Kd Ad'), cards('Qc Ac 7d 8s 10c')],
 		card('9h'),
-		cards('7c 10h 7s 6c')
+		cards('10h 6c 7c 7s')
 	);
 	const [host, guest] = players;
 	let [, view] = await views();
@@ -1037,7 +1076,7 @@ test('a draw and an accepted effect record only counts, and rejected commands re
 	const { players, views, seatIds } = await opened(
 		[cards('10c 10d Ks Kd'), cards('Qc Ac 7d 8s Qd')],
 		card('9h'),
-		cards('7c 8c 7h Jd')
+		cards('7h Jd')
 	);
 	const [host, guest] = players;
 	const [view] = await views();
@@ -1059,7 +1098,7 @@ test('a draw and an accepted effect record only counts, and rejected commands re
 	]);
 	expect(accepts.map((result) => result.status).sort()).toEqual(['fulfilled', 'rejected']);
 	const all = await views();
-	// The drawn 7♣, 8♣, and J♦ stay private: the shared events carry only how many moved.
+	// The drawn 7♥ and J♦ stay private: the shared events carry only how many moved.
 	for (const seat of all)
 		expect(seat.recentMoves).toEqual([
 			{
@@ -1075,7 +1114,7 @@ test('a draw and an accepted effect record only counts, and rejected commands re
 			{
 				version: 1,
 				seatId: seatIds[1],
-				event: { kind: 'draw', count: 3, recycles: 0, passed: false, coverWaived: false }
+				event: { kind: 'draw', count: 1, recycles: 0, passed: false, coverWaived: false }
 			},
 			{
 				version: 0,
@@ -1101,15 +1140,14 @@ test('an empty draw records a pass, then a recycle, and the feed keeps the lates
 	await second.mutation(api.rounds.draw, { roundId, expectedVersion: 0 });
 	await third.mutation(api.rounds.play, { roundId, expectedVersion: 1, cards: [card('10h')] });
 	await fourth.mutation(api.rounds.play, { roundId, expectedVersion: 2, cards: [card('10s')] });
-	const recycled = cards('9h 10h');
-	vi.stubGlobal('Math', scriptedMath(shuffleValues(recycled, recycled)));
+	vi.stubGlobal('Math', scriptedMath(shuffleValues(cards('9h 10h'), cards('10h 9h'))));
 	await host.mutation(api.rounds.draw, { roundId, expectedVersion: 3 });
 	vi.unstubAllGlobals();
 	const [view] = await pass.views();
 	expect(view.recentMoves.map(({ seatId, event }) => ({ seatId, event }))).toEqual([
 		{
 			seatId: pass.seatIds[0],
-			event: { kind: 'draw', count: 2, recycles: 1, passed: false, coverWaived: false }
+			event: { kind: 'draw', count: 1, recycles: 1, passed: false, coverWaived: false }
 		},
 		{
 			seatId: pass.seatIds[3],

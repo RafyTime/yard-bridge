@@ -117,11 +117,13 @@ export function drawCards(piles: Piles, count: number) {
 	return drawWhile(piles, (drawn) => drawn.length < count);
 }
 
-// Draw until a playable card appears. `playable` is null when nothing more can be drawn or recycled.
-export function drawUntilPlayable(
-	round: Piles & Pick<Round, 'playedPile' | 'activeSuit' | 'mustCover'>
-) {
+// The Draw command of a Seat with no playable card. An ordinary turn takes one card. A Seat that
+// owes a 6 cover keeps drawing until a cover appears. `playable` is the last drawn card when it
+// can be played, otherwise null and the turn passes.
+export function drawForTurn(round: Piles & Pick<Round, 'activeSuit' | 'mustCover'>) {
 	const playable = (card?: Card) => (card && canPlay(round, card) ? card : null);
-	const result = drawWhile(round, (drawn) => !playable(drawn.at(-1)));
+	const result = round.mustCover
+		? drawWhile(round, (drawn) => !playable(drawn.at(-1)))
+		: drawCards(round, 1);
 	return { ...result, playable: playable(result.drawn.at(-1)) };
 }

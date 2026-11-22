@@ -18,7 +18,9 @@ export const roundEventValidator = v.union(
 		kind: v.literal('draw'),
 		count: v.number(),
 		recycles: v.number(),
-		// Nothing playable could be drawn, so the turn passed and any 6 cover was waived.
+		// No playable card was drawn, so the turn passed. An ordinary turn draws once, so a pass
+		// after one card is a miss with cards still available. Only a pass with no card drawn, or a
+		// waived 6 cover, means nothing more could be drawn or recycled.
 		passed: v.boolean(),
 		coverWaived: v.boolean()
 	}),
