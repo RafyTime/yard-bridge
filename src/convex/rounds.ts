@@ -376,8 +376,7 @@ export const draw = mutation({
 			round,
 			{
 				...piles,
-				// An unplayable draw passes the turn. A 6 cover is waived only when nothing more could be
-				// drawn or recycled, because an owed cover keeps drawing until one appears.
+				// A Seat that owes a 6 cover passes only when nothing more could be drawn, which waives it.
 				currentSeatId: playable ? round.currentSeatId : nextSeatId(round),
 				drawnCard: playable,
 				mustCover: playable ? round.mustCover : false,
