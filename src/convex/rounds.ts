@@ -1,6 +1,6 @@
 import { ConvexError, v } from 'convex/values';
 import type { ObjectType } from 'convex/values';
-import type { Doc } from './_generated/dataModel';
+import type { Doc, Id } from './_generated/dataModel';
 import { mutation, query } from './_generated/server';
 import type { MutationCtx } from './_generated/server';
 import { requirePlayer } from './access';
@@ -13,12 +13,15 @@ import {
 	shuffle,
 	suitValidator
 } from './cards';
-import { initializeRound } from './roundInitialization';
+import { initializeRound, laterStarter } from './roundInitialization';
 import { recentMoveValidator, recentMoves, recordEvent } from './roundEvents';
 import type { RoundEvent } from './roundEvents';
+import { handPoints, roundResultValidator } from './roundScoring';
+import type { RoundResult } from './roundScoring';
 import {
 	blockedReason,
 	canPlay,
+	cancelAces,
 	drawCards,
 	drawEffect,
 	drawUntilPlayable,
@@ -47,23 +50,95 @@ export const start = mutation({
 		if (!hostSeat) throw new ConvexError('The Host has no Seat at this table');
 		const deck = shuffle(orderedDeck);
 		const starterIndex = Math.floor(Math.random() * seats.length);
-		const { hands, ...round } = initializeRound({
+		await deal(ctx, {
+			gameId,
+			number: 1,
 			deck,
-			seats,
+			seats: seats.map((seat) => seat._id),
 			starterSeatId: seats[starterIndex]._id,
-			rules: game.rules
-		});
-		const roundId = await ctx.db.insert('rounds', { gameId, number: 1, ...round });
-		for (const hand of hands) await ctx.db.insert('roundHands', { roundId, ...hand });
-		await recordEvent(ctx, roundId, {
-			version: round.version,
-			seatId: hostSeat._id,
-			event: { kind: 'start', topCard: round.playedPile[0] }
+			rules: game.rules,
+			callerSeatId: hostSeat._id
 		});
 		await ctx.db.patch('games', gameId, { status: 'active', version: game.version + 1 });
 		return null;
 	}
 });
+
+// Load a Round and the caller's Seat in its Game, rejecting outsiders.
+async function seatedRound(ctx: MutationCtx, roundId: Id<'rounds'>) {
+	const player = await requirePlayer(ctx);
+	const round = await ctx.db.get('rounds', roundId);
+	const seat =
+		round &&
+		(await ctx.db
+			.query('seats')
+			.withIndex('by_gameId_and_userId', (q) =>
+				q.eq('gameId', round.gameId).eq('userId', player.id)
+			)
+			.unique());
+	if (!round || !seat) throw new ConvexError('Game unavailable');
+	return { round, seat };
+}
+
+// The Host continues a finished Round into the next one. The finished Round's version guards
+// against a stale or repeated request dealing twice.
+export const next = mutation({
+	args: { roundId: v.id('rounds'), expectedVersion: v.number() },
+	returns: v.null(),
+	handler: async (ctx, { roundId, expectedVersion }) => {
+		const { round, seat } = await seatedRound(ctx, roundId);
+		const game = await ctx.db.get('games', round.gameId);
+		if (game?.hostId !== seat.userId) throw new ConvexError('Host only');
+		if (!round.result) throw new ConvexError('The Round is still in play');
+		const latest = await ctx.db
+			.query('rounds')
+			.withIndex('by_gameId', (q) => q.eq('gameId', round.gameId))
+			.order('desc')
+			.first();
+		if (latest?._id !== round._id || round.version !== expectedVersion)
+			throw new ConvexError('Round changed. Review the latest table');
+		const deck = shuffle(orderedDeck);
+		const starterSeatId = laterStarter(
+			round.rules.starterPolicy,
+			round.starterSeatId,
+			round.result.hands
+		);
+		await deal(ctx, {
+			gameId: round.gameId,
+			number: round.number + 1,
+			deck,
+			seats: round.handCounts.map((held) => held.seatId),
+			starterSeatId,
+			rules: round.rules,
+			callerSeatId: seat._id
+		});
+		return null;
+	}
+});
+
+// Save a new Round's deal and its public start event.
+async function deal(
+	ctx: MutationCtx,
+	{
+		gameId,
+		number,
+		callerSeatId,
+		...setup
+	}: Parameters<typeof initializeRound>[0] & {
+		gameId: Id<'games'>;
+		number: number;
+		callerSeatId: Id<'seats'>;
+	}
+) {
+	const { hands, ...round } = initializeRound(setup);
+	const roundId = await ctx.db.insert('rounds', { gameId, number, ...round });
+	for (const hand of hands) await ctx.db.insert('roundHands', { roundId, ...hand });
+	await recordEvent(ctx, roundId, {
+		version: round.version,
+		seatId: callerSeatId,
+		event: { kind: 'start', topCard: round.playedPile[0] }
+	});
+}
 
 export const view = query({
 	args: { gameId: v.id('games') },
@@ -75,6 +150,8 @@ export const view = query({
 		// Server-decided moves for this viewer; both stay empty outside the viewer's turn.
 		playable: v.array(cardValidator),
 		canDraw: v.boolean(),
+		// Aces the viewer may play to cancel the effect aimed at them; empty for everyone else.
+		cancelWith: v.array(cardValidator),
 		drawnCard: v.union(cardValidator, v.null()),
 		topCard: cardValidator,
 		drawCount: v.number(),
@@ -87,7 +164,9 @@ export const view = query({
 		openingEffects: v.boolean(),
 		seats: v.array(v.object({ seatId: v.id('seats'), cardCount: v.number() })),
 		// The latest public moves, newest first, identical for every Seat.
-		recentMoves: v.array(recentMoveValidator)
+		recentMoves: v.array(recentMoveValidator),
+		// Every Seat's final hand and points once the Round ends; hands stay private until then.
+		result: v.union(roundResultValidator, v.null())
 	}),
 	handler: async (ctx, { gameId }) => {
 		const player = await requirePlayer(ctx);
@@ -116,6 +195,7 @@ export const view = query({
 			hand: hand.cards,
 			playable,
 			canDraw: isTurn && !blockedReason(round) && !playable.length,
+			cancelWith: cancelAces(round, seat._id, hand.cards),
 			drawnCard: isTurn ? round.drawnCard : null,
 			topCard: round.playedPile[round.playedPile.length - 1],
 			drawCount: round.drawPile.length,
@@ -127,7 +207,8 @@ export const view = query({
 			effect: round.effect,
 			openingEffects: round.rules.openingEffects,
 			seats: round.handCounts,
-			recentMoves: await recentMoves(ctx, round)
+			recentMoves: await recentMoves(ctx, round),
+			result: round.result
 		};
 	}
 });
@@ -137,17 +218,8 @@ type Turn = ObjectType<typeof turnArgs>;
 
 // Load the Round for the caller's turn, rejecting outsiders, stale versions, and other Seats.
 async function currentTurn(ctx: MutationCtx, { roundId, expectedVersion }: Turn) {
-	const player = await requirePlayer(ctx);
-	const round = await ctx.db.get('rounds', roundId);
-	const seat =
-		round &&
-		(await ctx.db
-			.query('seats')
-			.withIndex('by_gameId_and_userId', (q) =>
-				q.eq('gameId', round.gameId).eq('userId', player.id)
-			)
-			.unique());
-	if (!round || !seat) throw new ConvexError('Game unavailable');
+	const { round, seat } = await seatedRound(ctx, roundId);
+	if (round.result) throw new ConvexError('The Round is over');
 	if (round.version !== expectedVersion)
 		throw new ConvexError('Round changed. Review the latest table');
 	if (round.currentSeatId !== seat._id) throw new ConvexError('Not your turn');
@@ -166,10 +238,11 @@ async function currentHand(ctx: MutationCtx, round: Doc<'rounds'>) {
 	return hand;
 }
 
-type RoundPatch = Partial<Omit<Doc<'rounds'>, '_id' | '_creationTime' | 'version'>>;
+type RoundPatch = Partial<Omit<Doc<'rounds'>, '_id' | '_creationTime' | 'version' | 'result'>>;
 
 // Commit the current Seat's accepted command: advance the Round version so stale or repeated
-// moves are rejected, and record the command's public event in the same mutation.
+// moves are rejected, and record the command's public event in the same mutation. Call it after
+// saving the mover's hand, since a command that leaves a hand empty may end the Round here.
 async function commitTurn(
 	ctx: MutationCtx,
 	round: Doc<'rounds'>,
@@ -177,8 +250,39 @@ async function commitTurn(
 	event: RoundEvent
 ) {
 	const version = round.version + 1;
-	await ctx.db.patch('rounds', round._id, { ...patch, version });
+	const updated = { ...round, ...patch, version };
+	const result = isOver(updated) ? await scoreRound(ctx, updated) : null;
+	await ctx.db.patch('rounds', round._id, { ...patch, version, result });
 	await recordEvent(ctx, round._id, { version, seatId: round.currentSeatId, event });
+}
+
+// A hand is empty and its final card has resolved: no 6 still waits for a cover and no draw or
+// skip still waits on its target.
+function isOver(round: Doc<'rounds'>) {
+	return !round.mustCover && !round.effect && round.handCounts.some((seat) => seat.cardCount === 0);
+}
+
+// Score every remaining hand into the Game and reveal the final hands.
+async function scoreRound(ctx: MutationCtx, round: Doc<'rounds'>): Promise<RoundResult> {
+	const hands = await Promise.all(
+		round.handCounts.map(async ({ seatId }) => {
+			const [seat, hand] = await Promise.all([
+				ctx.db.get('seats', seatId),
+				ctx.db
+					.query('roundHands')
+					.withIndex('by_roundId_and_seatId', (q) =>
+						q.eq('roundId', round._id).eq('seatId', seatId)
+					)
+					.unique()
+			]);
+			if (!seat || !hand) throw new ConvexError('Game unavailable');
+			const points = handPoints(hand.cards, round.rules);
+			const score = seat.score + points;
+			await ctx.db.patch('seats', seatId, { score });
+			return { seatId, cards: hand.cards, points, score };
+		})
+	);
+	return { hands };
 }
 
 // Load the turn for Play or Draw, rejecting pending states these moves cannot resolve.
@@ -315,6 +419,36 @@ export const accept = mutation({
 				recycles: piles.recycles - round.recycles,
 				skipped: effect.skip
 			}
+		);
+		return null;
+	}
+});
+
+// Under the cancellation rule, the target of a pending effect plays an Ace from hand instead of
+// accepting. The Ace goes on top, the whole effect is dropped, and play passes onward.
+export const cancel = mutation({
+	args: { ...turnArgs, card: cardValidator },
+	returns: v.null(),
+	handler: async (ctx, { card, ...turn }) => {
+		const round = await currentTurn(ctx, turn);
+		if (round.rules.aceBehavior !== 'cancel') throw new ConvexError('Ace cancellation is off');
+		if (!round.effect) throw new ConvexError('No effect to cancel');
+		const hand = await currentHand(ctx, round);
+		if (!cancelAces(round, hand.seatId, hand.cards).some((ace) => sameCard(ace, card)))
+			throw new ConvexError('Cancel with an Ace from your hand');
+		const cards = hand.cards.filter((held) => !sameCard(held, card));
+		await ctx.db.patch('roundHands', hand._id, { cards });
+		await commitTurn(
+			ctx,
+			round,
+			{
+				playedPile: [...round.playedPile, card],
+				activeSuit: card.suit,
+				effect: null,
+				currentSeatId: nextSeatId(round),
+				handCounts: withCardCount(round, hand.seatId, cards.length)
+			},
+			{ kind: 'cancel', card }
 		);
 		return null;
 	}

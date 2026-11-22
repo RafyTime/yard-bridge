@@ -23,7 +23,7 @@ Playing all four cards of one rank to end a round, even if the declaring player 
 The net points assigned to a player's game score at the end of a round. A finish bonus can make that round's net points negative. The accumulated score helps determine losses and ranking.
 
 **Pending effect**:
-The draw or skip from a played or opening special card, waiting on the next Seat. That player accepts it before doing anything else, and it never carries into a later turn.
+The draw or skip from a played or opening special card, waiting on the next Seat. That player must resolve it before doing anything else: they accept it, or, under the cancellation Ace rule, cancel it with an Ace. It never carries into a later turn.
 
 **Rules configuration**:
 The selected values and optional rules that govern one game. A saved configuration can be reused for another game.

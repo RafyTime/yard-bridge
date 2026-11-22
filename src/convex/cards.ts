@@ -32,6 +32,9 @@ export type Effect = Infer<typeof effectValidator>;
 export const sameCard = (left: Card, right: Card) =>
 	left.rank === right.rank && left.suit === right.suit;
 
+// A stable identity for a card, such as a keyed `{#each}` block.
+export const cardKey = (card: Card) => `${card.rank}:${card.suit}`;
+
 // Convex seeds Math.random independently for each mutation and preserves it on retries.
 export function shuffle(cards: readonly Card[]) {
 	const shuffled = [...cards];

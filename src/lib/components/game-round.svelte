@@ -2,7 +2,8 @@
 	import { useConvexClient, useQuery } from 'convex-svelte';
 	import type { FunctionReturnType } from 'convex/server';
 	import { api } from '../../convex/_generated/api';
-	import { sameCard, suits } from '../../convex/cards';
+	import { cardKey, sameCard, suits } from '../../convex/cards';
+	import { cardPoints } from '../../convex/roundScoring';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as m from '#lib/paraglide/messages.js';
 	import { getLocale } from '#lib/paraglide/runtime.js';
@@ -40,16 +41,25 @@
 	type Suit = Card['suit'];
 	let moving = $state(false);
 	let moveError = $state(false);
-	// The ordered group being arranged; it belongs to one table version and clears on any change.
-	let selection = $state<{ version: number; cards: Card[] }>({ version: -1, cards: [] });
+	// The ordered group being arranged; it belongs to one Round version and clears on any change.
+	// Each Round restarts at version 0, so the Round id is part of the key.
+	let selection = $state<{ roundId: Round['id'] | null; version: number; cards: Card[] }>({
+		roundId: null,
+		version: -1,
+		cards: []
+	});
 	const chosen = $derived(
-		round.data && selection.version === round.data.version ? selection.cards : []
+		round.data && selection.roundId === round.data.id && selection.version === round.data.version
+			? selection.cards
+			: []
 	);
 	type Command =
 		| { kind: 'play'; suit?: Suit }
 		| { kind: 'chooseSuit'; suit: Suit }
 		| { kind: 'draw' }
-		| { kind: 'accept' };
+		| { kind: 'accept' }
+		| { kind: 'cancel'; card: Card }
+		| { kind: 'next' };
 	// Turn commands carry the viewed version, so a move chosen from an outdated table is rejected.
 	async function move(table: Round, command: Command) {
 		if (moving) return;
@@ -69,6 +79,12 @@
 					break;
 				case 'draw':
 					await client.mutation(api.rounds.draw, turn);
+					break;
+				case 'cancel':
+					await client.mutation(api.rounds.cancel, { ...turn, card: command.card });
+					break;
+				case 'next':
+					await client.mutation(api.rounds.next, turn);
 					break;
 			}
 		} catch (failure) {
@@ -92,7 +108,7 @@
 		const cards = chosen.some((item) => sameCard(item, card))
 			? chosen.filter((item) => !sameCard(item, card))
 			: [...chosen, card];
-		selection = { version: table.version, cards };
+		selection = { roundId: table.id, version: table.version, cards };
 	}
 	function seatNumber(id: string) {
 		return game.seats.findIndex((seat) => seat.id === id) + 1;
@@ -124,6 +140,8 @@
 				if (!event.skipped) return m.round_event_accept({ number, count });
 				return count ? m.round_event_skip({ number, count }) : m.round_event_miss({ number });
 			}
+			case 'cancel':
+				return m.round_event_cancel({ number, card: cardLabel(event.card) });
 			default:
 				return event satisfies never;
 		}
@@ -179,57 +197,102 @@
 					</div>
 				</div>
 			</div>
-			<p>{m.round_current({ number: seatNumber(table.currentSeatId) })}</p>
-			{#if table.activeSuit}<p>{m.round_active_suit({ suit: suitNames[table.activeSuit] })}</p>{/if}
-			{#if table.opening.kind === 'choose-suit'}
-				{#if isTurn}{@render suitPicker(table, 'chooseSuit', true)}
-				{:else}<p>{m.round_choose_suit()}</p>{/if}
-			{:else if table.mustCover && !isTurn}<p>
-					{m.round_cover_waiting({ number: seatNumber(table.currentSeatId) })}
-				</p>
-			{:else if table.effect && !isTurn}
-				{@const effect = {
-					number: seatNumber(table.effect.targetSeatId),
-					count: table.effect.drawCount
-				}}
-				{#if !effect.count}<p>{m.round_skip_effect()}</p>
-				{:else if table.effect.skip}<p>{m.round_effect_skip(effect)}</p>
-				{:else}<p>{m.round_effect_play(effect)}</p>{/if}
-			{:else if !table.openingEffects}<p class="text-muted-foreground">
-					{m.round_effects_off()}
-				</p>{/if}
-			{#if table.drawnCard}<p role="status">
-					{m.round_play_drawn({ card: cardLabel(table.drawnCard) })}
-				</p>
-			{:else if isTurn && table.mustCover && table.activeSuit}<p role="status">
-					{m.round_cover_prompt({ suit: suitNames[table.activeSuit] })}
-				</p>
-			{:else if isTurn && table.effect}
-				{@const count = table.effect.drawCount}
-				<p role="status">
-					{!count
-						? m.round_effect_incoming_miss()
-						: table.effect.skip
-							? m.round_effect_incoming_skip({ count })
-							: m.round_effect_incoming_play({ count })}
-				</p>
-				<Button class="min-h-11" onclick={() => move(table, { kind: 'accept' })} disabled={moving}
-					>{moving
-						? m.auth_working()
-						: count
-							? m.round_effect_accept({ count })
-							: m.round_effect_accept_miss()}</Button
-				>
-			{:else if table.playable.length || table.canDraw}<p role="status">{m.round_your_turn()}</p>
-			{:else if isTurn && table.opening.kind !== 'choose-suit'}<p role="status">
-					{m.round_waiting_opening()}
-				</p>{/if}
-			{#if table.canDraw}<Button
-					class="min-h-11"
-					onclick={() => move(table, { kind: 'draw' })}
-					disabled={moving}>{moving ? m.auth_working() : m.round_draw()}</Button
-				>{/if}
-			{#if moveError}<p role="alert">{m.round_move_error()}</p>{/if}
+			{#if table.result}
+				<section class="flex flex-col gap-3 rounded-xl border p-4" aria-labelledby="result-heading">
+					<h4 id="result-heading" class="font-semibold">{m.round_result()}</h4>
+					<p role="status">{m.round_result_hint()}</p>
+					<ul class="flex flex-col gap-3">
+						{#each table.result.hands as hand (hand.seatId)}<li class="flex flex-col gap-1">
+								<p class="font-semibold">
+									{m.round_result_seat({ number: seatNumber(hand.seatId) })}{hand.seatId ===
+									game.viewerSeatId
+										? ` · ${m.invite_you()}`
+										: ''}
+								</p>
+								{#if hand.cards.length}<ul class="flex flex-wrap gap-2 text-sm">
+										{#each hand.cards as card (cardKey(card))}<li
+												class="rounded-md border bg-card px-2 py-1"
+											>
+												{m.round_result_card({
+													card: cardLabel(card),
+													points: cardPoints(card, game.rules)
+												})}
+											</li>{/each}
+									</ul>
+								{:else}<p class="text-sm">{m.round_result_out()}</p>{/if}
+								<p class="text-sm">
+									{m.round_result_points({ points: hand.points, score: hand.score })}
+								</p>
+							</li>{/each}
+					</ul>
+					{#if game.isHost}
+						<Button class="min-h-11" onclick={() => move(table, { kind: 'next' })} disabled={moving}
+							>{moving ? m.auth_working() : m.round_next()}</Button
+						>
+					{:else}<p>{m.round_next_waiting()}</p>{/if}
+					{#if moveError}<p role="alert">{m.round_move_error()}</p>{/if}
+				</section>
+			{:else}
+				<p>{m.round_current({ number: seatNumber(table.currentSeatId) })}</p>
+				{#if table.activeSuit}<p>
+						{m.round_active_suit({ suit: suitNames[table.activeSuit] })}
+					</p>{/if}
+				{#if table.opening.kind === 'choose-suit'}
+					{#if isTurn}{@render suitPicker(table, 'chooseSuit', true)}
+					{:else}<p>{m.round_choose_suit()}</p>{/if}
+				{:else if table.mustCover && !isTurn}<p>
+						{m.round_cover_waiting({ number: seatNumber(table.currentSeatId) })}
+					</p>
+				{:else if table.effect && !isTurn}
+					{@const effect = {
+						number: seatNumber(table.effect.targetSeatId),
+						count: table.effect.drawCount
+					}}
+					{#if !effect.count}<p>{m.round_skip_effect(effect)}</p>
+					{:else if table.effect.skip}<p>{m.round_effect_skip(effect)}</p>
+					{:else}<p>{m.round_effect_play(effect)}</p>{/if}
+				{:else if !table.openingEffects}<p class="text-muted-foreground">
+						{m.round_effects_off()}
+					</p>{/if}
+				{#if table.drawnCard}<p role="status">
+						{m.round_play_drawn({ card: cardLabel(table.drawnCard) })}
+					</p>
+				{:else if isTurn && table.mustCover && table.activeSuit}<p role="status">
+						{m.round_cover_prompt({ suit: suitNames[table.activeSuit] })}
+					</p>
+				{:else if isTurn && table.effect}
+					{@const count = table.effect.drawCount}
+					<p role="status">
+						{!count
+							? m.round_effect_incoming_miss()
+							: table.effect.skip
+								? m.round_effect_incoming_skip({ count })
+								: m.round_effect_incoming_play({ count })}
+					</p>
+					<Button class="min-h-11" onclick={() => move(table, { kind: 'accept' })} disabled={moving}
+						>{moving
+							? m.auth_working()
+							: count
+								? m.round_effect_accept({ count })
+								: m.round_effect_accept_miss()}</Button
+					>
+					{#each table.cancelWith as ace (cardKey(ace))}<Button
+							variant="outline"
+							class="min-h-11"
+							onclick={() => move(table, { kind: 'cancel', card: ace })}
+							disabled={moving}>{m.round_cancel_with({ card: cardLabel(ace) })}</Button
+						>{/each}
+				{:else if table.playable.length || table.canDraw}<p role="status">{m.round_your_turn()}</p>
+				{:else if isTurn && table.opening.kind !== 'choose-suit'}<p role="status">
+						{m.round_waiting_opening()}
+					</p>{/if}
+				{#if table.canDraw}<Button
+						class="min-h-11"
+						onclick={() => move(table, { kind: 'draw' })}
+						disabled={moving}>{moving ? m.auth_working() : m.round_draw()}</Button
+					>{/if}
+				{#if moveError}<p role="alert">{m.round_move_error()}</p>{/if}
+			{/if}
 			<ul class="flex flex-col gap-2" aria-label={m.round_counts()}>
 				{#each table.seats as seat (seat.seatId)}<li>
 						{m.round_count({
@@ -249,57 +312,57 @@
 						</li>{/each}
 				</ol>
 			</section>
-			<h4 class="font-semibold">{m.round_hand()}</h4>
-			<ul class="flex flex-wrap gap-2" aria-label={m.round_hand()}>
-				{#each table.hand as card (`${card.rank}:${card.suit}`)}
-					{@const selected = chosen.some((item) => sameCard(item, card))}
-					{@const selectable = selected || canSelect(table, card)}
-					<li>
-						<button
-							type="button"
-							class="flex h-20 w-14 flex-col items-center justify-center rounded-lg border bg-card text-xl font-semibold text-card-foreground transition-transform enabled:-translate-y-1 enabled:border-primary enabled:shadow-md disabled:opacity-100 aria-pressed:-translate-y-3 aria-pressed:bg-primary aria-pressed:text-primary-foreground motion-reduce:transition-none"
-							aria-label={selectable
-								? m.round_select_card({ card: cardLabel(card) })
-								: cardLabel(card)}
-							aria-pressed={selectable ? selected : undefined}
-							disabled={!selectable || moving}
-							onclick={() => toggle(table, card)}
-						>
-							{card.rank}<span aria-hidden="true">{suitSymbols[card.suit]}</span>
-						</button>
-					</li>
-				{/each}
-			</ul>
-			{#if chosen.length}
-				<section
-					class="flex flex-col gap-3 rounded-xl border p-4"
-					aria-labelledby="selection-heading"
-				>
-					<h4 id="selection-heading" class="font-semibold">{m.round_selection()}</h4>
-					<ol class="flex flex-wrap gap-2" aria-labelledby="selection-heading">
-						{#each chosen as card (`${card.rank}:${card.suit}`)}<li
-								class="rounded-md border bg-card px-2 py-1"
+			{#if !table.result}
+				<h4 class="font-semibold">{m.round_hand()}</h4>
+				<ul class="flex flex-wrap gap-2" aria-label={m.round_hand()}>
+					{#each table.hand as card (cardKey(card))}
+						{@const selected = chosen.some((item) => sameCard(item, card))}
+						{@const selectable = selected || canSelect(table, card)}
+						<li>
+							<button
+								type="button"
+								class="flex h-20 w-14 flex-col items-center justify-center rounded-lg border bg-card text-xl font-semibold text-card-foreground transition-transform enabled:-translate-y-1 enabled:border-primary enabled:shadow-md disabled:opacity-100 aria-pressed:-translate-y-3 aria-pressed:bg-primary aria-pressed:text-primary-foreground motion-reduce:transition-none"
+								aria-label={selectable
+									? m.round_select_card({ card: cardLabel(card) })
+									: cardLabel(card)}
+								aria-pressed={selectable ? selected : undefined}
+								disabled={!selectable || moving}
+								onclick={() => toggle(table, card)}
 							>
-								{cardLabel(card)}
-							</li>{/each}
-					</ol>
-					<p class="text-sm text-muted-foreground">{m.round_selection_hint()}</p>
-					{#if chosen.at(-1)?.rank === 'J'}{@render suitPicker(table, 'play', ready)}
-					{:else}<Button
-							class="min-h-11"
-							onclick={() => move(table, { kind: 'play' })}
-							disabled={moving || !ready}
-							>{moving ? m.auth_working() : m.round_play_selected()}</Button
-						>{/if}
-					<Button
-						variant="ghost"
-						class="min-h-11"
-						onclick={() => (selection = { version: -1, cards: [] })}
-						>{m.round_clear_selection()}</Button
+								{card.rank}<span aria-hidden="true">{suitSymbols[card.suit]}</span>
+							</button>
+						</li>
+					{/each}
+				</ul>
+				{#if chosen.length}
+					<section
+						class="flex flex-col gap-3 rounded-xl border p-4"
+						aria-labelledby="selection-heading"
 					>
-				</section>
+						<h4 id="selection-heading" class="font-semibold">{m.round_selection()}</h4>
+						<ol class="flex flex-wrap gap-2" aria-labelledby="selection-heading">
+							{#each chosen as card (cardKey(card))}<li class="rounded-md border bg-card px-2 py-1">
+									{cardLabel(card)}
+								</li>{/each}
+						</ol>
+						<p class="text-sm text-muted-foreground">{m.round_selection_hint()}</p>
+						{#if chosen.at(-1)?.rank === 'J'}{@render suitPicker(table, 'play', ready)}
+						{:else}<Button
+								class="min-h-11"
+								onclick={() => move(table, { kind: 'play' })}
+								disabled={moving || !ready}
+								>{moving ? m.auth_working() : m.round_play_selected()}</Button
+							>{/if}
+						<Button
+							variant="ghost"
+							class="min-h-11"
+							onclick={() => (selection = { roundId: null, version: -1, cards: [] })}
+							>{m.round_clear_selection()}</Button
+						>
+					</section>
+				{/if}
+				<p class="text-sm text-muted-foreground">{m.round_private_hint()}</p>
 			{/if}
-			<p class="text-sm text-muted-foreground">{m.round_private_hint()}</p>
 		{:else}<p role="status">{m.round_loading()}</p>{/if}
 	</section>
 {/if}

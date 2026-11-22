@@ -2,6 +2,7 @@
 import { convexTest } from 'convex-test';
 import { afterEach, expect, test, vi } from 'vite-plus/test';
 import { api } from './_generated/api';
+import type { Id } from './_generated/dataModel';
 import type { Card } from './cards';
 import type { RulesConfiguration } from './rules';
 import schema from './schema';
@@ -855,7 +856,8 @@ test.each([
 	{ top: 'Qs', rules: { openingEffects: false }, effect: null },
 	{ top: 'Ks', rules: { kingOfSpades: true }, effect: { drawCount: 7, skip: true } },
 	{ top: 'Ks', rules: { kingOfSpades: false }, effect: null },
-	{ top: 'Ks', rules: { kingOfSpades: true, openingEffects: false }, effect: null }
+	{ top: 'Ks', rules: { kingOfSpades: true, openingEffects: false }, effect: null },
+	{ top: 'Ah', rules: { aceBehavior: 'cancel' as const }, effect: null }
 ])(
 	'an opening $top under $rules leaves $effect on the next Seat',
 	async ({ top, rules, effect }) => {
@@ -1187,3 +1189,371 @@ test('choosing an opening Jack suit and accepting an opening skip record their e
 		event: { kind: 'accept', count: 0, recycles: 0, skipped: true }
 	});
 });
+
+test.each([
+	{ count: 2, skipped: 0, next: 1 },
+	{ count: 4, skipped: 2, next: 3 }
+])(
+	'a played Ace skips exactly the next Seat of $count once they accept it',
+	async ({ count, skipped, next }) => {
+		const hands = [
+			cards('10c Ks Qc 9s'),
+			cards('Ah 9d Kc Kd Ac'),
+			cards('9c Qh Qs 10s 10d'),
+			cards('8c 8d 7s Js Jh')
+		];
+		const { players, views, seatIds } = await opened(hands.slice(0, count), card('9h'));
+		let [view] = await views();
+		await players[1].mutation(api.rounds.play, {
+			roundId: view.id,
+			expectedVersion: view.version,
+			cards: cards('Ah')
+		});
+		[view] = await views();
+		expect(view).toMatchObject({
+			topCard: card('Ah'),
+			effect: { targetSeatId: seatIds[skipped], drawCount: 0, skip: true },
+			currentSeatId: seatIds[skipped]
+		});
+		await players[skipped].mutation(api.rounds.accept, {
+			roundId: view.id,
+			expectedVersion: view.version
+		});
+		const after = await views();
+		for (const seat of after)
+			expect(seat).toMatchObject({
+				effect: null,
+				currentSeatId: seatIds[next],
+				drawCount: view.drawCount
+			});
+		expect(after[skipped].hand).toEqual(hands[skipped]);
+	}
+);
+
+test.each([
+	{ count: 2, target: 0, ace: 'As', next: 1 },
+	{ count: 4, target: 2, ace: 'Ah', next: 3 }
+])(
+	'with Ace cancellation the targeted Seat of $count cancels a stacked 8 with the $ace',
+	async ({ count, target, ace, next }) => {
+		const hands = [
+			cards('10c Ks Qc As'),
+			cards('8c 8d Kc Kd 9d'),
+			cards('9s Qh Ah 10s 10d'),
+			cards('7c 7d 7s Js Jh')
+		];
+		const { players, views, seatIds } = await opened(hands.slice(0, count), card('9c'), [], {
+			aceBehavior: 'cancel'
+		});
+		let all = await views();
+		const roundId = all[0].id;
+		await players[1].mutation(api.rounds.play, {
+			roundId,
+			expectedVersion: all[0].version,
+			cards: cards('8c 8d')
+		});
+		all = await views();
+		expect(all[target]).toMatchObject({
+			effect: { targetSeatId: seatIds[target], drawCount: 4, skip: true },
+			cancelWith: cards(ace)
+		});
+		for (const seat of all.filter((_, index) => index !== target))
+			expect(seat.cancelWith).toEqual([]);
+		const turn = { roundId, expectedVersion: all[0].version };
+		await expect(
+			players[next].mutation(api.rounds.cancel, { ...turn, card: card('Ac') })
+		).rejects.toThrow('Not your turn');
+		await expect(
+			players[target].mutation(api.rounds.cancel, { ...turn, card: hands[target][0] })
+		).rejects.toThrow('Cancel with an Ace from your hand');
+		await players[target].mutation(api.rounds.cancel, { ...turn, card: card(ace) });
+		const after = await views();
+		for (const seat of after)
+			expect(seat).toMatchObject({
+				effect: null,
+				topCard: card(ace),
+				activeSuit: card(ace).suit,
+				currentSeatId: seatIds[next],
+				drawCount: all[0].drawCount,
+				recentMoves: [
+					{
+						version: turn.expectedVersion + 1,
+						seatId: seatIds[target],
+						event: { kind: 'cancel', card: card(ace) }
+					},
+					expect.anything(),
+					expect.anything()
+				]
+			});
+		expect(after[target].hand).toEqual(hands[target].filter((held) => held.rank !== 'A'));
+	}
+);
+
+test('the default Ace rule offers no cancellation', async () => {
+	const { players, views } = await opened(
+		[cards('10c Ks Qc As'), cards('8c Kc Kd 9d 10d')],
+		card('9c')
+	);
+	let [view] = await views();
+	await players[1].mutation(api.rounds.play, {
+		roundId: view.id,
+		expectedVersion: view.version,
+		cards: cards('8c')
+	});
+	[view] = await views();
+	expect(view.cancelWith).toEqual([]);
+	await expect(
+		players[0].mutation(api.rounds.cancel, {
+			roundId: view.id,
+			expectedVersion: view.version,
+			card: card('As')
+		})
+	).rejects.toThrow('Ace cancellation is off');
+});
+
+test('emptying a hand ends the Round, scores every hand, and reveals the final hands', async () => {
+	const { players, views, seatIds, gameId } = await opened(
+		[cards('Qs Ah Jd'), cards('10h 10s 10d Kc')],
+		card('9h')
+	);
+	const [host, guest] = players;
+	const roundId = (await views())[0].id;
+	await guest.mutation(api.rounds.play, {
+		roundId,
+		expectedVersion: 0,
+		cards: cards('10h 10s 10d')
+	});
+	await host.mutation(api.rounds.play, {
+		roundId,
+		expectedVersion: 1,
+		cards: cards('Jd'),
+		suit: 'clubs'
+	});
+	for (const seat of await views()) expect(seat.result).toBeNull();
+	await guest.mutation(api.rounds.play, { roundId, expectedVersion: 2, cards: cards('Kc') });
+	const after = await views();
+	const result = {
+		hands: [
+			{ seatId: seatIds[0], cards: cards('Qs Ah'), points: 65, score: 65 },
+			{ seatId: seatIds[1], cards: [], points: 0, score: 0 }
+		]
+	};
+	for (const seat of after) expect(seat).toMatchObject({ result, playable: [], canDraw: false });
+	const game = await guest.query(api.games.view, { gameId });
+	expect(game.seats.map(({ id, score }) => ({ id, score }))).toEqual([
+		{ id: seatIds[0], score: 65 },
+		{ id: seatIds[1], score: 0 }
+	]);
+	await expect(
+		host.mutation(api.rounds.draw, { roundId, expectedVersion: after[0].version })
+	).rejects.toThrow('The Round is over');
+});
+
+test('a final draw effect resolves on its target before the Round is scored, and only once', async () => {
+	const { players, views, seatIds } = await opened(
+		[cards('Ah'), cards('8h 8d')],
+		card('9h'),
+		cards('Qs 10c 9d 7s Kd')
+	);
+	const [host, guest] = players;
+	const roundId = (await views())[0].id;
+	await guest.mutation(api.rounds.play, { roundId, expectedVersion: 0, cards: cards('8h 8d') });
+	for (const seat of await views())
+		expect(seat).toMatchObject({
+			result: null,
+			effect: { targetSeatId: seatIds[0], drawCount: 4, skip: true }
+		});
+	const accepts = await Promise.allSettled([
+		host.mutation(api.rounds.accept, { roundId, expectedVersion: 1 }),
+		host.mutation(api.rounds.accept, { roundId, expectedVersion: 1 })
+	]);
+	expect(accepts.map((result) => result.status).sort()).toEqual(['fulfilled', 'rejected']);
+	await expect(host.mutation(api.rounds.accept, { roundId, expectedVersion: 2 })).rejects.toThrow(
+		'The Round is over'
+	);
+	for (const seat of await views())
+		expect(seat.result).toEqual({
+			hands: [
+				{ seatId: seatIds[0], cards: cards('Ah Qs 10c 9d 7s'), points: 75, score: 75 },
+				{ seatId: seatIds[1], cards: [], points: 0, score: 0 }
+			]
+		});
+});
+
+test('a final draw effect at a four-player table resolves on the next Seat, then scores all four hands', async () => {
+	const { players, views, seatIds, gameId } = await opened(
+		[cards('Kc'), cards('8h 8d'), cards('Qd Jc'), cards('10s 9c')],
+		card('9h'),
+		cards('Qs 10c 9d 7s Kd')
+	);
+	const [, second, third, fourth] = players;
+	const roundId = (await views())[0].id;
+	await second.mutation(api.rounds.play, { roundId, expectedVersion: 0, cards: cards('8h 8d') });
+	for (const seat of await views())
+		expect(seat).toMatchObject({
+			result: null,
+			effect: { targetSeatId: seatIds[2], drawCount: 4, skip: true }
+		});
+	const accepts = await Promise.allSettled([
+		third.mutation(api.rounds.accept, { roundId, expectedVersion: 1 }),
+		third.mutation(api.rounds.accept, { roundId, expectedVersion: 1 })
+	]);
+	expect(accepts.map((result) => result.status).sort()).toEqual(['fulfilled', 'rejected']);
+	await expect(fourth.mutation(api.rounds.draw, { roundId, expectedVersion: 2 })).rejects.toThrow(
+		'The Round is over'
+	);
+	const result = {
+		hands: [
+			{ seatId: seatIds[0], cards: cards('Kc'), points: 10, score: 10 },
+			{ seatId: seatIds[1], cards: [], points: 0, score: 0 },
+			{ seatId: seatIds[2], cards: cards('Qd Jc Qs 10c 9d 7s'), points: 90, score: 90 },
+			{ seatId: seatIds[3], cards: cards('10s 9c'), points: 10, score: 10 }
+		]
+	};
+	for (const seat of await views()) expect(seat).toMatchObject({ result, drawCount: 24 });
+	const game = await second.query(api.games.view, { gameId });
+	expect(game.seats.map((seat) => seat.score)).toEqual([10, 0, 90, 10]);
+});
+
+test('a final 6 cannot finish a Round uncovered, so its player draws a cover first', async () => {
+	const { players, views, seatIds } = await opened(
+		[cards('Kc'), cards('6d 6h')],
+		card('9h'),
+		cards('Qh 10c')
+	);
+	const [, guest] = players;
+	const roundId = (await views())[0].id;
+	await guest.mutation(api.rounds.play, { roundId, expectedVersion: 0, cards: cards('6d 6h') });
+	for (const seat of await views())
+		expect(seat).toMatchObject({ result: null, mustCover: true, currentSeatId: seatIds[1] });
+	expect((await views())[1]).toMatchObject({ hand: [], playable: [], canDraw: true });
+	await guest.mutation(api.rounds.draw, { roundId, expectedVersion: 1 });
+	for (const seat of await views()) expect(seat.result).toBeNull();
+	await guest.mutation(api.rounds.play, { roundId, expectedVersion: 2, cards: cards('Qh') });
+	for (const seat of await views())
+		expect(seat.result).toEqual({
+			hands: [
+				{ seatId: seatIds[0], cards: cards('Kc'), points: 10, score: 10 },
+				{ seatId: seatIds[1], cards: [], points: 0, score: 0 }
+			]
+		});
+});
+
+test.each([
+	{ kingOfSpades: false, points: 10 },
+	{ kingOfSpades: true, points: 80 }
+])(
+	'a King of Spades left in hand scores $points when its effect is $kingOfSpades',
+	async ({ kingOfSpades, points }) => {
+		const { players, views } = await opened([cards('Ks'), cards('10h 10s')], card('9h'), [], {
+			kingOfSpades
+		});
+		await players[1].mutation(api.rounds.play, {
+			roundId: (await views())[0].id,
+			expectedVersion: 0,
+			cards: cards('10h 10s')
+		});
+		const [view] = await views();
+		expect(view.result?.hands[0]).toMatchObject({ cards: cards('Ks'), points, score: points });
+	}
+);
+
+// Deals the next Round from `deck`, then answers any starter tie with `choices`.
+async function nextRound(
+	caller: Awaited<ReturnType<typeof createPlayer>>,
+	{ id, version }: { id: Id<'rounds'>; version: number },
+	deck: readonly Card[],
+	choices: number[] = []
+) {
+	vi.stubGlobal('Math', scriptedMath([...shuffleValues(orderedDeck, deck), ...choices]));
+	try {
+		await caller.mutation(api.rounds.next, { roundId: id, expectedVersion: version });
+	} finally {
+		vi.unstubAllGlobals();
+	}
+}
+
+test('the default starter policy picks the highest score, then previous-Round points, then at random', async () => {
+	const { players, views, seatIds, gameId, player } = await opened(
+		[cards('Kh'), cards('10h 10s'), cards('10c 9c')],
+		card('9h')
+	);
+	const [, second, third] = players;
+	let [view] = await views();
+	await second.mutation(api.rounds.play, {
+		roundId: view.id,
+		expectedVersion: 0,
+		cards: cards('10h 10s')
+	});
+	[view] = await views();
+	const finished = view;
+	// Seats 1 and 3 tie on 10 points overall and in the previous Round, so a random choice decides.
+	await expect(nextRound(third, finished, orderedDeck)).rejects.toThrow('Host only');
+	await nextRound(
+		players[0],
+		finished,
+		dealDeck([cards('Kd'), cards('10h 10s'), cards('Jc 9d')], card('9h')),
+		[choice(1, 2)]
+	);
+	const round2 = await views();
+	for (const seat of round2)
+		expect(seat).toMatchObject({
+			number: 2,
+			starterSeatId: seatIds[2],
+			currentSeatId: seatIds[0],
+			result: null,
+			recentMoves: [
+				{ version: 0, seatId: seatIds[0], event: { kind: 'start', topCard: card('9h') } }
+			]
+		});
+	expect(round2.map((seat) => seat.hand)).toEqual([cards('10h 10s'), cards('Jc 9d'), cards('Kd')]);
+	await expect(nextRound(players[0], finished, orderedDeck)).rejects.toThrow('Round changed');
+	await expect(nextRound(await player(9), finished, orderedDeck)).rejects.toThrow(
+		'Game unavailable'
+	);
+	await expect(nextRound(players[0], round2[0], orderedDeck)).rejects.toThrow(
+		'The Round is still in play'
+	);
+	await players[0].mutation(api.rounds.play, {
+		roundId: round2[0].id,
+		expectedVersion: 0,
+		cards: cards('10h 10s')
+	});
+	[view] = await views();
+	expect(view.result?.hands.map(({ points, score }) => ({ points, score }))).toEqual([
+		{ points: 0, score: 10 },
+		{ points: 20, score: 20 },
+		{ points: 10, score: 20 }
+	]);
+	// Seats 2 and 3 tie on 20 overall; Seat 2 scored more last Round, so no random choice is needed.
+	await nextRound(players[0], view, orderedDeck);
+	[view] = await views();
+	expect(view).toMatchObject({ number: 3, starterSeatId: seatIds[1] });
+	const game = await players[0].query(api.games.view, { gameId });
+	expect(game.seats.map((seat) => seat.score)).toEqual([10, 20, 20]);
+});
+
+test.each([
+	{ starterPolicy: 'previous-starter', choices: [], starter: 0 },
+	{ starterPolicy: 'random', choices: [choice(1, 2)], starter: 1 }
+] as const)(
+	'the $starterPolicy starter policy picks Seat $starter for the next Round',
+	async ({ starterPolicy, choices, starter }) => {
+		const { players, views, seatIds } = await opened(
+			[cards('Kh'), cards('10h 10s')],
+			card('9h'),
+			[],
+			{ starterPolicy }
+		);
+		let [view] = await views();
+		await players[1].mutation(api.rounds.play, {
+			roundId: view.id,
+			expectedVersion: 0,
+			cards: cards('10h 10s')
+		});
+		[view] = await views();
+		await nextRound(players[0], view, orderedDeck, [...choices]);
+		[view] = await views();
+		expect(view).toMatchObject({ number: 2, starterSeatId: seatIds[starter] });
+	}
+);

@@ -27,7 +27,9 @@ export const roundEventValidator = v.union(
 		count: v.number(),
 		recycles: v.number(),
 		skipped: v.boolean()
-	})
+	}),
+	// The target played this Ace to cancel the whole pending effect.
+	v.object({ kind: v.literal('cancel'), card: cardValidator })
 );
 export type RoundEvent = Infer<typeof roundEventValidator>;
 

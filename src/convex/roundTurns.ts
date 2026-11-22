@@ -15,12 +15,14 @@ export function canPlay(round: Pick<Round, 'playedPile' | 'activeSuit' | 'mustCo
 
 // The draw effect of a played group's top card. Same-rank 7s and 8s add their draws; any other
 // group fires only its top card. The Queen and enabled King of Spades also skip their target.
-// Played Aces arrive with ticket 10.
+// Under the default Ace rule an Ace is a zero-draw skip; under cancellation it has no effect of
+// its own and serves only as the target's reaction (see `cancel` in rounds.ts).
 export function drawEffect(
 	group: readonly Card[],
-	rules: Pick<RulesConfiguration, 'kingOfSpades'>
+	rules: Pick<RulesConfiguration, 'kingOfSpades' | 'aceBehavior'>
 ) {
 	const top = group[group.length - 1];
+	if (top.rank === 'A') return rules.aceBehavior === 'skip' ? { drawCount: 0, skip: true } : null;
 	if (top.rank === '7') return { drawCount: group.length, skip: false };
 	if (top.rank === '8') return { drawCount: 2 * group.length, skip: true };
 	if (top.suit === 'spades' && top.rank === 'Q') return { drawCount: 5, skip: true };
@@ -30,7 +32,8 @@ export function drawEffect(
 }
 
 // Pending states that Play and Draw cannot resolve, with the reason shown to the mover.
-export function blockedReason(round: Pick<Round, 'opening' | 'effect'>) {
+export function blockedReason(round: Pick<Round, 'opening' | 'effect' | 'result'>) {
+	if (round.result) return 'The Round is over';
 	if (round.opening.kind === 'choose-suit') return 'The opening card must be resolved first';
 	if (round.effect) return 'Accept the pending effect first';
 	return null;
@@ -40,7 +43,14 @@ export function blockedReason(round: Pick<Round, 'opening' | 'effect'>) {
 export function playableCards(
 	round: Pick<
 		Round,
-		'currentSeatId' | 'drawnCard' | 'opening' | 'effect' | 'playedPile' | 'activeSuit' | 'mustCover'
+		| 'currentSeatId'
+		| 'drawnCard'
+		| 'opening'
+		| 'effect'
+		| 'result'
+		| 'playedPile'
+		| 'activeSuit'
+		| 'mustCover'
 	>,
 	seatId: Id<'seats'>,
 	hand: readonly Card[]
@@ -48,6 +58,16 @@ export function playableCards(
 	if (round.currentSeatId !== seatId || blockedReason(round)) return [];
 	if (round.drawnCard) return [round.drawnCard];
 	return hand.filter((card) => canPlay(round, card));
+}
+
+// Aces the Seat may play to cancel the pending effect aimed at it, under the cancellation rule.
+export function cancelAces(
+	round: Pick<Round, 'rules' | 'effect'>,
+	seatId: Id<'seats'>,
+	hand: readonly Card[]
+) {
+	if (round.rules.aceBehavior !== 'cancel' || round.effect?.targetSeatId !== seatId) return [];
+	return hand.filter((card) => card.rank === 'A');
 }
 
 // Table order follows the Round's Seat list.
