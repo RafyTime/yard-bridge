@@ -240,6 +240,9 @@
 				{#if table.opening.kind === 'choose-suit'}
 					{#if isTurn}{@render suitPicker(table, 'chooseSuit', true)}
 					{:else}<p>{m.round_choose_suit()}</p>{/if}
+				{:else if table.mustPlayDrawn && !isTurn}<p>
+						{m.round_drawn_waiting({ number: seatNumber(table.currentSeatId) })}
+					</p>
 				{:else if table.mustCover && !isTurn}<p>
 						{m.round_cover_waiting({ number: seatNumber(table.currentSeatId) })}
 					</p>

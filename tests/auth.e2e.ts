@@ -606,11 +606,11 @@ test('Rules drafts follow clean updates, require explicit conflict reload, and s
 	await expect(page.getByRole('alert').filter({ hasText: /\S/ })).toHaveCount(0);
 });
 
-test('players take ordinary turns, drawing until the drawn card must be played', async ({
+test('players draw once on ordinary turns and play a drawn card only when it can be played', async ({
 	page,
 	backend
 }) => {
-	// Six sign-ins across two accounts; Firefox needs more than the default budget.
+	// Eight sign-ins across two accounts; Firefox needs more than the default budget.
 	test.slow();
 	await page.setViewportSize({ width: 390, height: 844 });
 	await page.goto('/');
@@ -628,11 +628,12 @@ test('players take ordinary turns, drawing until the drawn card must be played',
 	await switchAccount(page, backend, invitation, 'guest@example.com');
 	await reviewRules(page);
 	await switchAccount(page, backend, gameURL, 'host@example.com');
-	// The Host opens 9♥; the guest has no match and draws 7♣ and 8♣ before 10♥.
+	// The Host opens 9♥. The guest has no match and draws 10♥; then the Host has no match on it
+	// and draws 7♣, which cannot be played.
 	const deck = dealDeck(
-		[cards('10c 10d Ks Kd'), cards('Qc Ac 7d 8s Qd')],
+		[cards('Ks Kd Qs 9c'), cards('Qc Ac 7d 8s Qd')],
 		card('9h'),
-		cards('7c 8c 10h')
+		cards('10h 7c')
 	);
 	backend.scriptNextRound([...shuffleValues(orderedDeck, deck), choice(0, 2)]);
 	await page.getByRole('button', { name: 'Review and start', exact: true }).click();
@@ -647,28 +648,38 @@ test('players take ordinary turns, drawing until the drawn card must be played',
 	await expect(
 		page.getByRole('status').filter({ hasText: 'You drew the 10 of hearts. Play it now.' })
 	).toBeVisible();
-	await expect(page.getByText('Seat 2: 8 cards', { exact: false })).toBeVisible();
+	await expect(page.getByText('Seat 2: 6 cards', { exact: false })).toBeVisible();
 	await expect(hand.getByRole('button', { disabled: false })).toHaveCount(1);
 	await page.reload();
 	// The feed survives the reload and shows how many cards moved, never which.
 	const recent = page.getByRole('list', { name: 'Recent moves', exact: true });
 	await expect(recent.getByRole('listitem')).toHaveText([
-		'Seat 2 drew 3.',
+		'Seat 2 drew 1.',
 		'Seat 1 started the round with the 9 of hearts on top.'
 	]);
+
+	// The Host learns that the drawn card must be played, but not which card it is.
+	await switchAccount(page, backend, gameURL, 'host@example.com');
+	await expect(
+		page.getByText('Seat 2 drew a playable card and must play it.', { exact: true })
+	).toBeVisible();
+	await expect(page.getByText('10 of hearts', { exact: false })).toHaveCount(0);
+	await expect(page.getByLabel('10 of hearts', { exact: false })).toHaveCount(0);
+
+	await switchAccount(page, backend, gameURL, 'guest@example.com');
 	await page.getByRole('button', { name: 'Select 10 of hearts', exact: true }).click();
 	await page.getByRole('button', { name: 'Play selected cards', exact: true }).click();
 	await expect(page.getByText('Current player: seat 1.', { exact: true })).toBeVisible();
 	await expect(page.getByRole('img', { name: '10 of hearts', exact: true })).toBeVisible();
-	await expect(page.getByText('Seat 2: 7 cards', { exact: false })).toBeVisible();
+	await expect(page.getByText('Seat 2: 5 cards', { exact: false })).toBeVisible();
 	expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 
 	await switchAccount(page, backend, gameURL, 'host@example.com');
-	await page.getByRole('button', { name: 'Select 10 of clubs', exact: true }).click();
-	await page.getByRole('button', { name: 'Play selected cards', exact: true }).click();
+	await page.getByRole('button', { name: 'Draw', exact: true }).click();
 	await expect(page.getByText('Current player: seat 2.', { exact: true })).toBeVisible();
-	await expect(page.getByText('Seat 1: 3 cards', { exact: false })).toBeVisible();
-	await expect(recent.getByRole('listitem').first()).toHaveText('Seat 1 played 10 of clubs.');
+	await expect(page.getByText('Seat 1: 5 cards', { exact: false })).toBeVisible();
+	await expect(hand.getByRole('button', { name: '7 of clubs', exact: true })).toBeDisabled();
+	await expect(recent.getByRole('listitem').first()).toHaveText('Seat 1 drew 1 and passed.');
 	await expect(recent.getByRole('listitem')).toHaveCount(4);
 	await page.screenshot({
 		path: test.info().outputPath('ordinary-turn-phone.png'),
@@ -679,7 +690,7 @@ test('players take ordinary turns, drawing until the drawn card must be played',
 	await expect(page.getByText('Зараз ходить гравець на місці 2.', { exact: true })).toBeVisible();
 	await expect(
 		page.getByRole('list', { name: 'Останні ходи', exact: true }).getByRole('listitem').first()
-	).toHaveText('Місце 1: покладено 10, трефи.');
+	).toHaveText('Місце 1: узято з колоди 1 шт., хід передано.');
 	expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 	await page.screenshot({
 		path: test.info().outputPath('ordinary-turn-uk-phone.png'),
