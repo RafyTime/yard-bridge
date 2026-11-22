@@ -54,12 +54,16 @@ async function reviewRules(page: Page) {
 
 type Backend = Awaited<ReturnType<typeof authBackend>>;
 
+// Submits each step from its focused field. Under CI load, Firefox has dropped a pointer click on
+// a just-mounted sign-in form; Enter takes the same submit path without pointer hit-testing.
 async function signInAs(page: Page, backend: Backend, email: string) {
-	await page.getByLabel('Email address').fill(email);
-	await page.getByRole('button', { name: 'Send code', exact: true }).click();
-	await expect(page.getByLabel('Sign-in code')).toBeVisible();
-	await page.getByLabel('Sign-in code').fill(backend.code);
-	await page.getByRole('button', { name: 'Continue', exact: true }).click();
+	const emailField = page.getByLabel('Email address');
+	await emailField.fill(email);
+	await emailField.press('Enter');
+	const codeField = page.getByLabel('Sign-in code');
+	await expect(codeField).toBeVisible();
+	await codeField.fill(backend.code);
+	await codeField.press('Enter');
 	await expect(page.getByRole('heading', { name: 'You are signed in', exact: true })).toBeVisible();
 }
 
@@ -153,8 +157,9 @@ test('delivery failure stays on the email form and Ukrainian fits a narrow phone
 	backend.failDelivery();
 	await page.setViewportSize({ width: 320, height: 640 });
 	await page.goto('/uk');
-	await page.getByLabel('Електронна пошта').fill('leo@example.com');
-	await page.getByRole('button', { name: 'Надіслати код', exact: true }).click();
+	const email = page.getByLabel('Електронна пошта');
+	await email.fill('leo@example.com');
+	await email.press('Enter');
 	await expect(page.getByRole('alert').filter({ hasText: /\S/ })).toContainText(
 		'Не вдалося надіслати код'
 	);
@@ -206,11 +211,7 @@ test('a player creates multiple games and reopens the same seat after reload', a
 }) => {
 	await page.setViewportSize({ width: 390, height: 844 });
 	await page.goto('/');
-	await page.getByLabel('Email address').fill('leo@example.com');
-	await page.getByRole('button', { name: 'Send code', exact: true }).click();
-	await expect(page.getByLabel('Sign-in code')).toBeVisible();
-	await page.getByLabel('Sign-in code').fill(backend.code);
-	await page.getByRole('button', { name: 'Continue', exact: true }).click();
+	await signInAs(page, backend, 'leo@example.com');
 	await page.getByRole('button', { name: 'New game', exact: true }).click();
 	await page.getByLabel('Game name').fill('Evening table');
 	await page.getByRole('button', { name: 'Create private game' }).click();
@@ -426,11 +427,7 @@ test('Host edits advanced rules and copies a saved configuration into a later Ga
 }) => {
 	await page.setViewportSize({ width: 390, height: 844 });
 	await page.goto('/');
-	await page.getByLabel('Email address').fill('host@example.com');
-	await page.getByRole('button', { name: 'Send code', exact: true }).click();
-	await expect(page.getByLabel('Sign-in code')).toBeVisible();
-	await page.getByLabel('Sign-in code').fill(backend.code);
-	await page.getByRole('button', { name: 'Continue', exact: true }).click();
+	await signInAs(page, backend, 'host@example.com');
 	await page.getByRole('button', { name: 'New game', exact: true }).click();
 	await page.getByLabel('Game name').fill('Our rules');
 	await page.getByRole('button', { name: 'Create private game' }).click();
@@ -544,11 +541,7 @@ test('Rules drafts follow clean updates, require explicit conflict reload, and s
 	backend
 }) => {
 	await page.goto('/');
-	await page.getByLabel('Email address').fill('host@example.com');
-	await page.getByRole('button', { name: 'Send code', exact: true }).click();
-	await expect(page.getByLabel('Sign-in code')).toBeVisible();
-	await page.getByLabel('Sign-in code').fill(backend.code);
-	await page.getByRole('button', { name: 'Continue', exact: true }).click();
+	await signInAs(page, backend, 'host@example.com');
 	await page.getByRole('button', { name: 'New game', exact: true }).click();
 	await page.getByLabel('Game name').fill('Shared table');
 	await page.getByRole('button', { name: 'Create private game' }).click();
