@@ -1673,6 +1673,28 @@ test.each([
 	}
 );
 
+test('the target accepts a combined batch effect once: draws four, then is skipped', async () => {
+	const { players, views, seatIds } = await opened(
+		[cards('Kd Qd Ah'), cards('7c 7s 8s 10s')],
+		card('9c'),
+		[],
+		{ batchMode: 'match' }
+	);
+	await playBatch(players[1], (await views())[0], '7c 7s 8s');
+	const [before] = await views();
+	const turn = { roundId: before.id, expectedVersion: before.version };
+	await players[0].mutation(api.rounds.accept, turn);
+	const [host, guest] = await views();
+	expect(host.hand).toHaveLength(7);
+	expect(guest).toMatchObject({
+		effect: null,
+		currentSeatId: seatIds[1],
+		drawCount: before.drawCount - 4
+	});
+	const again = { ...turn, expectedVersion: guest.version };
+	await expect(players[0].mutation(api.rounds.accept, again)).rejects.toThrow('Not your turn');
+});
+
 test('under Ace cancellation, an Ace cancels a combined batch effect and uses the turn', async () => {
 	const { players, views, seatIds } = await opened(
 		[cards('Kd Qd As'), cards('7c 7s 8s 10s')],
