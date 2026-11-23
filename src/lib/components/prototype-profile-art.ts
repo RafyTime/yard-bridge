@@ -44,6 +44,15 @@ export const avatarIllustrations = [
 			`<circle cx="19.5" cy="23" r="3.6" fill="none" stroke="${ink}" stroke-width="1.6"/><circle cx="28.5" cy="23" r="3.6" fill="none" stroke="${ink}" stroke-width="1.6"/><path d="M23.1 23h1.8" stroke="${ink}" stroke-width="1.6"/>`
 	},
 	{
+		id: 'long',
+		label: 'Long hair',
+		radius: 11,
+		back: ({ ink }) =>
+			`<path d="M11 22Q11 8 24 8Q37 8 37 22L38.5 38Q34.5 40.5 31 37.5V20H17V37.5Q13.5 40.5 9.5 38Z" fill="${ink}"/>`,
+		front: ({ ink }) =>
+			`<path d="M13.5 20Q14.5 11 24 11Q33.5 11 34.5 20Q29 14.5 23 16.5Q18 14.5 13.5 20Z" fill="${ink}"/>`
+	},
+	{
 		id: 'cap',
 		label: 'Cap',
 		radius: 11,
@@ -57,6 +66,15 @@ export const avatarIllustrations = [
 		back: ({ ink }) => `<circle cx="24" cy="8" r="4.5" fill="${ink}"/>`,
 		front: ({ ink }) =>
 			`<path d="M13 20Q13 11 24 11Q35 11 35 20Q31 15 24 15Q17 15 13 20Z" fill="${ink}"/>`
+	},
+	{
+		id: 'ponytail',
+		label: 'Ponytail',
+		radius: 11,
+		back: ({ ink }) =>
+			`<path d="M32 13Q42.5 13.5 41.5 26Q41 31.5 37.5 34Q38.5 24.5 33 19.5Z" fill="${ink}"/>`,
+		front: ({ ink }) =>
+			`<path d="M13 20Q13 11 24 11Q35 11 35 20Q30 15 24 15Q18 15 13 20Z" fill="${ink}"/>`
 	},
 	{
 		id: 'beanie',
@@ -84,6 +102,14 @@ export const avatarIllustrations = [
 			`<path d="M15 17Q19 13 24 15Q29 13 33 17Q30 11 24 11Q18 11 15 17Z" fill="${ink}"/>`
 	},
 	{
+		id: 'bob',
+		label: 'Bob',
+		radius: 11,
+		back: ({ ink }) =>
+			`<path d="M10.5 31Q9.5 9 24 9Q38.5 9 37.5 31Q34 33 31 31V18H17V31Q14 33 10.5 31Z" fill="${ink}"/>`,
+		front: ({ ink }) => `<path d="M13.5 19.5Q13.5 11 24 11Q34.5 11 34.5 19.5Z" fill="${ink}"/>`
+	},
+	{
 		id: 'headphones',
 		label: 'Headphones',
 		radius: 11,
@@ -91,6 +117,20 @@ export const avatarIllustrations = [
 			`<path d="M11 24Q11 7 24 7Q37 7 37 24" fill="none" stroke="${ink}" stroke-width="2.4"/>`,
 		front: ({ ink }) =>
 			`<rect x="8.5" y="19.5" width="6" height="9" rx="3" fill="${ink}"/><rect x="33.5" y="19.5" width="6" height="9" rx="3" fill="${ink}"/>`
+	},
+	{
+		id: 'braids',
+		label: 'Braids',
+		radius: 11,
+		back: ({ ink }) =>
+			[24, 28.5, 33, 37]
+				.flatMap((y) => [
+					`<circle cx="11.5" cy="${y}" r="2.7" fill="${ink}"/>`,
+					`<circle cx="36.5" cy="${y}" r="2.7" fill="${ink}"/>`
+				])
+				.join(''),
+		front: ({ ink, face }) =>
+			`<path d="M13 21Q13 11 24 11Q35 11 35 21Q31 14.5 24 14Q17 14.5 13 21Z" fill="${ink}"/><path d="M24 11.5V14" stroke="${face}" stroke-width="1.2"/>`
 	},
 	{
 		id: 'sleepy',
@@ -108,12 +148,28 @@ export const avatarIllustrations = [
 			`<path d="M15.5 14V5.5l4.2 4 4.3-5 4.3 5 4.2-4V14Z" fill="${ink}" stroke="${ink}" stroke-width="1" stroke-linejoin="round"/>`
 	},
 	{
+		id: 'headscarf',
+		label: 'Headscarf',
+		radius: 11,
+		back: ({ ink }) =>
+			`<path d="M10 26Q10 6 24 6Q38 6 38 26L39.5 40Q24 43 8.5 40Z" fill="${ink}"/>`,
+		front: ({ ink }) =>
+			`<path d="M13 18.5Q13 10 24 10Q35 10 35 18.5Q30 14.5 24 14.5Q18 14.5 13 18.5Z" fill="${ink}"/>`
+	},
+	{
 		id: 'beard',
 		label: 'Beard',
 		radius: 11,
 		mouthOnInk: true,
 		front: ({ ink }) =>
 			`<path d="M13 25Q13 39 24 39Q35 39 35 25Q32 30 24 30Q16 30 13 25Z" fill="${ink}"/>`
+	},
+	{
+		id: 'bow',
+		label: 'Bow',
+		radius: 11,
+		front: ({ ink }) =>
+			`<path d="M13 20Q13 11 24 11Q35 11 35 20Q30 15 24 15Q18 15 13 20Z" fill="${ink}"/><path d="M32 10.5 27 7v7Zm0 0 5-3.5v7Z" fill="${ink}"/><circle cx="32" cy="10.5" r="1.6" fill="${ink}"/><circle cx="12.6" cy="29" r="1.4" fill="${ink}"/><circle cx="35.4" cy="29" r="1.4" fill="${ink}"/>`
 	},
 	{
 		id: 'visor',

@@ -1,6 +1,7 @@
 <script lang="ts">
-	// PROTOTYPE (throwaway): four account-sheet composers for Player Profiles on
-	// /?prototype=profile&variant=A|B|C|D, beside a live preview of every place the
+	// PROTOTYPE (throwaway): the chosen stage-and-grid account-sheet composer on
+	// /?prototype=profile&variant=D|E (illustrations in a 3×6 grid vs. a two-row
+	// horizontal scroller; A–C live in this branch's history), beside a live preview of every place the
 	// profile shows (lobby, Host approvals, waiting screen, table, recent moves).
 	// All state lives in memory; nothing reaches Convex.
 	import { onMount } from 'svelte';
@@ -10,7 +11,6 @@
 	import * as Avatar from '#lib/components/ui/avatar/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
-	import * as Field from '#lib/components/ui/field/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import { Separator } from '#lib/components/ui/separator/index.js';
 	import * as ToggleGroup from '#lib/components/ui/toggle-group/index.js';
@@ -22,7 +22,6 @@
 		avatarUri,
 		checkUsername,
 		colorOf,
-		illustrationOf,
 		randomAvatar,
 		randomUsername,
 		requestCode,
@@ -33,13 +32,11 @@
 	} from './prototype-profile-art';
 
 	const variants = [
-		{ key: 'A', name: 'Grid sheet' },
-		{ key: 'B', name: 'Stage + tabs' },
-		{ key: 'C', name: 'Stepper' },
-		{ key: 'D', name: 'Stage + grid' }
+		{ key: 'D', name: 'Grid 3×6' },
+		{ key: 'E', name: 'Two-row scroll' }
 	] as const;
 	const variant = $derived(
-		variants.find(({ key }) => key === page.url.searchParams.get('variant'))?.key ?? 'A'
+		variants.find(({ key }) => key === page.url.searchParams.get('variant'))?.key ?? 'D'
 	);
 
 	// What a Player Profile row would hold. Fixed first, randomized on mount to mimic signup
@@ -91,17 +88,6 @@
 		avatarIllustrations.some(({ id }) => id === value);
 	const isColor = (value: string): value is AvatarColorId =>
 		avatarColors.some(({ id }) => id === value);
-
-	const illustrationIndex = $derived(
-		avatarIllustrations.findIndex(({ id }) => id === profile.avatar.illustration)
-	);
-	function stepIllustration(step: number) {
-		const count = avatarIllustrations.length;
-		setIllustration(avatarIllustrations[(illustrationIndex + step + count) % count]!.id);
-	}
-
-	// Variant B: which option strip is showing.
-	let stageTab = $state<'illustration' | 'color'>('illustration');
 
 	// ---- Mock Game around the profile -------------------------------------------------------
 	type Person = { id: string; username: string; avatar: AvatarChoice };
@@ -204,232 +190,8 @@
 	</p>
 {/snippet}
 
-<!-- A: everything visible at once, two independent pickers stacked under a header. -->
-{#snippet variantA()}
-	<div class="flex flex-col gap-6 text-sm">
-		<div class="flex items-center gap-3">
-			{@render face(profile.avatar, 'size-16')}
-			<div class="flex min-w-0 flex-col gap-1">
-				<h3 class="truncate text-base font-semibold">{profile.username}</h3>
-				<p class="text-xs text-muted-foreground">
-					{illustrationOf(profile.avatar.illustration).label} on {colorOf(profile.avatar.color)
-						.label}
-				</p>
-			</div>
-		</div>
-		<Field.Field>
-			<Field.FieldLabel for="profile-username">Username</Field.FieldLabel>
-			<div class="flex gap-2">
-				{@render usernameInput()}
-				<Button variant="outline" class="min-h-11" onclick={shuffleUsername}>Shuffle</Button>
-			</div>
-			{@render usernameHelp()}
-		</Field.Field>
-		<Field.FieldSet>
-			<Field.FieldLegend class="text-sm">Illustration</Field.FieldLegend>
-			<ToggleGroup.Root
-				type="single"
-				spacing={2}
-				value={profile.avatar.illustration}
-				onValueChange={(value) => isIllustration(value) && setIllustration(value)}
-				aria-label="Illustration"
-				class="grid grid-cols-6 justify-items-center gap-1"
-			>
-				{#each avatarIllustrations as item (item.id)}
-					<ToggleGroup.Item
-						value={item.id}
-						aria-label={item.label}
-						title={item.label}
-						class="aspect-square size-auto w-full max-w-14 rounded-full p-0.5 data-[state=on]:ring-2 data-[state=on]:ring-primary"
-						><img
-							src={avatarUri({ illustration: item.id, color: profile.avatar.color })}
-							alt=""
-							class="size-full rounded-full"
-						/></ToggleGroup.Item
-					>
-				{/each}
-			</ToggleGroup.Root>
-		</Field.FieldSet>
-		<Field.FieldSet>
-			<Field.FieldLegend class="text-sm">Background</Field.FieldLegend>
-			<ToggleGroup.Root
-				type="single"
-				spacing={2}
-				value={profile.avatar.color}
-				onValueChange={(value) => isColor(value) && setColor(value)}
-				aria-label="Background color"
-				class="flex flex-wrap gap-2"
-			>
-				{#each avatarColors as color (color.id)}
-					<ToggleGroup.Item
-						value={color.id}
-						aria-label={color.label}
-						title={color.label}
-						class="size-11 rounded-full p-1 data-[state=on]:ring-2 data-[state=on]:ring-primary"
-						>{@render swatch(color.id)}</ToggleGroup.Item
-					>
-				{/each}
-			</ToggleGroup.Root>
-		</Field.FieldSet>
-		<Button variant="ghost" class="min-h-11 self-start" onclick={surprise}>Surprise me</Button>
-	</div>
-{/snippet}
-
-<!-- B: one big avatar on a stage; a tab picks which single strip of options shows. -->
-{#snippet variantB()}
-	<div class="flex flex-col items-center gap-5 text-sm">
-		<div class="relative">
-			{@render face(profile.avatar, 'size-32')}
-			<Button
-				variant="secondary"
-				size="icon"
-				class="absolute -right-1 -bottom-1 size-11 rounded-full shadow"
-				onclick={surprise}
-				aria-label="Random avatar"
-				title="Random avatar"><span aria-hidden="true">🎲</span></Button
-			>
-		</div>
-		<div class="flex w-full max-w-xs flex-col gap-1">
-			<label for="profile-username" class="sr-only">Username</label>
-			<div class="flex items-center gap-1">
-				{@render usernameInput(
-					'border-transparent text-center text-lg font-semibold shadow-none hover:border-input focus-visible:border-ring'
-				)}
-				<Button
-					variant="ghost"
-					size="icon"
-					class="size-11 shrink-0"
-					onclick={shuffleUsername}
-					aria-label="Random username"
-					title="Random username"><span aria-hidden="true">↻</span></Button
-				>
-			</div>
-			<div class="text-center">{@render usernameHelp()}</div>
-		</div>
-		<ToggleGroup.Root
-			type="single"
-			variant="outline"
-			value={stageTab}
-			onValueChange={(value) => {
-				if (value === 'illustration' || value === 'color') stageTab = value;
-			}}
-			aria-label="Edit"
-			class="w-full"
-		>
-			<ToggleGroup.Item value="illustration" class="min-h-11 flex-1">Illustration</ToggleGroup.Item>
-			<ToggleGroup.Item value="color" class="min-h-11 flex-1">Background</ToggleGroup.Item>
-		</ToggleGroup.Root>
-		<div class="-mx-1 w-full overflow-x-auto px-1 pb-2">
-			{#if stageTab === 'illustration'}
-				<ToggleGroup.Root
-					type="single"
-					spacing={2}
-					value={profile.avatar.illustration}
-					onValueChange={(value) => isIllustration(value) && setIllustration(value)}
-					aria-label="Illustration"
-					class="flex w-max gap-3"
-				>
-					{#each avatarIllustrations as item (item.id)}
-						<ToggleGroup.Item
-							value={item.id}
-							aria-label={item.label}
-							class="flex h-auto flex-col gap-1 rounded-xl p-1.5 data-[state=on]:bg-accent data-[state=on]:ring-2 data-[state=on]:ring-primary"
-							><img
-								src={avatarUri({ illustration: item.id, color: profile.avatar.color })}
-								alt=""
-								class="size-16 rounded-full"
-							/><span class="text-xs">{item.label}</span></ToggleGroup.Item
-						>
-					{/each}
-				</ToggleGroup.Root>
-			{:else}
-				<ToggleGroup.Root
-					type="single"
-					spacing={2}
-					value={profile.avatar.color}
-					onValueChange={(value) => isColor(value) && setColor(value)}
-					aria-label="Background color"
-					class="flex w-max gap-3"
-				>
-					{#each avatarColors as color (color.id)}
-						<ToggleGroup.Item
-							value={color.id}
-							aria-label={color.label}
-							class="flex h-auto flex-col gap-1 rounded-xl p-1.5 data-[state=on]:bg-accent data-[state=on]:ring-2 data-[state=on]:ring-primary"
-							><img
-								src={avatarUri({ illustration: profile.avatar.illustration, color: color.id })}
-								alt=""
-								class="size-16 rounded-full"
-							/><span class="text-xs">{color.label}</span></ToggleGroup.Item
-						>
-					{/each}
-				</ToggleGroup.Root>
-			{/if}
-		</div>
-	</div>
-{/snippet}
-
-<!-- C: compact; arrows flip illustrations, a dot row picks color. No grid to scan. -->
-{#snippet variantC()}
-	<div class="flex flex-col gap-6 text-sm">
-		<div class="flex flex-col items-center gap-3">
-			<div class="flex items-center gap-4">
-				<Button
-					variant="outline"
-					size="icon"
-					class="size-11 rounded-full"
-					onclick={() => stepIllustration(-1)}
-					aria-label="Previous illustration">‹</Button
-				>
-				{@render face(profile.avatar, 'size-24')}
-				<Button
-					variant="outline"
-					size="icon"
-					class="size-11 rounded-full"
-					onclick={() => stepIllustration(1)}
-					aria-label="Next illustration">›</Button
-				>
-			</div>
-			<p class="text-xs text-muted-foreground" aria-live="polite">
-				{illustrationOf(profile.avatar.illustration).label} · {illustrationIndex + 1} of {avatarIllustrations.length}
-			</p>
-			<ToggleGroup.Root
-				type="single"
-				spacing={2}
-				value={profile.avatar.color}
-				onValueChange={(value) => isColor(value) && setColor(value)}
-				aria-label="Background color"
-				class="flex flex-wrap justify-center gap-1"
-			>
-				{#each avatarColors as color (color.id)}
-					<ToggleGroup.Item
-						value={color.id}
-						aria-label={color.label}
-						title={color.label}
-						class="size-11 rounded-full p-2 data-[state=on]:ring-2 data-[state=on]:ring-primary"
-						>{@render swatch(color.id, 'size-7')}</ToggleGroup.Item
-					>
-				{/each}
-			</ToggleGroup.Root>
-		</div>
-		<Separator />
-		<Field.Field>
-			<Field.FieldLabel for="profile-username">Username</Field.FieldLabel>
-			<div class="relative">
-				{@render usernameInput('pr-24')}
-				<Button
-					variant="ghost"
-					class="absolute top-0 right-0 min-h-11 text-xs"
-					onclick={shuffleUsername}>New name</Button
-				>
-			</div>
-			{@render usernameHelp()}
-		</Field.Field>
-	</div>
-{/snippet}
-
-<!-- D: B's stage with A's always-visible pickers, sized for a phone-width sheet. -->
-{#snippet variantD()}
+<!-- B's stage with A's always-visible pickers; D and E differ only in the illustration picker. -->
+{#snippet composer()}
 	<div class="flex flex-col items-center gap-5 text-sm">
 		<div class="relative">
 			{@render face(profile.avatar, 'size-32')}
@@ -486,14 +248,17 @@
 			value={profile.avatar.illustration}
 			onValueChange={(value) => isIllustration(value) && setIllustration(value)}
 			aria-label="Illustration"
-			class="grid w-full grid-cols-6 justify-items-center gap-1.5"
+			class={variant === 'D'
+				? 'grid w-full grid-cols-6 justify-items-center gap-1.5'
+				: // 6.5 tiles per view at the grid's tile size, so a cut-off tile hints at more.
+					'grid w-full snap-x auto-cols-[calc((100%-2.4375rem)/6.5)] grid-flow-col grid-rows-2 gap-1.5 overflow-x-auto p-1 pb-2'}
 		>
 			{#each avatarIllustrations as item (item.id)}
 				<ToggleGroup.Item
 					value={item.id}
 					aria-label={item.label}
 					title={item.label}
-					class="aspect-square size-auto w-full max-w-16 rounded-full p-0.5 data-[state=on]:ring-2 data-[state=on]:ring-primary"
+					class="aspect-square size-auto w-full max-w-16 snap-start rounded-full p-0.5 data-[state=on]:ring-2 data-[state=on]:ring-primary"
 					><img
 						src={avatarUri({ illustration: item.id, color: profile.avatar.color })}
 						alt=""
@@ -523,7 +288,7 @@
 					Only you see your sign-in email: <span class="break-all">you@example.com</span>
 				</p>
 			</div>
-			{#if variant === 'A'}{@render variantA()}{:else if variant === 'B'}{@render variantB()}{:else if variant === 'C'}{@render variantC()}{:else}{@render variantD()}{/if}
+			{@render composer()}
 			<Separator />
 			<div class="flex flex-col gap-1">
 				<p class="text-xs font-medium">Stored Player Profile</p>
