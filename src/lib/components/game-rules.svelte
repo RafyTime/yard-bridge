@@ -23,6 +23,7 @@
 		defaultRules,
 		findChoice,
 		ruleChoices,
+		type ChoiceSetting,
 		type RulesConfiguration
 	} from '../../convex/rules';
 	import { Button, buttonVariants } from '#lib/components/ui/button/index.js';
@@ -92,26 +93,32 @@
 			draft.handSize <= 9
 	);
 	const onOff = (value: boolean) => (value ? m.rules_on() : m.rules_off());
-	const batching = (value: RulesConfiguration['batchMode']) =>
-		value === 'single'
-			? m.rules_grouping_single()
-			: value === 'same-rank'
-				? m.rules_grouping_same()
-				: m.rules_grouping_match();
-	const bridge = (value: RulesConfiguration['bridgeDeclaration']) =>
-		value === 'off'
-			? m.rules_off()
-			: value === 'jacks'
-				? m.rules_bridge_jacks()
-				: m.rules_bridge_four();
-	const ace = (value: RulesConfiguration['aceBehavior']) =>
-		value === 'skip' ? m.rules_skip() : m.rules_cancel();
-	const starter = (value: RulesConfiguration['starterPolicy']) =>
-		value === 'highest-score'
-			? m.rules_highest()
-			: value === 'previous-starter'
-				? m.rules_previous()
-				: m.rules_random();
+	// A label for every choice, so adding a choice to `rulesValidator` fails here until it has one.
+	const choiceLabels: {
+		[K in ChoiceSetting]: Record<RulesConfiguration[K], () => string>;
+	} = {
+		batchMode: {
+			single: m.rules_grouping_single,
+			'same-rank': m.rules_grouping_same,
+			match: m.rules_grouping_match
+		},
+		bridgeDeclaration: {
+			off: m.rules_off,
+			jacks: m.rules_bridge_jacks,
+			'four-of-a-kind': m.rules_bridge_four
+		},
+		aceBehavior: { skip: m.rules_skip, cancel: m.rules_cancel },
+		recycleMultiplier: { 1: () => '×1', 2: () => '×2', 3: () => '×3' },
+		starterPolicy: {
+			'highest-score': m.rules_highest,
+			'previous-starter': m.rules_previous,
+			random: m.rules_random
+		}
+	};
+	const label = <K extends ChoiceSetting>(key: K, value: RulesConfiguration[K]) =>
+		choiceLabels[key][value]();
+	const choiceOptions = <K extends ChoiceSetting>(key: K) =>
+		ruleChoices[key].map((choice) => ({ value: String(choice), label: label(key, choice) }));
 	const settings = $derived([
 		{
 			key: 'scoreCutoff',
@@ -145,8 +152,8 @@
 			key: 'batchMode',
 			help: m.rules_help_batchMode(),
 			label: m.rules_grouping(),
-			value: batching(game.rules.batchMode),
-			base: batching(defaultRules.batchMode)
+			value: label('batchMode', game.rules.batchMode),
+			base: label('batchMode', defaultRules.batchMode)
 		},
 		{
 			key: 'drawnCardBatching',
@@ -159,8 +166,8 @@
 			key: 'bridgeDeclaration',
 			help: m.rules_help_bridgeDeclaration(),
 			label: m.rules_bridge(),
-			value: bridge(game.rules.bridgeDeclaration),
-			base: bridge(defaultRules.bridgeDeclaration),
+			value: label('bridgeDeclaration', game.rules.bridgeDeclaration),
+			base: label('bridgeDeclaration', defaultRules.bridgeDeclaration),
 			// Single card keeps the Host's Bridge choice but cannot declare one.
 			note: game.rules.batchMode === 'single' ? m.rules_bridge_unavailable() : undefined
 		},
@@ -168,8 +175,8 @@
 			key: 'aceBehavior',
 			help: m.rules_help_aceBehavior(),
 			label: m.rules_ace(),
-			value: ace(game.rules.aceBehavior),
-			base: ace(defaultRules.aceBehavior)
+			value: label('aceBehavior', game.rules.aceBehavior),
+			base: label('aceBehavior', defaultRules.aceBehavior)
 		},
 		{
 			key: 'recycleMultiplier',
@@ -182,8 +189,8 @@
 			key: 'starterPolicy',
 			help: m.rules_help_starterPolicy(),
 			label: m.rules_starter(),
-			value: starter(game.rules.starterPolicy),
-			base: starter(defaultRules.starterPolicy)
+			value: label('starterPolicy', game.rules.starterPolicy),
+			base: label('starterPolicy', defaultRules.starterPolicy)
 		}
 	]);
 	const changes = $derived(settings.filter((setting) => setting.value !== setting.base));
@@ -218,6 +225,13 @@
 		}
 	}
 </script>
+
+{#snippet choiceItems(options: { value: string; label: string }[])}
+	{#each options as option (option.value)}<ToggleGroup.Item
+			value={option.value}
+			class="min-h-11 flex-1 whitespace-normal">{option.label}</ToggleGroup.Item
+		>{/each}
+{/snippet}
 
 {#snippet readyAction()}
 	{#if reviewed}{#if game.isHost}<p class="text-sm text-muted-foreground">
@@ -514,13 +528,7 @@
 												draft.recycleMultiplier)}
 										aria-label={m.rules_recycle()}
 										class="w-full"
-										><ToggleGroup.Item value="1" class="min-h-11 flex-1 whitespace-normal"
-											>×1</ToggleGroup.Item
-										><ToggleGroup.Item value="2" class="min-h-11 flex-1 whitespace-normal"
-											>×2</ToggleGroup.Item
-										><ToggleGroup.Item value="3" class="min-h-11 flex-1 whitespace-normal"
-											>×3</ToggleGroup.Item
-										></ToggleGroup.Root
+										>{@render choiceItems(choiceOptions('recycleMultiplier'))}</ToggleGroup.Root
 									></Field.FieldSet
 								>
 							{/snippet}</RuleHelp
@@ -552,13 +560,7 @@
 										aria-label={m.rules_grouping()}
 										class="w-full"
 										orientation="vertical"
-										><ToggleGroup.Item value="single" class="min-h-11 flex-1 whitespace-normal"
-											>{m.rules_grouping_single()}</ToggleGroup.Item
-										><ToggleGroup.Item value="same-rank" class="min-h-11 flex-1 whitespace-normal"
-											>{m.rules_grouping_same()}</ToggleGroup.Item
-										><ToggleGroup.Item value="match" class="min-h-11 flex-1 whitespace-normal"
-											>{m.rules_grouping_match()}</ToggleGroup.Item
-										></ToggleGroup.Root
+										>{@render choiceItems(choiceOptions('batchMode'))}</ToggleGroup.Root
 									></Field.FieldSet
 								>
 							{/snippet}</RuleHelp
@@ -631,11 +633,7 @@
 										aria-label={m.rules_ace()}
 										class="w-full"
 										orientation="vertical"
-										><ToggleGroup.Item value="skip" class="min-h-11 flex-1 whitespace-normal"
-											>{m.rules_skip()}</ToggleGroup.Item
-										><ToggleGroup.Item value="cancel" class="min-h-11 flex-1 whitespace-normal"
-											>{m.rules_cancel()}</ToggleGroup.Item
-										></ToggleGroup.Root
+										>{@render choiceItems(choiceOptions('aceBehavior'))}</ToggleGroup.Root
 									></Field.FieldSet
 								>
 							{/snippet}</RuleHelp
@@ -671,15 +669,7 @@
 											: undefined}
 										class="w-full"
 										orientation="vertical"
-										><ToggleGroup.Item value="off" class="min-h-11 flex-1 whitespace-normal"
-											>{m.rules_off()}</ToggleGroup.Item
-										><ToggleGroup.Item value="jacks" class="min-h-11 flex-1 whitespace-normal"
-											>{m.rules_bridge_jacks()}</ToggleGroup.Item
-										><ToggleGroup.Item
-											value="four-of-a-kind"
-											class="min-h-11 flex-1 whitespace-normal"
-											>{m.rules_bridge_four()}</ToggleGroup.Item
-										></ToggleGroup.Root
+										>{@render choiceItems(choiceOptions('bridgeDeclaration'))}</ToggleGroup.Root
 									>
 									<!-- Single card keeps the Bridge choice for when Batches return. -->
 									{#if draft.batchMode === 'single'}<p
@@ -709,17 +699,7 @@
 										aria-label={m.rules_starter()}
 										class="w-full"
 										orientation="vertical"
-										><ToggleGroup.Item
-											value="highest-score"
-											class="min-h-11 flex-1 whitespace-normal"
-											>{m.rules_highest()}</ToggleGroup.Item
-										><ToggleGroup.Item
-											value="previous-starter"
-											class="min-h-11 flex-1 whitespace-normal"
-											>{m.rules_previous()}</ToggleGroup.Item
-										><ToggleGroup.Item value="random" class="min-h-11 flex-1 whitespace-normal"
-											>{m.rules_random()}</ToggleGroup.Item
-										></ToggleGroup.Root
+										>{@render choiceItems(choiceOptions('starterPolicy'))}</ToggleGroup.Root
 									></Field.FieldSet
 								>
 							{/snippet}</RuleHelp

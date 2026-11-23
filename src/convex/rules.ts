@@ -25,8 +25,14 @@ export type RulesConfiguration = Infer<typeof rulesValidator>;
 
 const { batchMode, bridgeDeclaration, aceBehavior, recycleMultiplier, starterPolicy } =
 	rulesValidator.fields;
-// The choices of each setting picked from a fixed list, in the validator's order.
-export const ruleChoices = {
+// The settings picked from a fixed list, and their choices in the validator's order.
+export type ChoiceSetting =
+	| 'batchMode'
+	| 'bridgeDeclaration'
+	| 'aceBehavior'
+	| 'recycleMultiplier'
+	| 'starterPolicy';
+export const ruleChoices: { [K in ChoiceSetting]: readonly RulesConfiguration[K][] } = {
 	batchMode: batchMode.members.map((member) => member.value),
 	bridgeDeclaration: bridgeDeclaration.members.map((member) => member.value),
 	aceBehavior: aceBehavior.members.map((member) => member.value),
