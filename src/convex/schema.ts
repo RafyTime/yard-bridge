@@ -1,7 +1,7 @@
 import { defineSchema, defineTable } from 'convex/server';
 import { v } from 'convex/values';
 import { authTables } from '@convex-dev/auth/server';
-import { rulesValidator } from './rules';
+import { storedRulesValidator } from './rules';
 import { cardValidator, effectValidator, openingValidator, suitValidator } from './cards';
 import { recentMoveValidator } from './roundEvents';
 import { roundResultValidator } from './roundScoring';
@@ -17,13 +17,13 @@ export default defineSchema({
 			v.literal('finished'),
 			v.literal('abandoned')
 		),
-		rules: rulesValidator,
+		rules: storedRulesValidator,
 		version: v.number()
 	}),
 	rounds: defineTable({
 		gameId: v.id('games'),
 		number: v.number(),
-		rules: rulesValidator,
+		rules: storedRulesValidator,
 		drawPile: v.array(cardValidator),
 		playedPile: v.array(cardValidator),
 		starterSeatId: v.id('seats'),
@@ -40,6 +40,11 @@ export default defineSchema({
 		// Increases with every accepted turn command so stale or repeated moves cannot commit.
 		version: v.number(),
 		handCounts: v.array(v.object({ seatId: v.id('seats'), cardCount: v.number() })),
+		// The play that finishes the Round once its Pending effect resolves: an emptied hand, with the
+		// Jacks that ended its batch, or a Bridge declaration.
+		finish: v.optional(v.object({ seatId: v.id('seats'), bridge: v.boolean(), jacks: v.number() })),
+		// Consecutive passes with nothing left to draw or recycle; the Round ends once every Seat has.
+		exhaustedPasses: v.optional(v.number()),
 		// Set once the Round ends; every later turn command is rejected.
 		result: v.union(roundResultValidator, v.null())
 	}).index('by_gameId', ['gameId']),
@@ -56,7 +61,7 @@ export default defineSchema({
 	savedRules: defineTable({
 		ownerId: v.id('users'),
 		name: v.string(),
-		rules: rulesValidator
+		rules: storedRulesValidator
 	}).index('by_ownerId', ['ownerId']),
 	seats: defineTable({
 		gameId: v.id('games'),

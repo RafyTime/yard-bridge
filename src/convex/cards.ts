@@ -4,6 +4,7 @@ import type { Infer } from 'convex/values';
 export const suits = ['clubs', 'diamonds', 'hearts', 'spades'] as const;
 export const ranks = ['6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'] as const;
 export const suitValidator = v.union(...suits.map((suit) => v.literal(suit)));
+export type Suit = (typeof suits)[number];
 export const cardValidator = v.object({
 	suit: suitValidator,
 	rank: v.union(...ranks.map((rank) => v.literal(rank)))

@@ -36,7 +36,9 @@ test('a player creates private games and resumes the same host seat in a new ses
 		kingOfSpades: false,
 		handSize: 5,
 		openingEffects: true,
-		bridgeDeclaration: true,
+		groupingMode: 'same-rank',
+		drawnCardGrouping: true,
+		bridgeDeclaration: 'four-of-a-kind',
 		aceBehavior: 'skip',
 		recycleMultiplier: 2,
 		starterPolicy: 'highest-score'

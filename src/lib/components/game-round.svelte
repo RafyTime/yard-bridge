@@ -4,6 +4,7 @@
 	import { api } from '../../convex/_generated/api';
 	import { cardKey, sameCard, suits } from '../../convex/cards';
 	import { cardPoints } from '../../convex/roundScoring';
+	import { batchProblem } from '../../convex/roundTurns';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as m from '#lib/paraglide/messages.js';
 	import { getLocale } from '#lib/paraglide/runtime.js';
@@ -98,11 +99,15 @@
 	function cardLabel(card: Card) {
 		return m.round_card({ rank: card.rank, suit: suitNames[card.suit] });
 	}
-	// A group starts with a playable card and continues with same-rank cards; a drawn card plays alone.
+	// The server's batch check, so the hand offers only cards the Rules configuration lets follow.
+	function legalBatch(table: Round, batch: readonly Card[]) {
+		const { topCard: top, activeSuit, mustCover, drawnCard } = table;
+		return !batchProblem({ top, activeSuit, mustCover, drawnCard }, batch, game.rules);
+	}
+	// A batch starts with a playable card and continues with cards that may follow it.
 	function canSelect(table: Round, card: Card) {
-		const [first] = chosen;
-		if (!first) return table.playable.some((item) => sameCard(item, card));
-		return !table.drawnCard && card.rank === first.rank;
+		if (!chosen.length) return table.playable.some((item) => sameCard(item, card));
+		return legalBatch(table, [...chosen, card]);
 	}
 	function toggle(table: Round, card: Card) {
 		const cards = chosen.some((item) => sameCard(item, card))
@@ -176,7 +181,10 @@
 		{:else if round.data}
 			{@const table = round.data}
 			{@const isTurn = table.currentSeatId === game.viewerSeatId}
-			{@const ready = !!chosen[0] && table.playable.some((card) => sameCard(card, chosen[0]))}
+			{@const ready =
+				!!chosen[0] &&
+				table.playable.some((card) => sameCard(card, chosen[0])) &&
+				legalBatch(table, chosen)}
 			<h3 id="round-heading" class="text-xl font-semibold">
 				{m.round_title({ number: table.number })}
 			</h3>
@@ -201,6 +209,19 @@
 				<section class="flex flex-col gap-3 rounded-xl border p-4" aria-labelledby="result-heading">
 					<h4 id="result-heading" class="font-semibold">{m.round_result()}</h4>
 					<p role="status">{m.round_result_hint()}</p>
+					<!-- Results scored before Bridge endings always ended on an empty hand without a multiplier. -->
+					{#if table.result.ending?.kind === 'bridge'}<p>
+							{m.round_result_bridge({ number: seatNumber(table.result.ending.seatId) })}
+						</p>
+					{:else if table.result.ending?.kind === 'emptyHand'}<p>
+							{m.round_result_empty({ number: seatNumber(table.result.ending.seatId) })}
+						</p>
+					{:else if table.result.ending?.kind === 'exhausted'}<p>
+							{m.round_result_exhausted()}
+						</p>{/if}
+					{#if (table.result.multiplier ?? 1) > 1}<p class="text-sm">
+							{m.round_result_multiplier({ multiplier: table.result.multiplier ?? 1 })}
+						</p>{/if}
 					<ul class="flex flex-col gap-3">
 						{#each table.result.hands as hand (hand.seatId)}<li class="flex flex-col gap-1">
 								<p class="font-semibold">
@@ -220,6 +241,9 @@
 											</li>{/each}
 									</ul>
 								{:else}<p class="text-sm">{m.round_result_out()}</p>{/if}
+								{#if hand.jackDeduction}<p class="text-sm">
+										{m.round_result_jacks({ points: hand.jackDeduction })}
+									</p>{/if}
 								<p class="text-sm">
 									{m.round_result_points({ points: hand.points, score: hand.score })}
 								</p>

@@ -87,6 +87,18 @@
 			draft.handSize <= 9
 	);
 	const onOff = (value: boolean) => (value ? m.rules_on() : m.rules_off());
+	const grouping = (value: RulesConfiguration['groupingMode']) =>
+		value === 'single'
+			? m.rules_grouping_single()
+			: value === 'same-rank'
+				? m.rules_grouping_same()
+				: m.rules_grouping_match();
+	const bridge = (value: RulesConfiguration['bridgeDeclaration']) =>
+		value === 'off'
+			? m.rules_off()
+			: value === 'jacks'
+				? m.rules_bridge_jacks()
+				: m.rules_bridge_four();
 	const ace = (value: RulesConfiguration['aceBehavior']) =>
 		value === 'skip' ? m.rules_skip() : m.rules_cancel();
 	const starter = (value: RulesConfiguration['starterPolicy']) =>
@@ -125,11 +137,27 @@
 			base: onOff(defaultRules.openingEffects)
 		},
 		{
+			key: 'groupingMode',
+			help: m.rules_help_groupingMode(),
+			label: m.rules_grouping(),
+			value: grouping(game.rules.groupingMode),
+			base: grouping(defaultRules.groupingMode)
+		},
+		{
+			key: 'drawnCardGrouping',
+			help: m.rules_help_drawnCardGrouping(),
+			label: m.rules_drawn_grouping(),
+			value: onOff(game.rules.drawnCardGrouping),
+			base: onOff(defaultRules.drawnCardGrouping)
+		},
+		{
 			key: 'bridgeDeclaration',
 			help: m.rules_help_bridgeDeclaration(),
 			label: m.rules_bridge(),
-			value: onOff(game.rules.bridgeDeclaration),
-			base: onOff(defaultRules.bridgeDeclaration)
+			value: bridge(game.rules.bridgeDeclaration),
+			base: bridge(defaultRules.bridgeDeclaration),
+			// Single card keeps the Host's Bridge choice but cannot declare one.
+			note: game.rules.groupingMode === 'single' ? m.rules_bridge_unavailable() : undefined
 		},
 		{
 			key: 'aceBehavior',
@@ -244,6 +272,8 @@
 				<dd class="flex flex-col items-end gap-1 text-right font-medium">
 					{setting.value}{#if setting.value !== setting.base}<Badge variant="outline"
 							>{m.rules_changed()}</Badge
+						>{/if}{#if setting.note}<span class="text-xs font-normal text-muted-foreground"
+							>{setting.note}</span
 						>{/if}
 				</dd>
 			</div>{/each}
@@ -499,6 +529,54 @@
 								aria-hidden="true"
 							/>{m.rules_group_effects()}
 						</h4>
+						<RuleHelp label={m.rules_grouping()} description={m.rules_help_groupingMode()}
+							>{#snippet children(info)}
+								<Field.FieldSet
+									><div class="flex items-center">
+										<Field.FieldLegend class="mb-0 text-sm">{m.rules_grouping()}</Field.FieldLegend
+										>{@render info()}
+									</div>
+									<ToggleGroup.Root
+										type="single"
+										variant="outline"
+										value={draft.groupingMode}
+										disabled={pending}
+										onValueChange={(value) => {
+											if (value === 'single' || value === 'same-rank' || value === 'match')
+												draft.groupingMode = value;
+										}}
+										aria-label={m.rules_grouping()}
+										class="w-full"
+										orientation="vertical"
+										><ToggleGroup.Item value="single" class="min-h-11 flex-1 whitespace-normal"
+											>{m.rules_grouping_single()}</ToggleGroup.Item
+										><ToggleGroup.Item value="same-rank" class="min-h-11 flex-1 whitespace-normal"
+											>{m.rules_grouping_same()}</ToggleGroup.Item
+										><ToggleGroup.Item value="match" class="min-h-11 flex-1 whitespace-normal"
+											>{m.rules_grouping_match()}</ToggleGroup.Item
+										></ToggleGroup.Root
+									></Field.FieldSet
+								>
+							{/snippet}</RuleHelp
+						>
+						<RuleHelp
+							label={m.rules_drawn_grouping()}
+							description={m.rules_help_drawnCardGrouping()}
+							>{#snippet children(info)}
+								<Field.Field orientation="horizontal"
+									><div class="flex flex-1 items-center">
+										<Field.FieldLabel for="rule-drawnCardGrouping" class="text-sm"
+											>{m.rules_drawn_grouping()}</Field.FieldLabel
+										>{@render info()}
+									</div>
+									<Switch
+										id="rule-drawnCardGrouping"
+										bind:checked={draft.drawnCardGrouping}
+										disabled={pending}
+									/></Field.Field
+								>
+							{/snippet}</RuleHelp
+						>
 						<RuleHelp label={m.rules_king()} description={m.rules_help_kingOfSpades()}
 							>{#snippet children(info)}
 								<Field.Field orientation="horizontal"
@@ -569,17 +647,43 @@
 						</h4>
 						<RuleHelp label={m.rules_bridge()} description={m.rules_help_bridgeDeclaration()}
 							>{#snippet children(info)}
-								<Field.Field orientation="horizontal"
-									><div class="flex flex-1 items-center">
-										<Field.FieldLabel for="rule-bridgeDeclaration" class="text-sm"
-											>{m.rules_bridge()}</Field.FieldLabel
+								<Field.FieldSet
+									><div class="flex items-center">
+										<Field.FieldLegend class="mb-0 text-sm">{m.rules_bridge()}</Field.FieldLegend
 										>{@render info()}
 									</div>
-									<Switch
-										id="rule-bridgeDeclaration"
-										bind:checked={draft.bridgeDeclaration}
-										disabled={pending}
-									/></Field.Field
+									<ToggleGroup.Root
+										type="single"
+										variant="outline"
+										value={draft.bridgeDeclaration}
+										disabled={pending || draft.groupingMode === 'single'}
+										onValueChange={(value) => {
+											if (value === 'off' || value === 'jacks' || value === 'four-of-a-kind')
+												draft.bridgeDeclaration = value;
+										}}
+										aria-label={m.rules_bridge()}
+										aria-describedby={draft.groupingMode === 'single'
+											? 'bridge-unavailable'
+											: undefined}
+										class="w-full"
+										orientation="vertical"
+										><ToggleGroup.Item value="off" class="min-h-11 flex-1 whitespace-normal"
+											>{m.rules_off()}</ToggleGroup.Item
+										><ToggleGroup.Item value="jacks" class="min-h-11 flex-1 whitespace-normal"
+											>{m.rules_bridge_jacks()}</ToggleGroup.Item
+										><ToggleGroup.Item
+											value="four-of-a-kind"
+											class="min-h-11 flex-1 whitespace-normal"
+											>{m.rules_bridge_four()}</ToggleGroup.Item
+										></ToggleGroup.Root
+									>
+									<!-- Single card keeps the Bridge choice for when grouping returns. -->
+									{#if draft.groupingMode === 'single'}<p
+											id="bridge-unavailable"
+											class="text-sm text-muted-foreground"
+										>
+											{m.rules_bridge_unavailable()}
+										</p>{/if}</Field.FieldSet
 								>
 							{/snippet}</RuleHelp
 						>
@@ -652,7 +756,10 @@
 												>{m.rules_default({ value: setting.base })}</span
 											>{/if}
 									</div>
-								</div>{/snippet}</RuleHelp
+								</div>
+								{#if setting.note}<p class="pb-2 text-xs text-muted-foreground">
+										{setting.note}
+									</p>{/if}{/snippet}</RuleHelp
 						>
 					</li>{/each}
 			</ul>

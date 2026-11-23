@@ -16,19 +16,25 @@ import {
 import { initializeRound, laterStarter } from './roundInitialization';
 import { recentMoveValidator, recentMoves, recordEvent } from './roundEvents';
 import type { RoundEvent } from './roundEvents';
+import { currentRules } from './rules';
 import { handPoints, roundResultValidator } from './roundScoring';
 import type { RoundResult } from './roundScoring';
 import {
+	batchProblem,
 	blockedReason,
 	canPlay,
 	cancelAces,
+	declaresBridge,
 	drawCards,
 	drawEffect,
 	drawForTurn,
 	nextSeatId,
 	playableCards,
+	tableOf,
+	trailingJacks,
 	withCardCount
 } from './roundTurns';
+import type { Round } from './roundTurns';
 
 export const start = mutation({
 	args: { gameId: v.id('games'), expectedGameVersion: v.number() },
@@ -56,7 +62,7 @@ export const start = mutation({
 			deck,
 			seats: seats.map((seat) => seat._id),
 			starterSeatId: seats[starterIndex]._id,
-			rules: game.rules,
+			rules: currentRules(game.rules),
 			callerSeatId: hostSeat._id
 		});
 		await ctx.db.patch('games', gameId, { status: 'active', version: game.version + 1 });
@@ -64,10 +70,17 @@ export const start = mutation({
 	}
 });
 
+// Read a Round's frozen rules in their current shape.
+const withCurrentRules = (round: Doc<'rounds'>): Round => ({
+	...round,
+	rules: currentRules(round.rules)
+});
+
 // Load a Round and the caller's Seat in its Game, rejecting outsiders.
 async function seatedRound(ctx: MutationCtx, roundId: Id<'rounds'>) {
 	const player = await requirePlayer(ctx);
-	const round = await ctx.db.get('rounds', roundId);
+	const stored = await ctx.db.get('rounds', roundId);
+	const round = stored && withCurrentRules(stored);
 	const seat =
 		round &&
 		(await ctx.db
@@ -177,12 +190,13 @@ export const view = query({
 			.withIndex('by_gameId_and_userId', (q) => q.eq('gameId', gameId).eq('userId', player.id))
 			.unique();
 		if (!seat) throw new ConvexError('Game unavailable');
-		const round = await ctx.db
+		const latest = await ctx.db
 			.query('rounds')
 			.withIndex('by_gameId', (q) => q.eq('gameId', gameId))
 			.order('desc')
 			.first();
-		if (!round) throw new ConvexError('Round unavailable');
+		if (!latest) throw new ConvexError('Round unavailable');
+		const round = withCurrentRules(latest);
 		const hand = await ctx.db
 			.query('roundHands')
 			.withIndex('by_roundId_and_seatId', (q) => q.eq('roundId', round._id).eq('seatId', seat._id))
@@ -230,7 +244,7 @@ async function currentTurn(ctx: MutationCtx, { roundId, expectedVersion }: Turn)
 }
 
 // Load the caller's hand for the turn.
-async function currentHand(ctx: MutationCtx, round: Doc<'rounds'>) {
+async function currentHand(ctx: MutationCtx, round: Round) {
 	const hand = await ctx.db
 		.query('roundHands')
 		.withIndex('by_roundId_and_seatId', (q) =>
@@ -241,32 +255,53 @@ async function currentHand(ctx: MutationCtx, round: Doc<'rounds'>) {
 	return hand;
 }
 
-type RoundPatch = Partial<Omit<Doc<'rounds'>, '_id' | '_creationTime' | 'version' | 'result'>>;
+type RoundPatch = Partial<
+	Omit<Round, '_id' | '_creationTime' | 'version' | 'result' | 'rules' | 'gameId'>
+>;
+type RoundEnding = NonNullable<RoundResult['ending']>;
 
 // Commit the current Seat's accepted command: advance the Round version so stale or repeated
 // moves are rejected, and record the command's public event in the same mutation. Call it after
-// saving the mover's hand, since a command that leaves a hand empty may end the Round here.
-async function commitTurn(
-	ctx: MutationCtx,
-	round: Doc<'rounds'>,
-	patch: RoundPatch,
-	event: RoundEvent
-) {
+// saving the mover's hand, since a command that finishes the Round scores it here. Any command
+// other than an exhausted pass resets the count of exhausted passes. A Play that finishes passes
+// its own `finish`; any other command that leaves the mover's hand empty with no 6 to cover, such
+// as a waived cover or a cancelling last Ace, finishes without Jacks.
+async function commitTurn(ctx: MutationCtx, round: Round, patch: RoundPatch, event: RoundEvent) {
 	const version = round.version + 1;
-	const updated = { ...round, ...patch, version };
-	const result = isOver(updated) ? await scoreRound(ctx, updated) : null;
-	await ctx.db.patch('rounds', round._id, { ...patch, version, result });
+	const changes = { exhaustedPasses: 0, ...patch, version };
+	const moved = { ...round, ...changes };
+	const emptied =
+		!moved.finish &&
+		!moved.mustCover &&
+		moved.handCounts.some((seat) => seat.seatId === round.currentSeatId && !seat.cardCount);
+	if (emptied) changes.finish = { seatId: round.currentSeatId, bridge: false, jacks: 0 };
+	const updated = { ...round, ...changes };
+	const ending = roundEnding(updated);
+	const result = ending && (await scoreRound(ctx, updated, ending));
+	await ctx.db.patch('rounds', round._id, { ...changes, result });
 	await recordEvent(ctx, round._id, { version, seatId: round.currentSeatId, event });
 }
 
-// A hand is empty and its final card has resolved: no 6 still waits for a cover and no draw or
-// skip still waits on its target.
-function isOver(round: Doc<'rounds'>) {
-	return !round.mustCover && !round.effect && round.handCounts.some((seat) => seat.cardCount === 0);
+// The Round ends once a finishing play has resolved, with no 6 still waiting for a cover and no
+// draw or skip still waiting on its target, or once every Seat has passed with nothing to draw.
+function roundEnding(round: Round): RoundEnding | null {
+	const { finish } = round;
+	if (finish && !round.mustCover && !round.effect)
+		return { kind: finish.bridge ? 'bridge' : 'emptyHand', seatId: finish.seatId };
+	if ((round.exhaustedPasses ?? 0) >= round.handCounts.length) return { kind: 'exhausted' };
+	return null;
 }
 
-// Score every remaining hand into the Game and reveal the final hands.
-async function scoreRound(ctx: MutationCtx, round: Doc<'rounds'>): Promise<RoundResult> {
+// Score every remaining hand into the Game and reveal the final hands. The recycle multiplier
+// applies once if the played pile was ever recycled. A hand emptied by the finishing play then
+// loses 20 per Jack that ended its batch, which can make its points and Game score negative.
+async function scoreRound(
+	ctx: MutationCtx,
+	round: Round,
+	ending: RoundEnding
+): Promise<RoundResult> {
+	const multiplier = round.recycles ? round.rules.recycleMultiplier : 1;
+	const finisher = ending.kind === 'exhausted' ? null : round.finish;
 	const hands = await Promise.all(
 		round.handCounts.map(async ({ seatId }) => {
 			const [seat, hand] = await Promise.all([
@@ -279,13 +314,15 @@ async function scoreRound(ctx: MutationCtx, round: Doc<'rounds'>): Promise<Round
 					.unique()
 			]);
 			if (!seat || !hand) throw new ConvexError('Game unavailable');
-			const points = handPoints(hand.cards, round.rules);
+			const jackDeduction =
+				finisher?.seatId === seatId && !hand.cards.length ? 20 * finisher.jacks : 0;
+			const points = handPoints(hand.cards, round.rules) * multiplier - jackDeduction;
 			const score = seat.score + points;
 			await ctx.db.patch('seats', seatId, { score });
-			return { seatId, cards: hand.cards, points, score };
+			return { seatId, cards: hand.cards, jackDeduction, points, score };
 		})
 	);
-	return { hands };
+	return { ending, multiplier, hands };
 }
 
 // Load the turn for Play or Draw, rejecting pending states these moves cannot resolve.
@@ -314,47 +351,51 @@ export const chooseSuit = mutation({
 });
 
 export const play = mutation({
-	// `cards` is an ordered same-rank group placed first to last; the last card is the new top.
-	// A Jack on top needs the chosen `suit`.
+	// `cards` is an ordered batch placed first to last; the last card is the new top. A Jack on
+	// top needs the chosen `suit`.
 	args: { ...turnArgs, cards: v.array(cardValidator), suit: v.optional(suitValidator) },
 	returns: v.null(),
-	handler: async (ctx, { cards: group, suit, ...turn }) => {
+	handler: async (ctx, { cards: batch, suit, ...turn }) => {
 		const { round, hand } = await ordinaryTurn(ctx, turn);
-		const [first] = group;
-		const top = group.at(-1);
-		if (!first || !top) throw new ConvexError('Choose a card to play');
-		if (round.drawnCard && (group.length > 1 || !sameCard(round.drawnCard, first)))
-			throw new ConvexError('Play the card you drew');
-		if (group.some((card) => card.rank !== first.rank))
-			throw new ConvexError('A group must share the same rank');
+		const problem = batchProblem(
+			{ ...tableOf(round), drawnCard: round.drawnCard },
+			batch,
+			round.rules
+		);
+		if (problem) throw new ConvexError(problem);
 		const cards = [...hand.cards];
-		for (const card of group) {
+		for (const card of batch) {
 			const index = cards.findIndex((held) => sameCard(held, card));
 			if (index < 0) throw new ConvexError('Card not in your hand');
 			cards.splice(index, 1);
 		}
-		if (!canPlay(round, first)) throw new ConvexError('Card does not match the table');
+		const top = batch[batch.length - 1];
 		if (top.rank === 'J' && !suit) throw new ConvexError('Choose a suit for the Jack');
 		if (top.rank !== 'J' && suit) throw new ConvexError('Only a Jack chooses a suit');
 		// A 6 on top keeps the turn until the same Seat covers it.
 		const mustCover = top.rank === '6';
 		const next = nextSeatId(round);
-		const effect = drawEffect(group, round.rules);
+		const effect = drawEffect(batch, round.rules);
+		const bridge = declaresBridge(batch, round.rules);
+		const emptied = !cards.length && !mustCover;
 		await ctx.db.patch('roundHands', hand._id, { cards });
 		const activeSuit = suit ?? top.suit;
 		await commitTurn(
 			ctx,
 			round,
 			{
-				playedPile: [...round.playedPile, ...group],
+				playedPile: [...round.playedPile, ...batch],
 				activeSuit,
 				currentSeatId: mustCover ? round.currentSeatId : next,
 				mustCover,
 				effect: effect && { targetSeatId: next, ...effect },
 				drawnCard: null,
-				handCounts: withCardCount(round, hand.seatId, cards.length)
+				handCounts: withCardCount(round, hand.seatId, cards.length),
+				...((bridge || emptied) && {
+					finish: { seatId: hand.seatId, bridge, jacks: emptied ? trailingJacks(batch) : 0 }
+				})
 			},
-			{ kind: 'play', cards: group, activeSuit }
+			{ kind: 'play', cards: batch, activeSuit }
 		);
 		return null;
 	}
@@ -366,10 +407,13 @@ export const draw = mutation({
 	handler: async (ctx, turn) => {
 		const { round, hand } = await ordinaryTurn(ctx, turn);
 		if (round.drawnCard) throw new ConvexError('Play the card you drew');
-		if (hand.cards.some((card) => canPlay(round, card)))
+		if (hand.cards.some((card) => canPlay(tableOf(round), card)))
 			throw new ConvexError('You already have a playable card');
 		const { drawn, playable, ...piles } = drawForTurn(round);
 		const cards = [...hand.cards, ...drawn];
+		// A pass counts toward an exhausted table only when nothing more could be drawn: no card was
+		// drawn, or a 6 cover was drawn for until the cards ran out.
+		const exhausted = !playable && (!drawn.length || round.mustCover);
 		await ctx.db.patch('roundHands', hand._id, { cards });
 		await commitTurn(
 			ctx,
@@ -380,7 +424,8 @@ export const draw = mutation({
 				currentSeatId: playable ? round.currentSeatId : nextSeatId(round),
 				drawnCard: playable,
 				mustCover: playable ? round.mustCover : false,
-				handCounts: withCardCount(round, hand.seatId, cards.length)
+				handCounts: withCardCount(round, hand.seatId, cards.length),
+				exhaustedPasses: exhausted ? (round.exhaustedPasses ?? 0) + 1 : 0
 			},
 			{
 				kind: 'draw',

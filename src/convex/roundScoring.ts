@@ -4,13 +4,27 @@ import type { Card } from './cards';
 import { cardValidator } from './cards';
 import type { RulesConfiguration } from './rules';
 
+// How a Round ended: a hand emptied, a Bridge was declared, or every Seat passed with nothing
+// left to draw or recycle.
+export const roundEndingValidator = v.union(
+	v.object({ kind: v.literal('emptyHand'), seatId: v.id('seats') }),
+	v.object({ kind: v.literal('bridge'), seatId: v.id('seats') }),
+	v.object({ kind: v.literal('exhausted') })
+);
+
 // A completed Round's final hands, Penalty points, and accumulated Game scores, shown to
-// every Seat once the Round ends.
+// every Seat once the Round ends. Results scored before Bridge and exhausted-table endings omit
+// `ending`, `multiplier`, and `jackDeduction`; they all ended on an empty hand without either.
 export const roundResultValidator = v.object({
+	ending: v.optional(roundEndingValidator),
+	// Applied to held-card points once the played pile has been recycled.
+	multiplier: v.optional(v.number()),
 	hands: v.array(
 		v.object({
 			seatId: v.id('seats'),
 			cards: v.array(cardValidator),
+			// 20 per Jack ending the batch that emptied this hand, subtracted after the multiplier.
+			jackDeduction: v.optional(v.number()),
 			points: v.number(),
 			score: v.number()
 		})
