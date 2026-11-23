@@ -1918,3 +1918,20 @@ test('a final 6 whose cover is waived ends the Round on the empty hand', async (
 		]
 	});
 });
+
+test('a Bridge of four Jacks that empties the hand still deducts its finishing Jacks', async () => {
+	const { players, views, seatIds } = await opened(
+		[cards('Kc Kd Ks'), cards('Jh Js Jc Jd')],
+		card('9h')
+	);
+	await playBatch(players[1], (await views())[0], 'Jh Js Jc Jd', 'clubs');
+	const [view] = await views();
+	expect(view.result).toEqual({
+		ending: { kind: 'bridge', seatId: seatIds[1] },
+		multiplier: 1,
+		hands: [
+			{ seatId: seatIds[0], cards: cards('Kc Kd Ks'), jackDeduction: 0, points: 30, score: 30 },
+			{ seatId: seatIds[1], cards: [], jackDeduction: 80, points: -80, score: -80 }
+		]
+	});
+});
