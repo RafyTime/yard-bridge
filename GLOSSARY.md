@@ -37,6 +37,9 @@ The player with authority to invite players, approve seats, and choose rules bef
 **Seat**:
 A player's place in a game, approved by the host and retained when that player reconnects.
 
+**Player Profile**:
+The username and avatar that represent a player across Games.
+
 **Score cutoff**:
 The point total a player may reach exactly to reset their score; crossing it triggers the game's loss rule.
 
