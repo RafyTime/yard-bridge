@@ -19,7 +19,12 @@
 	import type { FunctionReturnType } from 'convex/server';
 	import { useConvexClient, useQuery } from 'convex-svelte';
 	import { api } from '../../convex/_generated/api';
-	import { defaultRules, type RulesConfiguration } from '../../convex/rules';
+	import {
+		defaultRules,
+		findChoice,
+		ruleChoices,
+		type RulesConfiguration
+	} from '../../convex/rules';
 	import { Button, buttonVariants } from '#lib/components/ui/button/index.js';
 	import { cn } from '#lib/utils.js';
 	import { Input } from '#lib/components/ui/input/index.js';
@@ -503,10 +508,10 @@
 										variant="outline"
 										value={String(draft.recycleMultiplier)}
 										disabled={pending}
-										onValueChange={(value) => {
-											if (value === '1' || value === '2' || value === '3')
-												draft.recycleMultiplier = value === '1' ? 1 : value === '2' ? 2 : 3;
-										}}
+										onValueChange={(value) =>
+											(draft.recycleMultiplier =
+												findChoice(ruleChoices.recycleMultiplier, value) ??
+												draft.recycleMultiplier)}
 										aria-label={m.rules_recycle()}
 										class="w-full"
 										><ToggleGroup.Item value="1" class="min-h-11 flex-1 whitespace-normal"
@@ -541,10 +546,9 @@
 										variant="outline"
 										value={draft.batchMode}
 										disabled={pending}
-										onValueChange={(value) => {
-											if (value === 'single' || value === 'same-rank' || value === 'match')
-												draft.batchMode = value;
-										}}
+										onValueChange={(value) =>
+											(draft.batchMode =
+												findChoice(ruleChoices.batchMode, value) ?? draft.batchMode)}
 										aria-label={m.rules_grouping()}
 										class="w-full"
 										orientation="vertical"
@@ -621,9 +625,9 @@
 										variant="outline"
 										value={draft.aceBehavior}
 										disabled={pending}
-										onValueChange={(value) => {
-											if (value === 'skip' || value === 'cancel') draft.aceBehavior = value;
-										}}
+										onValueChange={(value) =>
+											(draft.aceBehavior =
+												findChoice(ruleChoices.aceBehavior, value) ?? draft.aceBehavior)}
 										aria-label={m.rules_ace()}
 										class="w-full"
 										orientation="vertical"
@@ -657,10 +661,10 @@
 										variant="outline"
 										value={draft.bridgeDeclaration}
 										disabled={pending || draft.batchMode === 'single'}
-										onValueChange={(value) => {
-											if (value === 'off' || value === 'jacks' || value === 'four-of-a-kind')
-												draft.bridgeDeclaration = value;
-										}}
+										onValueChange={(value) =>
+											(draft.bridgeDeclaration =
+												findChoice(ruleChoices.bridgeDeclaration, value) ??
+												draft.bridgeDeclaration)}
 										aria-label={m.rules_bridge()}
 										aria-describedby={draft.batchMode === 'single'
 											? 'bridge-unavailable'
@@ -699,14 +703,9 @@
 										variant="outline"
 										value={draft.starterPolicy}
 										disabled={pending}
-										onValueChange={(value) => {
-											if (
-												value === 'highest-score' ||
-												value === 'previous-starter' ||
-												value === 'random'
-											)
-												draft.starterPolicy = value;
-										}}
+										onValueChange={(value) =>
+											(draft.starterPolicy =
+												findChoice(ruleChoices.starterPolicy, value) ?? draft.starterPolicy)}
 										aria-label={m.rules_starter()}
 										class="w-full"
 										orientation="vertical"

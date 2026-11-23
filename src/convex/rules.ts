@@ -23,6 +23,22 @@ export const rulesValidator = v.object({
 
 export type RulesConfiguration = Infer<typeof rulesValidator>;
 
+const { batchMode, bridgeDeclaration, aceBehavior, recycleMultiplier, starterPolicy } =
+	rulesValidator.fields;
+// The choices of each setting picked from a fixed list, in the validator's order.
+export const ruleChoices = {
+	batchMode: batchMode.members.map((member) => member.value),
+	bridgeDeclaration: bridgeDeclaration.members.map((member) => member.value),
+	aceBehavior: aceBehavior.members.map((member) => member.value),
+	recycleMultiplier: recycleMultiplier.members.map((member) => member.value),
+	starterPolicy: starterPolicy.members.map((member) => member.value)
+};
+
+// The choice an editor control's string value names, if it names one.
+export function findChoice<T extends string | number>(choices: readonly T[], value: string) {
+	return choices.find((choice) => String(choice) === value);
+}
+
 // Stored rules may predate batch modes: Bridge was on or off and Batches were not configurable.
 // Read them through `currentRules`.
 export const storedRulesValidator = v.object({
