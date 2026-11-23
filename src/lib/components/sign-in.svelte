@@ -53,15 +53,20 @@
 		pending = true;
 		error = null;
 		notice = '';
+		let signedIn = false;
 		try {
-			const result = await auth.signIn('resend-otp', { email: sentTo, code: code.trim() });
-			if (!result.signingIn) error = m.auth_code_error();
-			else code = '';
+			signedIn = (await auth.signIn('resend-otp', { email: sentTo, code })).signingIn;
 		} catch {
-			error = m.auth_code_error();
+			// A failed request reads as a rejected code.
 		} finally {
 			pending = false;
 		}
+		code = '';
+		if (signedIn) return;
+		// Empty the boxes so a rejected code is never resent and the next full code submits itself.
+		error = m.auth_code_error();
+		await tick();
+		codeInput?.focus();
 	}
 
 	async function changeEmail() {

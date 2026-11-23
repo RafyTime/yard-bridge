@@ -169,6 +169,7 @@ test('code boxes fill as digits are typed, erased, or pasted and a full code sig
 	await expect(boxes).toHaveText(['1', '', '', '', '', '']);
 	await page.keyboard.press('Backspace');
 	// Codes copied from an email often carry a space or dash; the boxes keep only the digits.
+	const wrong = backend.code === '000000' ? '111111' : '000000';
 	await code.evaluate(
 		(input, text) => {
 			const clipboardData = new DataTransfer();
@@ -178,8 +179,15 @@ test('code boxes fill as digits are typed, erased, or pasted and a full code sig
 			Object.defineProperty(paste, 'clipboardData', { value: clipboardData });
 			input.dispatchEvent(paste);
 		},
-		`${backend.code.slice(0, 3)} ${backend.code.slice(3)}`
+		`${wrong.slice(0, 3)} ${wrong.slice(3)}`
 	);
+	// A rejected code empties the boxes so the next complete code submits itself.
+	await expect(page.getByRole('alert').filter({ hasText: /\S/ })).toContainText(
+		'invalid or has expired'
+	);
+	await expect(boxes).toHaveText(['', '', '', '', '', '']);
+	await expect(code).toBeFocused();
+	await page.keyboard.type(backend.code);
 	await expect(page.getByRole('heading', { name: 'You are signed in', exact: true })).toBeVisible();
 });
 
