@@ -6,7 +6,9 @@
 	import { HugeiconsIcon } from '@hugeicons/svelte';
 	import { Loading03Icon } from '@hugeicons/core-free-icons';
 	import { Button } from '#lib/components/ui/button/index.js';
+	import { REGEXP_ONLY_DIGITS } from 'bits-ui';
 	import { Input } from '#lib/components/ui/input/index.js';
+	import * as InputOTP from '#lib/components/ui/input-otp/index.js';
 	import * as Field from '#lib/components/ui/field/index.js';
 	import * as m from '#lib/paraglide/messages.js';
 
@@ -46,8 +48,7 @@
 		}
 	}
 
-	async function verifyCode(event: SubmitEvent) {
-		event.preventDefault();
+	async function verifyCode() {
 		if (pending || sentTo === null) return;
 		pending = true;
 		error = null;
@@ -133,27 +134,43 @@
 						</Field.FieldGroup>
 					</form>
 				{:else}
-					<form onsubmit={verifyCode} aria-busy={pending}>
+					<form
+						aria-busy={pending}
+						onsubmit={(event) => {
+							event.preventDefault();
+							void verifyCode();
+						}}
+					>
 						<Field.FieldGroup>
 							<Field.Field data-invalid={!!error}>
 								<Field.FieldLabel for="code">{m.auth_code_label()}</Field.FieldLabel>
-								<Input
-									id="code"
+								<!-- The boxes only mirror one real input, which keeps one-time-code autofill and
+								     the label. A complete code submits itself; codes pasted from an email keep
+								     only their digits. -->
+								<InputOTP.Root
+									inputId="code"
 									name="code"
-									bind:ref={codeInput}
+									bind:inputRef={codeInput}
 									bind:value={code}
-									type="text"
-									inputmode="numeric"
-									autocomplete="one-time-code"
-									pattern={'[0-9]{6}'}
-									minlength={6}
 									maxlength={6}
+									pattern={REGEXP_ONLY_DIGITS}
+									pasteTransformer={(text) => text.replace(/\D/g, '')}
+									onComplete={() => void verifyCode()}
 									required
-									class="text-center font-mono text-lg tracking-[0.3em]"
+									class="w-full"
 									aria-invalid={!!error}
 									aria-describedby="code-hint auth-error"
 									disabled={pending}
-								/>
+								>
+									{#snippet children({ cells })}
+										<!-- Boxes share the row so six fit a 320px phone. -->
+										<InputOTP.Group class="w-full max-w-80">
+											{#each cells as cell, index (index)}
+												<InputOTP.Slot {cell} class="h-12 w-auto flex-1 font-mono text-lg" />
+											{/each}
+										</InputOTP.Group>
+									{/snippet}
+								</InputOTP.Root>
 								<Field.FieldDescription id="code-hint">{m.auth_code_hint()}</Field.FieldDescription>
 							</Field.Field>
 							<Button type="submit" class="min-h-11" disabled={pending}>
