@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import MobileLobbyPrototype from '#lib/components/mobile-lobby-prototype.svelte';
+	import ProfilePrototype from '#lib/components/prototype-profile.svelte';
 	import Games from '#lib/components/games.svelte';
 	import AppBar from '#lib/components/app-bar.svelte';
 	import SignIn from '#lib/components/sign-in.svelte';
@@ -15,7 +16,9 @@
 
 <svelte:head><title>Yard Bridge</title></svelte:head>
 
-{#if import.meta.env.DEV && page.url.searchParams.has('prototype')}
+{#if import.meta.env.DEV && page.url.searchParams.get('prototype') === 'profile'}
+	<ProfilePrototype />
+{:else if import.meta.env.DEV && page.url.searchParams.has('prototype')}
 	<MobileLobbyPrototype />
 {:else}
 	<main class="flex min-h-svh flex-col items-center gap-6 px-5 py-4">

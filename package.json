@@ -6,6 +6,7 @@
 	"packageManager": "bun@1.4.3",
 	"scripts": {
 		"dev": "vp dev",
+		"prototype:profile": "vp dev --open \"/?prototype=profile\"",
 		"build": "vp build",
 		"preview": "vp preview",
 		"prepare": "svelte-kit sync",
