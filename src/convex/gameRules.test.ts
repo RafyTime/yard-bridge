@@ -96,13 +96,13 @@ test('the Host saves a private rules snapshot and reuses it without changing the
 	expect((await host.query(api.gameRules.saved, {}))[0].rules.scoreCutoff).toBe(200);
 });
 
-test('rules saved before batch and Bridge modes read as Off or Four of a kind with default grouping', async () => {
+test('rules saved before batch and Bridge modes read as Off or Four of a kind with default batching', async () => {
 	const { t, host, gameId } = await table();
 	const current = await host.query(api.games.view, { gameId });
-	const { groupingMode, drawnCardGrouping, ...legacy } = current.rules;
-	expect({ groupingMode, drawnCardGrouping }).toEqual({
-		groupingMode: 'same-rank',
-		drawnCardGrouping: true
+	const { batchMode, drawnCardBatching, ...legacy } = current.rules;
+	expect({ batchMode, drawnCardBatching }).toEqual({
+		batchMode: 'same-rank',
+		drawnCardBatching: true
 	});
 	const viewer = await host.query(api.players.viewer, {});
 	await t.run(async (ctx) => {

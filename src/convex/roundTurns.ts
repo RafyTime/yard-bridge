@@ -29,18 +29,18 @@ export function canPlay(table: Table, card: Card) {
 export function batchProblem(
 	table: Table & { drawnCard: Card | null },
 	batch: readonly Card[],
-	rules: Pick<RulesConfiguration, 'groupingMode' | 'drawnCardGrouping'>
+	rules: Pick<RulesConfiguration, 'batchMode' | 'drawnCardBatching'>
 ) {
 	const [first] = batch;
 	if (!first) return 'Choose a card to play';
 	if (table.drawnCard && !sameCard(table.drawnCard, first)) return 'Play the card you drew';
 	if (batch.length > 1) {
-		if (table.drawnCard && !rules.drawnCardGrouping) return 'Play the card you drew alone';
-		if (rules.groupingMode === 'single') return 'Play one card at a time';
+		if (table.drawnCard && !rules.drawnCardBatching) return 'Play the card you drew alone';
+		if (rules.batchMode === 'single') return 'Play one card at a time';
 	}
 	let current: Table = table;
 	for (const [index, card] of batch.entries()) {
-		if (index && rules.groupingMode === 'same-rank' && card.rank !== first.rank)
+		if (index && rules.batchMode === 'same-rank' && card.rank !== first.rank)
 			return 'A batch must share the same rank';
 		if (index && batch[index - 1].rank === 'J' && card.rank !== 'J') return 'A Jack ends the batch';
 		if (!canPlay(current, card)) return 'Card does not match the table';
@@ -83,9 +83,9 @@ export function drawEffect(
 // Single card play cannot form one, whatever Bridge setting the Host chose.
 export function declaresBridge(
 	batch: readonly Card[],
-	rules: Pick<RulesConfiguration, 'groupingMode' | 'bridgeDeclaration'>
+	rules: Pick<RulesConfiguration, 'batchMode' | 'bridgeDeclaration'>
 ) {
-	if (rules.groupingMode === 'single' || rules.bridgeDeclaration === 'off') return false;
+	if (rules.batchMode === 'single' || rules.bridgeDeclaration === 'off') return false;
 	const last = batch.slice(-4);
 	const { rank } = last[0] ?? {};
 	if (last.length < 4 || rank === '6' || last.some((card) => card.rank !== rank)) return false;

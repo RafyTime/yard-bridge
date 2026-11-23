@@ -614,12 +614,12 @@ test('a Seat that owes a 6 cover keeps drawing past an unplayable card, and a co
 	expect(next.playable).toEqual(next.hand);
 });
 
-test('with drawn-card grouping off, a drawn card is played alone, and a drawn 6 still must be covered', async () => {
+test('with drawn-card batching off, a drawn card is played alone, and a drawn 6 still must be covered', async () => {
 	const { players, views, seatIds } = await opened(
 		[cards('Kc Ks Kd Ad'), cards('Qc Ac 7d 8s 10c')],
 		card('9h'),
 		cards('10h 6c 7c 7s'),
-		{ drawnCardGrouping: false }
+		{ drawnCardBatching: false }
 	);
 	const [host, guest] = players;
 	let [, view] = await views();
@@ -1626,7 +1626,7 @@ const playBatch = (
 
 test('Single card mode plays one card at a time', async () => {
 	const { players, views } = await opened([cards('Kc Kd'), cards('10h 10s 9c')], card('9h'), [], {
-		groupingMode: 'single'
+		batchMode: 'single'
 	});
 	const [view] = await views();
 	await expect(playBatch(players[1], view, '10h 10s')).rejects.toThrow('one card at a time');
@@ -1639,7 +1639,7 @@ test('Match rank or suit checks each card against the one before it, and a Jack 
 		[cards('Kc Kd Qd Ah Ad'), cards('7c 7s 6s 9s Jd Kh')],
 		card('9c'),
 		[],
-		{ groupingMode: 'match' }
+		{ batchMode: 'match' }
 	);
 	const [view] = await views();
 	for (const [batch, error] of [
@@ -1665,7 +1665,7 @@ test.each([
 			[cards('Kd Qd Ah Ad Kh'), cards('7c 7s 8s 10s 8c Jc')],
 			card('9c'),
 			[],
-			{ groupingMode: 'match' }
+			{ batchMode: 'match' }
 		);
 		await playBatch(players[1], (await views())[0], batch, suit);
 		for (const seat of await views())
@@ -1678,7 +1678,7 @@ test('under Ace cancellation, an Ace cancels a combined batch effect and uses th
 		[cards('Kd Qd As'), cards('7c 7s 8s 10s')],
 		card('9c'),
 		[],
-		{ groupingMode: 'match', aceBehavior: 'cancel' }
+		{ batchMode: 'match', aceBehavior: 'cancel' }
 	);
 	await playBatch(players[1], (await views())[0], '7c 7s 8s');
 	const [before] = await views();
@@ -1722,12 +1722,12 @@ test('a drawn 10 starts a batch that completes a Bridge, and the declarer scores
 	expect(game.seats.map((seat) => seat.score)).toEqual([30, 10]);
 });
 
-test('with drawn-card grouping off, a drawn card cannot start a Bridge', async () => {
+test('with drawn-card batching off, a drawn card cannot start a Bridge', async () => {
 	const { players, views } = await opened(
 		[cards('Kc Kd Ks'), cards('10h 10s 10c Qc')],
 		card('9d'),
 		cards('10d'),
-		{ drawnCardGrouping: false }
+		{ drawnCardBatching: false }
 	);
 	const [, guest] = players;
 	await guest.mutation(api.rounds.draw, { roundId: (await views())[0].id, expectedVersion: 0 });

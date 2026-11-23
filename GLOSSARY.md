@@ -19,6 +19,9 @@ The saved public record of one accepted move in a round, which every Seat sees t
 **Batch**:
 An ordered group of cards played together as one move.
 
+**Batch mode**:
+The Rules configuration setting for which cards may form a Batch: Single card, Same rank, or Match rank or suit. Players see it as "Card grouping".
+
 **Bridge declaration**:
 Ending a Round by finishing a batch with all four cards of an eligible rank, even if the declaring player still holds other cards.
 

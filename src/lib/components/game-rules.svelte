@@ -87,7 +87,7 @@
 			draft.handSize <= 9
 	);
 	const onOff = (value: boolean) => (value ? m.rules_on() : m.rules_off());
-	const grouping = (value: RulesConfiguration['groupingMode']) =>
+	const batching = (value: RulesConfiguration['batchMode']) =>
 		value === 'single'
 			? m.rules_grouping_single()
 			: value === 'same-rank'
@@ -137,18 +137,18 @@
 			base: onOff(defaultRules.openingEffects)
 		},
 		{
-			key: 'groupingMode',
-			help: m.rules_help_groupingMode(),
+			key: 'batchMode',
+			help: m.rules_help_batchMode(),
 			label: m.rules_grouping(),
-			value: grouping(game.rules.groupingMode),
-			base: grouping(defaultRules.groupingMode)
+			value: batching(game.rules.batchMode),
+			base: batching(defaultRules.batchMode)
 		},
 		{
-			key: 'drawnCardGrouping',
-			help: m.rules_help_drawnCardGrouping(),
+			key: 'drawnCardBatching',
+			help: m.rules_help_drawnCardBatching(),
 			label: m.rules_drawn_grouping(),
-			value: onOff(game.rules.drawnCardGrouping),
-			base: onOff(defaultRules.drawnCardGrouping)
+			value: onOff(game.rules.drawnCardBatching),
+			base: onOff(defaultRules.drawnCardBatching)
 		},
 		{
 			key: 'bridgeDeclaration',
@@ -157,7 +157,7 @@
 			value: bridge(game.rules.bridgeDeclaration),
 			base: bridge(defaultRules.bridgeDeclaration),
 			// Single card keeps the Host's Bridge choice but cannot declare one.
-			note: game.rules.groupingMode === 'single' ? m.rules_bridge_unavailable() : undefined
+			note: game.rules.batchMode === 'single' ? m.rules_bridge_unavailable() : undefined
 		},
 		{
 			key: 'aceBehavior',
@@ -529,7 +529,7 @@
 								aria-hidden="true"
 							/>{m.rules_group_effects()}
 						</h4>
-						<RuleHelp label={m.rules_grouping()} description={m.rules_help_groupingMode()}
+						<RuleHelp label={m.rules_grouping()} description={m.rules_help_batchMode()}
 							>{#snippet children(info)}
 								<Field.FieldSet
 									><div class="flex items-center">
@@ -539,11 +539,11 @@
 									<ToggleGroup.Root
 										type="single"
 										variant="outline"
-										value={draft.groupingMode}
+										value={draft.batchMode}
 										disabled={pending}
 										onValueChange={(value) => {
 											if (value === 'single' || value === 'same-rank' || value === 'match')
-												draft.groupingMode = value;
+												draft.batchMode = value;
 										}}
 										aria-label={m.rules_grouping()}
 										class="w-full"
@@ -561,17 +561,17 @@
 						>
 						<RuleHelp
 							label={m.rules_drawn_grouping()}
-							description={m.rules_help_drawnCardGrouping()}
+							description={m.rules_help_drawnCardBatching()}
 							>{#snippet children(info)}
 								<Field.Field orientation="horizontal"
 									><div class="flex flex-1 items-center">
-										<Field.FieldLabel for="rule-drawnCardGrouping" class="text-sm"
+										<Field.FieldLabel for="rule-drawnCardBatching" class="text-sm"
 											>{m.rules_drawn_grouping()}</Field.FieldLabel
 										>{@render info()}
 									</div>
 									<Switch
-										id="rule-drawnCardGrouping"
-										bind:checked={draft.drawnCardGrouping}
+										id="rule-drawnCardBatching"
+										bind:checked={draft.drawnCardBatching}
 										disabled={pending}
 									/></Field.Field
 								>
@@ -656,13 +656,13 @@
 										type="single"
 										variant="outline"
 										value={draft.bridgeDeclaration}
-										disabled={pending || draft.groupingMode === 'single'}
+										disabled={pending || draft.batchMode === 'single'}
 										onValueChange={(value) => {
 											if (value === 'off' || value === 'jacks' || value === 'four-of-a-kind')
 												draft.bridgeDeclaration = value;
 										}}
 										aria-label={m.rules_bridge()}
-										aria-describedby={draft.groupingMode === 'single'
+										aria-describedby={draft.batchMode === 'single'
 											? 'bridge-unavailable'
 											: undefined}
 										class="w-full"
@@ -677,8 +677,8 @@
 											>{m.rules_bridge_four()}</ToggleGroup.Item
 										></ToggleGroup.Root
 									>
-									<!-- Single card keeps the Bridge choice for when grouping returns. -->
-									{#if draft.groupingMode === 'single'}<p
+									<!-- Single card keeps the Bridge choice for when Batches return. -->
+									{#if draft.batchMode === 'single'}<p
 											id="bridge-unavailable"
 											class="text-sm text-muted-foreground"
 										>
