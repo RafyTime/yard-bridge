@@ -9,7 +9,7 @@ export const emailCode = Email({
 		generateRandomString(
 			{ read: (bytes) => bytes.set(crypto.getRandomValues(new Uint8Array(bytes.length))) },
 			'0123456789',
-			8
+			6
 		),
 	async sendVerificationRequest({ identifier, token }) {
 		const apiKey = env.AUTH_RESEND_KEY;

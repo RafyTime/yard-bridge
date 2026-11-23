@@ -54,16 +54,16 @@ async function reviewRules(page: Page) {
 
 type Backend = Awaited<ReturnType<typeof authBackend>>;
 
-// Submits each step from its focused field. Under CI load, Firefox has dropped a pointer click on
-// a just-mounted sign-in form; Enter takes the same submit path without pointer hit-testing.
+// Submits the email from its focused field: under CI load, Firefox has dropped a pointer click on
+// a just-mounted sign-in form. A complete code submits itself.
 async function signInAs(page: Page, backend: Backend, email: string) {
 	const emailField = page.getByLabel('Email address');
 	await emailField.fill(email);
 	await emailField.press('Enter');
 	const codeField = page.getByLabel('Sign-in code');
+	// The field appears once the email is delivered, so `backend.code` is fresh only after it.
 	await expect(codeField).toBeVisible();
 	await codeField.fill(backend.code);
-	await codeField.press('Enter');
 	await expect(page.getByRole('heading', { name: 'You are signed in', exact: true })).toBeVisible();
 }
 
@@ -106,8 +106,7 @@ test('email code signs in, returns after reload and reopening, then signs out', 
 	await page.screenshot({ path: test.info().outputPath('sign-in-code.png') });
 	await expect(page.getByLabel('Sign-in code')).toHaveAttribute('autocomplete', 'one-time-code');
 	const firstCode = backend.code;
-	await page.getByLabel('Sign-in code').fill('00000000' === firstCode ? '11111111' : '00000000');
-	await page.getByRole('button', { name: 'Continue', exact: true }).click();
+	await page.getByLabel('Sign-in code').fill('000000' === firstCode ? '111111' : '000000');
 	await expect(page.getByRole('alert').filter({ hasText: /\S/ })).toContainText(
 		'invalid or has expired'
 	);
@@ -117,7 +116,6 @@ test('email code signs in, returns after reload and reopening, then signs out', 
 	await page.getByRole('button', { name: 'Send a new code', exact: true }).click();
 	await expect(page.getByRole('status').filter({ hasText: 'Code sent.' })).toBeVisible();
 	await page.getByLabel('Sign-in code').fill(backend.code);
-	await page.getByRole('button', { name: 'Continue', exact: true }).click();
 	await expect(page.getByRole('heading', { name: 'You are signed in', exact: true })).toBeVisible();
 	await expect(page.getByText('leo@example.com', { exact: true })).toHaveCount(0);
 	await expect(page.getByRole('button', { name: 'Sign out', exact: true })).toHaveCount(0);
@@ -148,6 +146,62 @@ test('email code signs in, returns after reload and reopening, then signs out', 
 	await signOut(reopened);
 	await reopened.reload();
 	await expect(reopened.getByLabel('Email address')).toBeVisible();
+});
+
+test('code boxes fill as digits are typed, erased, or pasted and a full code signs in', async ({
+	page,
+	backend
+}) => {
+	await page.setViewportSize({ width: 320, height: 640 });
+	await page.goto('/');
+	await page.getByLabel('Email address').fill('leo@example.com');
+	await page.getByLabel('Email address').press('Enter');
+	const code = page.getByLabel('Sign-in code');
+	await expect(code).toBeFocused();
+	await expect(code).toHaveAttribute('autocomplete', 'one-time-code');
+	await expect(code).toHaveAttribute('inputmode', 'numeric');
+	const boxes = page.locator('[data-slot="input-otp-slot"]');
+	await expect(boxes).toHaveText(['', '', '', '', '', '']);
+	expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+	await page.keyboard.type('12');
+	await expect(boxes).toHaveText(['1', '2', '', '', '', '']);
+	await page.keyboard.press('Backspace');
+	await expect(boxes).toHaveText(['1', '', '', '', '', '']);
+	// A partial code never reaches the server, where it would count toward the sign-in limit.
+	await expect(page.getByRole('button', { name: 'Continue', exact: true })).toBeDisabled();
+	await page.keyboard.press('Enter');
+	await expect(boxes).toHaveText(['1', '', '', '', '', '']);
+	await expect(page.getByRole('alert').filter({ hasText: /\S/ })).toHaveCount(0);
+	await page.keyboard.press('Backspace');
+	const paste = (text: string) =>
+		code.evaluate((input, text) => {
+			const clipboardData = new DataTransfer();
+			clipboardData.setData('text/plain', text);
+			// Firefox drops `clipboardData` from the event constructor, so attach it directly.
+			const event = new ClipboardEvent('paste', { bubbles: true, cancelable: true });
+			Object.defineProperty(event, 'clipboardData', { value: clipboardData });
+			input.dispatchEvent(event);
+		}, text);
+	// Codes copied from an email often carry a space or dash; the boxes keep only the digits.
+	const wrong = backend.code === '000000' ? '111111' : '000000';
+	await paste(`${wrong.slice(0, 3)} ${wrong.slice(3)}`);
+	// A rejected code empties the boxes so the next complete code submits itself.
+	await expect(page.getByRole('alert').filter({ hasText: /\S/ })).toContainText(
+		'invalid or has expired'
+	);
+	await expect(boxes).toHaveText(['', '', '', '', '', '']);
+	await expect(code).toBeFocused();
+	// A full code pasted after a stray digit replaces the boxes rather than splicing in.
+	await page.keyboard.type('9');
+	backend.dropNextAction();
+	await paste(backend.code);
+	// A dropped connection keeps the code for a retry instead of calling it invalid.
+	await expect(page.getByRole('alert').filter({ hasText: /\S/ })).toContainText(
+		'Check your connection'
+	);
+	await expect(boxes).toHaveText([...backend.code]);
+	await page.getByRole('button', { name: 'Continue', exact: true }).click();
+	await expect(page.getByRole('heading', { name: 'You are signed in', exact: true })).toBeVisible();
 });
 
 test('delivery failure stays on the email form and Ukrainian fits a narrow phone', async ({
