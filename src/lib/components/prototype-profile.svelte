@@ -1,10 +1,12 @@
 <script lang="ts">
-	// PROTOTYPE (throwaway): three account-sheet composers for Player Profiles on
-	// /?prototype=profile&variant=A|B|C, beside a live preview of every place the
+	// PROTOTYPE (throwaway): four account-sheet composers for Player Profiles on
+	// /?prototype=profile&variant=A|B|C|D, beside a live preview of every place the
 	// profile shows (lobby, Host approvals, waiting screen, table, recent moves).
 	// All state lives in memory; nothing reaches Convex.
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
+	import { HugeiconsIcon } from '@hugeicons/svelte';
+	import { DiceIcon, PencilEdit01Icon, RefreshIcon } from '@hugeicons/core-free-icons';
 	import * as Avatar from '#lib/components/ui/avatar/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
@@ -33,7 +35,8 @@
 	const variants = [
 		{ key: 'A', name: 'Grid sheet' },
 		{ key: 'B', name: 'Stage + tabs' },
-		{ key: 'C', name: 'Stepper' }
+		{ key: 'C', name: 'Stepper' },
+		{ key: 'D', name: 'Stage + grid' }
 	] as const;
 	const variant = $derived(
 		variants.find(({ key }) => key === page.url.searchParams.get('variant'))?.key ?? 'A'
@@ -425,6 +428,91 @@
 	</div>
 {/snippet}
 
+<!-- D: B's stage with A's always-visible pickers, sized for a phone-width sheet. -->
+{#snippet variantD()}
+	<div class="flex flex-col items-center gap-5 text-sm">
+		<div class="relative">
+			{@render face(profile.avatar, 'size-32')}
+			<Button
+				variant="secondary"
+				size="icon"
+				class="absolute -right-1 -bottom-1 size-11 rounded-full shadow"
+				onclick={surprise}
+				aria-label="Random avatar"
+				title="Random avatar"><HugeiconsIcon icon={DiceIcon} size={20} aria-hidden="true" /></Button
+			>
+		</div>
+		<div class="flex w-full max-w-xs flex-col gap-1">
+			<label for="profile-username" class="sr-only">Username</label>
+			<div class="flex items-center gap-1">
+				<!-- Spacer balances the refresh button so the name stays centred. -->
+				<span class="size-11 shrink-0" aria-hidden="true"></span>
+				<div class="relative min-w-0 flex-1">
+					{@render usernameInput(
+						'rounded-none border-0 border-b border-dashed border-muted-foreground/50 bg-transparent px-8 text-center text-lg font-semibold shadow-none focus-visible:border-solid focus-visible:border-ring focus-visible:ring-0 dark:bg-transparent'
+					)}
+					<HugeiconsIcon
+						icon={PencilEdit01Icon}
+						size={16}
+						class="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground"
+						aria-hidden="true"
+					/>
+				</div>
+				<Button
+					variant="ghost"
+					size="icon"
+					class="size-11 shrink-0"
+					onclick={shuffleUsername}
+					aria-label="Random username"
+					title="Random username"
+					><HugeiconsIcon icon={RefreshIcon} size={20} aria-hidden="true" /></Button
+				>
+			</div>
+			<div class="text-center">{@render usernameHelp()}</div>
+		</div>
+		<ToggleGroup.Root
+			type="single"
+			spacing={2}
+			value={profile.avatar.color}
+			onValueChange={(value) => isColor(value) && setColor(value)}
+			aria-label="Background color"
+			class="grid w-full grid-cols-8 justify-items-center"
+		>
+			{#each avatarColors as color (color.id)}
+				<ToggleGroup.Item
+					value={color.id}
+					aria-label={color.label}
+					title={color.label}
+					class="size-11 rounded-full p-1.5 data-[state=on]:ring-2 data-[state=on]:ring-primary"
+					>{@render swatch(color.id, 'size-8')}</ToggleGroup.Item
+				>
+			{/each}
+		</ToggleGroup.Root>
+		<ToggleGroup.Root
+			type="single"
+			spacing={2}
+			value={profile.avatar.illustration}
+			onValueChange={(value) => isIllustration(value) && setIllustration(value)}
+			aria-label="Illustration"
+			class="grid w-full grid-cols-4 justify-items-center gap-3"
+		>
+			{#each avatarIllustrations as item (item.id)}
+				<ToggleGroup.Item
+					value={item.id}
+					aria-label={item.label}
+					title={item.label}
+					class="aspect-square size-auto w-full max-w-20 rounded-full p-1 data-[state=on]:ring-2 data-[state=on]:ring-primary"
+					><img
+						src={avatarUri({ illustration: item.id, color: profile.avatar.color })}
+						alt=""
+						class="size-full rounded-full"
+					/></ToggleGroup.Item
+				>
+			{/each}
+		</ToggleGroup.Root>
+	</div>
+{/snippet}
+
 <main class="mx-auto flex min-h-svh w-full max-w-5xl flex-col gap-6 px-4 pt-4 pb-28">
 	<header class="flex items-center justify-between">
 		<p class="font-semibold">Yard Bridge</p>
@@ -433,14 +521,17 @@
 	</header>
 
 	<div class="grid grid-cols-[minmax(0,1fr)] gap-8 md:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
-		<section class="flex flex-col gap-4 rounded-2xl border p-5" aria-labelledby="sheet-heading">
+		<section
+			class="flex flex-col gap-4 md:rounded-2xl md:border md:p-5"
+			aria-labelledby="sheet-heading"
+		>
 			<div>
 				<h2 id="sheet-heading" class="text-base font-semibold">Account</h2>
 				<p class="text-xs text-muted-foreground">
 					Only you see your sign-in email: <span class="break-all">you@example.com</span>
 				</p>
 			</div>
-			{#if variant === 'A'}{@render variantA()}{:else if variant === 'B'}{@render variantB()}{:else}{@render variantC()}{/if}
+			{#if variant === 'A'}{@render variantA()}{:else if variant === 'B'}{@render variantB()}{:else if variant === 'C'}{@render variantC()}{:else}{@render variantD()}{/if}
 			<Separator />
 			<div class="flex flex-col gap-1">
 				<p class="text-xs font-medium">Stored Player Profile</p>
