@@ -22,7 +22,7 @@ beforeEach(() => {
 		'fetch',
 		vi.fn<typeof fetch>(async (_url, init) => {
 			const message: { text: string } = JSON.parse(String(init?.body));
-			deliveredCode = message.text.match(/\b\d{8}\b/)![0];
+			deliveredCode = message.text.match(/\b\d{6}\b/)![0];
 			return Response.json({ id: 'test-email' });
 		})
 	);
@@ -43,7 +43,7 @@ test('a delivered code grants only its player identity, refreshes, and cannot be
 	const t = convexTest(schema, modules);
 	const email = 'leo@example.com';
 	await t.action(api.auth.signIn, { provider: 'resend-otp', params: { email } });
-	expect(deliveredCode).toMatch(/^\d{8}$/);
+	expect(deliveredCode).toMatch(/^\d{6}$/);
 	const code = deliveredCode;
 	const result = await t.action(api.auth.signIn, {
 		provider: 'resend-otp',
@@ -112,6 +112,40 @@ test('wrong, expired, replaced, and wrong-email codes never grant a session', as
 	vi.setSystemTime(Date.now() + 16 * 60 * 1000);
 	await expect(verify(deliveredCode)).rejects.toThrow('Could not verify code');
 	await expect(t.query(api.players.viewer, {})).rejects.toThrow('Sign in to continue');
+});
+
+test('five wrong codes for one email lock out even the right code', async () => {
+	const t = convexTest(schema, modules);
+	const verify = (email: string, code: string) =>
+		t.action(api.auth.signIn, { provider: 'resend-otp', params: { email, code } });
+	const wrongCode = (code: string) => (code === '000000' ? '111111' : '000000');
+
+	await t.action(api.auth.signIn, { provider: 'resend-otp', params: { email: 'leo@example.com' } });
+	const leoCode = deliveredCode;
+	for (let attempt = 0; attempt < 4; attempt++) {
+		await expect(verify('leo@example.com', wrongCode(leoCode))).rejects.toThrow(
+			'Could not verify code'
+		);
+	}
+	expect((await verify('leo@example.com', leoCode)).tokens).toBeTruthy();
+
+	await t.action(api.auth.signIn, {
+		provider: 'resend-otp',
+		params: { email: 'guest@example.com' }
+	});
+	const guestCode = deliveredCode;
+	for (let attempt = 0; attempt < 5; attempt++) {
+		await expect(verify('guest@example.com', wrongCode(guestCode))).rejects.toThrow(
+			'Could not verify code'
+		);
+	}
+	await expect(verify('guest@example.com', guestCode)).rejects.toThrow('Could not verify code');
+	// Requesting a new code does not reset the limit.
+	await t.action(api.auth.signIn, {
+		provider: 'resend-otp',
+		params: { email: 'guest@example.com' }
+	});
+	await expect(verify('guest@example.com', deliveredCode)).rejects.toThrow('Could not verify code');
 });
 
 test('a provider delivery failure does not report a sent code or authenticate the player', async () => {

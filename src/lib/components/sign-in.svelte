@@ -6,7 +6,9 @@
 	import { HugeiconsIcon } from '@hugeicons/svelte';
 	import { Loading03Icon } from '@hugeicons/core-free-icons';
 	import { Button } from '#lib/components/ui/button/index.js';
+	import { REGEXP_ONLY_DIGITS } from 'bits-ui';
 	import { Input } from '#lib/components/ui/input/index.js';
+	import * as InputOTP from '#lib/components/ui/input-otp/index.js';
 	import * as Field from '#lib/components/ui/field/index.js';
 	import * as m from '#lib/paraglide/messages.js';
 
@@ -19,6 +21,7 @@
 	let codeInput = $state<HTMLInputElement | null>(null);
 	let emailInput = $state<HTMLInputElement | null>(null);
 	let notice = $state('');
+	const codeLength = 6;
 
 	// Each step slides in; reduced motion swaps steps instantly.
 	const stepIn = () => ({ y: 8, duration: prefersReducedMotion.current ? 0 : 200 });
@@ -46,21 +49,48 @@
 		}
 	}
 
-	async function verifyCode(event: SubmitEvent) {
-		event.preventDefault();
-		if (pending || sentTo === null) return;
+	async function verifyCode() {
+		// A partial code can only fail, and each failure counts toward the sign-in limit.
+		if (pending || sentTo === null || code.length < codeLength) return;
 		pending = true;
 		error = null;
 		notice = '';
+		let outcome: 'signedIn' | 'rejected' | 'unreachable';
 		try {
-			const result = await auth.signIn('resend-otp', { email: sentTo, code: code.trim() });
-			if (!result.signingIn) error = m.auth_code_error();
-			else code = '';
-		} catch {
-			error = m.auth_code_error();
+			outcome = (await auth.signIn('resend-otp', { email: sentTo, code })).signingIn
+				? 'signedIn'
+				: 'rejected';
+		} catch (cause) {
+			// Convex rejects an in-flight action with this message when the socket drops; the
+			// server may never have seen the code. Every other failure is the server refusing it.
+			outcome =
+				cause instanceof Error &&
+				cause.message.includes('Connection lost while action was in flight')
+					? 'unreachable'
+					: 'rejected';
 		} finally {
 			pending = false;
 		}
+		if (outcome === 'signedIn') {
+			code = '';
+			return;
+		}
+		if (outcome === 'unreachable') {
+			// Keep the code so the player can retry once the connection is back.
+			error = m.auth_verify_error();
+		} else {
+			// Empty the boxes so a rejected code is never resent and the next full code submits itself.
+			code = '';
+			error = m.auth_code_error();
+		}
+		await tick();
+		codeInput?.focus();
+	}
+
+	// bits-ui splices a paste in at the caret; a pasted full code replaces the boxes instead.
+	function replaceWithPastedCode(event: ClipboardEvent) {
+		const digits = event.clipboardData?.getData('text/plain').replace(/\D/g, '') ?? '';
+		if (digits.length === codeLength) codeInput?.select();
 	}
 
 	async function changeEmail() {
@@ -133,30 +163,47 @@
 						</Field.FieldGroup>
 					</form>
 				{:else}
-					<form onsubmit={verifyCode} aria-busy={pending}>
+					<form
+						aria-busy={pending}
+						onsubmit={(event) => {
+							event.preventDefault();
+							void verifyCode();
+						}}
+					>
 						<Field.FieldGroup>
 							<Field.Field data-invalid={!!error}>
 								<Field.FieldLabel for="code">{m.auth_code_label()}</Field.FieldLabel>
-								<Input
-									id="code"
+								<!-- The boxes only mirror one real input, which keeps one-time-code autofill and
+								     the label. A complete code submits itself; codes pasted from an email keep
+								     only their digits. -->
+								<InputOTP.Root
+									inputId="code"
 									name="code"
-									bind:ref={codeInput}
+									bind:inputRef={codeInput}
 									bind:value={code}
-									type="text"
-									inputmode="numeric"
-									autocomplete="one-time-code"
-									pattern={'[0-9]{8}'}
-									minlength={8}
-									maxlength={8}
+									maxlength={codeLength}
+									pattern={REGEXP_ONLY_DIGITS}
+									pasteTransformer={(text) => text.replace(/\D/g, '')}
+									onpastecapture={replaceWithPastedCode}
+									onComplete={() => void verifyCode()}
 									required
-									class="text-center font-mono text-lg tracking-[0.3em]"
+									class="w-full"
 									aria-invalid={!!error}
 									aria-describedby="code-hint auth-error"
 									disabled={pending}
-								/>
+								>
+									{#snippet children({ cells })}
+										<!-- Boxes share the row so six fit a 320px phone. -->
+										<InputOTP.Group class="w-full max-w-80">
+											{#each cells as cell, index (index)}
+												<InputOTP.Slot {cell} class="h-12 w-auto flex-1 font-mono text-lg" />
+											{/each}
+										</InputOTP.Group>
+									{/snippet}
+								</InputOTP.Root>
 								<Field.FieldDescription id="code-hint">{m.auth_code_hint()}</Field.FieldDescription>
 							</Field.Field>
-							<Button type="submit" class="min-h-11" disabled={pending}>
+							<Button type="submit" class="min-h-11" disabled={pending || code.length < codeLength}>
 								{#if pending}{@render busy(m.auth_verifying())}{:else}{m.auth_continue()}{/if}
 							</Button>
 						</Field.FieldGroup>
