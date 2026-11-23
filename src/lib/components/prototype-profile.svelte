@@ -6,7 +6,7 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { HugeiconsIcon } from '@hugeicons/svelte';
-	import { DiceIcon, PencilEdit01Icon, RefreshIcon } from '@hugeicons/core-free-icons';
+	import { DiceIcon, RefreshIcon } from '@hugeicons/core-free-icons';
 	import * as Avatar from '#lib/components/ui/avatar/index.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
@@ -447,17 +447,9 @@
 			<div class="flex items-center gap-1">
 				<!-- Spacer balances the refresh button so the name stays centred. -->
 				<span class="size-11 shrink-0" aria-hidden="true"></span>
-				<div class="relative min-w-0 flex-1">
-					{@render usernameInput(
-						'rounded-none border-0 border-b border-dashed border-muted-foreground/50 bg-transparent px-8 text-center text-lg font-semibold shadow-none focus-visible:border-solid focus-visible:border-ring focus-visible:ring-0 dark:bg-transparent'
-					)}
-					<HugeiconsIcon
-						icon={PencilEdit01Icon}
-						size={16}
-						class="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground"
-						aria-hidden="true"
-					/>
-				</div>
+				{@render usernameInput(
+					'border-transparent text-center text-lg font-semibold shadow-none hover:border-input focus-visible:border-ring'
+				)}
 				<Button
 					variant="ghost"
 					size="icon"
@@ -494,14 +486,14 @@
 			value={profile.avatar.illustration}
 			onValueChange={(value) => isIllustration(value) && setIllustration(value)}
 			aria-label="Illustration"
-			class="grid w-full grid-cols-4 justify-items-center gap-3"
+			class="grid w-full grid-cols-6 justify-items-center gap-1.5"
 		>
 			{#each avatarIllustrations as item (item.id)}
 				<ToggleGroup.Item
 					value={item.id}
 					aria-label={item.label}
 					title={item.label}
-					class="aspect-square size-auto w-full max-w-20 rounded-full p-1 data-[state=on]:ring-2 data-[state=on]:ring-primary"
+					class="aspect-square size-auto w-full max-w-16 rounded-full p-0.5 data-[state=on]:ring-2 data-[state=on]:ring-primary"
 					><img
 						src={avatarUri({ illustration: item.id, color: profile.avatar.color })}
 						alt=""
