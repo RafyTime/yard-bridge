@@ -12,9 +12,20 @@ export const roundEndingValidator = v.union(
 	v.object({ kind: v.literal('exhausted') })
 );
 
+// A Batch that ends the Round once it resolves: it emptied a hand or declared a Bridge. `jacks`
+// counts the Jacks ending a Batch that emptied the hand, each earning the Finish bonus.
+export const finishValidator = v.object({
+	kind: v.union(v.literal('emptyHand'), v.literal('bridge')),
+	seatId: v.id('seats'),
+	jacks: v.number()
+});
+
+// Points deducted per Jack ending the Batch that empties a hand.
+export const finishBonusPerJack = 20;
+
 // A completed Round's final hands, Penalty points, and accumulated Game scores, shown to
 // every Seat once the Round ends. Results scored before Bridge and exhausted-table endings omit
-// `ending`, `multiplier`, and `jackDeduction`; they all ended on an empty hand without either.
+// `ending`, `multiplier`, and `finishBonus`; they all ended on an empty hand without either.
 export const roundResultValidator = v.object({
 	ending: v.optional(roundEndingValidator),
 	// Applied to held-card points once the played pile has been recycled.
@@ -23,8 +34,8 @@ export const roundResultValidator = v.object({
 		v.object({
 			seatId: v.id('seats'),
 			cards: v.array(cardValidator),
-			// 20 per Jack ending the batch that emptied this hand, subtracted after the multiplier.
-			jackDeduction: v.optional(v.number()),
+			// The Finish bonus, subtracted after the multiplier.
+			finishBonus: v.optional(v.number()),
 			points: v.number(),
 			score: v.number()
 		})

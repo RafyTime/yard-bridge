@@ -241,8 +241,8 @@
 											</li>{/each}
 									</ul>
 								{:else}<p class="text-sm">{m.round_result_out()}</p>{/if}
-								{#if hand.jackDeduction}<p class="text-sm">
-										{m.round_result_jacks({ points: hand.jackDeduction })}
+								{#if hand.finishBonus}<p class="text-sm">
+										{m.round_result_finish_bonus({ points: hand.finishBonus })}
 									</p>{/if}
 								<p class="text-sm">
 									{m.round_result_points({ points: hand.points, score: hand.score })}

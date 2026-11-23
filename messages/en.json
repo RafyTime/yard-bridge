@@ -217,7 +217,7 @@
 	"invite_share_error": "Could not open sharing. Copy the link instead.",
 	"rules_help_scoreCutoff": "Reaching this total exactly resets your score to zero. Crossing it triggers the loss rule.",
 	"rules_help_handSize": "Deal 2 to 9 cards per player. The first starter places their last dealt card face up.",
-	"rules_help_recycleMultiplier": "Apply this multiplier once to held-card points after recycling the draw pile, before Jack finish deductions.",
+	"rules_help_recycleMultiplier": "Apply this multiplier once to held-card points after recycling the draw pile, before the Finish bonus.",
 	"rules_help_kingOfSpades": "When enabled, the King of Spades makes the next player draw seven and skip, and is worth 80 points. Otherwise it is an ordinary King worth 10.",
 	"rules_help_openingEffects": "Choose whether the first face-up card triggers its special effect.",
 	"rules_help_aceBehavior": "An Ace skips the next player by default. With cancellation enabled, a targeted player may play an Ace to cancel an entire incoming draw or skip effect. That Ace uses their turn.",
@@ -239,5 +239,5 @@
 	"round_result_empty": "Seat {number} emptied their hand.",
 	"round_result_exhausted": "Nobody could play or draw, so the round ended.",
 	"round_result_multiplier": "Held cards count ×{multiplier} after the recycle.",
-	"round_result_jacks": "Finishing Jacks: −{points}"
+	"round_result_finish_bonus": "Finish bonus: −{points}"
 }

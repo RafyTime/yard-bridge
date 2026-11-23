@@ -1418,11 +1418,11 @@ test('a final draw effect resolves on its target before the Round is scored, and
 				{
 					seatId: seatIds[0],
 					cards: cards('Ah Qs 10c 9d 7s'),
-					jackDeduction: 0,
+					finishBonus: 0,
 					points: 75,
 					score: 75
 				},
-				{ seatId: seatIds[1], cards: [], jackDeduction: 0, points: 0, score: 0 }
+				{ seatId: seatIds[1], cards: [], finishBonus: 0, points: 0, score: 0 }
 			]
 		});
 });
@@ -1482,8 +1482,8 @@ test('a final 6 cannot finish a Round uncovered, so its player draws a cover fir
 			ending: { kind: 'emptyHand', seatId: seatIds[1] },
 			multiplier: 1,
 			hands: [
-				{ seatId: seatIds[0], cards: cards('Kc'), jackDeduction: 0, points: 10, score: 10 },
-				{ seatId: seatIds[1], cards: [], jackDeduction: 0, points: 0, score: 0 }
+				{ seatId: seatIds[0], cards: cards('Kc'), finishBonus: 0, points: 10, score: 10 },
+				{ seatId: seatIds[1], cards: [], finishBonus: 0, points: 0, score: 0 }
 			]
 		});
 });
@@ -1713,8 +1713,8 @@ test('a drawn 10 starts a batch that completes a Bridge, and the declarer scores
 		ending: { kind: 'bridge', seatId: seatIds[1] },
 		multiplier: 1,
 		hands: [
-			{ seatId: seatIds[0], cards: cards('Kc Kd Ks'), jackDeduction: 0, points: 30, score: 30 },
-			{ seatId: seatIds[1], cards: cards('Qc'), jackDeduction: 0, points: 10, score: 10 }
+			{ seatId: seatIds[0], cards: cards('Kc Kd Ks'), finishBonus: 0, points: 30, score: 30 },
+			{ seatId: seatIds[1], cards: cards('Qc'), finishBonus: 0, points: 10, score: 10 }
 		]
 	};
 	for (const seat of await views()) expect(seat.result).toEqual(result);
@@ -1758,16 +1758,16 @@ test.each([
 			);
 			await playBatch(players[1], (await views())[0], batch, suit);
 			const [view] = await views();
-			// A Bridge with cards still held gets no Jack finish deduction.
+			// A Bridge with cards still held gets no Finish bonus.
 			const hands = [
 				{
 					seatId: seatIds[0],
 					cards: cards('Kc Kd Ks Qd'),
-					jackDeduction: 0,
+					finishBonus: 0,
 					points: 40,
 					score: 40
 				},
-				{ seatId: seatIds[1], cards: cards('Qc'), jackDeduction: 0, points: 10, score: 10 }
+				{ seatId: seatIds[1], cards: cards('Qc'), finishBonus: 0, points: 10, score: 10 }
 			];
 			const ending = { kind: 'bridge', seatId: seatIds[1] };
 			expect(view.result).toEqual(declares ? { ending, multiplier: 1, hands } : null);
@@ -1811,11 +1811,11 @@ test('a Bridge resolves its remaining penalty on the next Seat before scoring', 
 			{
 				seatId: seatIds[0],
 				cards: cards('Kd Kc Ks Qd 7c 7d 9c 9d 9s 10c 10d 10s'),
-				jackDeduction: 0,
+				finishBonus: 0,
 				points: 70,
 				score: 70
 			},
-			{ seatId: seatIds[1], cards: cards('Qc'), jackDeduction: 0, points: 10, score: 10 }
+			{ seatId: seatIds[1], cards: cards('Qc'), finishBonus: 0, points: 10, score: 10 }
 		]
 	});
 });
@@ -1831,8 +1831,8 @@ test('an empty-hand finish deducts 20 per final Jack, allowing a negative Game s
 		ending: { kind: 'emptyHand', seatId: seatIds[1] },
 		multiplier: 1,
 		hands: [
-			{ seatId: seatIds[0], cards: cards('Qs'), jackDeduction: 0, points: 50, score: 50 },
-			{ seatId: seatIds[1], cards: [], jackDeduction: 40, points: -40, score: -40 }
+			{ seatId: seatIds[0], cards: cards('Qs'), finishBonus: 0, points: 50, score: 50 },
+			{ seatId: seatIds[1], cards: [], finishBonus: 40, points: -40, score: -40 }
 		]
 	});
 	const game = await players[0].query(api.games.view, { gameId });
@@ -1867,8 +1867,8 @@ test('the first recycle applies the multiplier once, and a later recycle does no
 		ending: { kind: 'emptyHand', seatId: seatIds[1] },
 		multiplier: 2,
 		hands: [
-			{ seatId: seatIds[0], cards: cards('Kc Kd 10h'), jackDeduction: 0, points: 60, score: 60 },
-			{ seatId: seatIds[1], cards: [], jackDeduction: 0, points: 0, score: 0 }
+			{ seatId: seatIds[0], cards: cards('Kc Kd 10h'), finishBonus: 0, points: 60, score: 60 },
+			{ seatId: seatIds[1], cards: [], finishBonus: 0, points: 0, score: 0 }
 		]
 	});
 });
@@ -1892,8 +1892,8 @@ test('when nothing can be drawn and every Seat passes once, the Round ends and s
 		ending: { kind: 'exhausted' },
 		multiplier: 1,
 		hands: [
-			{ seatId: seatIds[0], cards: cards('Qs'), jackDeduction: 0, points: 50, score: 50 },
-			{ seatId: seatIds[1], cards: cards('Kd Ac 8c'), jackDeduction: 0, points: 25, score: 25 }
+			{ seatId: seatIds[0], cards: cards('Qs'), finishBonus: 0, points: 50, score: 50 },
+			{ seatId: seatIds[1], cards: cards('Kd Ac 8c'), finishBonus: 0, points: 25, score: 25 }
 		]
 	};
 	for (const seat of await views()) expect(seat.result).toEqual(result);
@@ -1913,8 +1913,8 @@ test('a final 6 whose cover is waived ends the Round on the empty hand', async (
 		ending: { kind: 'emptyHand', seatId: seatIds[1] },
 		multiplier: 1,
 		hands: [
-			{ seatId: seatIds[0], cards: cards('Kc'), jackDeduction: 0, points: 10, score: 10 },
-			{ seatId: seatIds[1], cards: [], jackDeduction: 0, points: 0, score: 0 }
+			{ seatId: seatIds[0], cards: cards('Kc'), finishBonus: 0, points: 10, score: 10 },
+			{ seatId: seatIds[1], cards: [], finishBonus: 0, points: 0, score: 0 }
 		]
 	});
 });
@@ -1930,8 +1930,8 @@ test('a Bridge of four Jacks that empties the hand still deducts its finishing J
 		ending: { kind: 'bridge', seatId: seatIds[1] },
 		multiplier: 1,
 		hands: [
-			{ seatId: seatIds[0], cards: cards('Kc Kd Ks'), jackDeduction: 0, points: 30, score: 30 },
-			{ seatId: seatIds[1], cards: [], jackDeduction: 80, points: -80, score: -80 }
+			{ seatId: seatIds[0], cards: cards('Kc Kd Ks'), finishBonus: 0, points: 30, score: 30 },
+			{ seatId: seatIds[1], cards: [], finishBonus: 80, points: -80, score: -80 }
 		]
 	});
 });

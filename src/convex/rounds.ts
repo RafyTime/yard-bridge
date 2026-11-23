@@ -17,7 +17,7 @@ import { initializeRound, laterStarter } from './roundInitialization';
 import { recentMoveValidator, recentMoves, recordEvent } from './roundEvents';
 import type { RoundEvent } from './roundEvents';
 import { currentRules } from './rules';
-import { handPoints, roundResultValidator } from './roundScoring';
+import { finishBonusPerJack, handPoints, roundResultValidator } from './roundScoring';
 import type { RoundResult } from './roundScoring';
 import {
 	batchProblem,
@@ -274,7 +274,7 @@ async function commitTurn(ctx: MutationCtx, round: Round, patch: RoundPatch, eve
 		!moved.finish &&
 		!moved.mustCover &&
 		moved.handCounts.some((seat) => seat.seatId === round.currentSeatId && !seat.cardCount);
-	if (emptied) changes.finish = { seatId: round.currentSeatId, bridge: false, jacks: 0 };
+	if (emptied) changes.finish = { kind: 'emptyHand', seatId: round.currentSeatId, jacks: 0 };
 	const updated = { ...round, ...changes };
 	const ending = roundEnding(updated);
 	const result = ending && (await scoreRound(ctx, updated, ending));
@@ -287,14 +287,14 @@ async function commitTurn(ctx: MutationCtx, round: Round, patch: RoundPatch, eve
 function roundEnding(round: Round): RoundEnding | null {
 	const { finish } = round;
 	if (finish && !round.mustCover && !round.effect)
-		return { kind: finish.bridge ? 'bridge' : 'emptyHand', seatId: finish.seatId };
+		return { kind: finish.kind, seatId: finish.seatId };
 	if ((round.exhaustedPasses ?? 0) >= round.handCounts.length) return { kind: 'exhausted' };
 	return null;
 }
 
 // Score every remaining hand into the Game and reveal the final hands. The recycle multiplier
-// applies once if the played pile was ever recycled. A hand emptied by the finishing play then
-// loses 20 per Jack that ended its batch, which can make its points and Game score negative.
+// applies once if the played pile was ever recycled. A hand emptied by the Finish then earns the
+// Finish bonus for each Jack that ended its Batch, which can make its points and score negative.
 async function scoreRound(
 	ctx: MutationCtx,
 	round: Round,
@@ -314,12 +314,12 @@ async function scoreRound(
 					.unique()
 			]);
 			if (!seat || !hand) throw new ConvexError('Game unavailable');
-			const jackDeduction =
-				finisher?.seatId === seatId && !hand.cards.length ? 20 * finisher.jacks : 0;
-			const points = handPoints(hand.cards, round.rules) * multiplier - jackDeduction;
+			const finishBonus =
+				finisher?.seatId === seatId && !hand.cards.length ? finishBonusPerJack * finisher.jacks : 0;
+			const points = handPoints(hand.cards, round.rules) * multiplier - finishBonus;
 			const score = seat.score + points;
 			await ctx.db.patch('seats', seatId, { score });
-			return { seatId, cards: hand.cards, jackDeduction, points, score };
+			return { seatId, cards: hand.cards, finishBonus, points, score };
 		})
 	);
 	return { ending, multiplier, hands };
@@ -392,7 +392,11 @@ export const play = mutation({
 				drawnCard: null,
 				handCounts: withCardCount(round, hand.seatId, cards.length),
 				...((bridge || emptied) && {
-					finish: { seatId: hand.seatId, bridge, jacks: emptied ? trailingJacks(batch) : 0 }
+					finish: {
+						kind: bridge ? 'bridge' : 'emptyHand',
+						seatId: hand.seatId,
+						jacks: emptied ? trailingJacks(batch) : 0
+					}
 				})
 			},
 			{ kind: 'play', cards: batch, activeSuit }
