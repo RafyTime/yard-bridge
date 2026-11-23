@@ -263,23 +263,29 @@ type RoundEnding = NonNullable<RoundResult['ending']>;
 // Commit the current Seat's accepted command: advance the Round version so stale or repeated
 // moves are rejected, and record the command's public event in the same mutation. Call it after
 // saving the mover's hand, since a command that finishes the Round scores it here. Any command
-// other than an exhausted pass resets the count of exhausted passes. A Play that finishes passes
-// its own `finish`; any other command that leaves the mover's hand empty with no 6 to cover, such
-// as a waived cover or a cancelling last Ace, finishes without Jacks.
+// other than an exhausted pass resets the count of exhausted passes.
 async function commitTurn(ctx: MutationCtx, round: Round, patch: RoundPatch, event: RoundEvent) {
 	const version = round.version + 1;
 	const changes = { exhaustedPasses: 0, ...patch, version };
-	const moved = { ...round, ...changes };
-	const emptied =
-		!moved.finish &&
-		!moved.mustCover &&
-		moved.handCounts.some((seat) => seat.seatId === round.currentSeatId && !seat.cardCount);
-	if (emptied) changes.finish = { kind: 'emptyHand', seatId: round.currentSeatId, jacks: 0 };
-	const updated = { ...round, ...changes };
+	const finish = round.finish ?? finishOf({ ...round, ...changes }, round.currentSeatId, event);
+	const updated = { ...round, ...changes, finish };
 	const ending = roundEnding(updated);
 	const result = ending && (await scoreRound(ctx, updated, ending));
-	await ctx.db.patch('rounds', round._id, { ...changes, result });
+	await ctx.db.patch('rounds', round._id, { ...changes, finish, result });
 	await recordEvent(ctx, round._id, { version, seatId: round.currentSeatId, event });
+}
+
+// Whether the mover's command is the Finish: a played Batch that declares a Bridge, or any command
+// that leaves their hand empty with no 6 to cover, such as a waived cover or a cancelling last
+// Ace. Only an emptied hand earns the Finish bonus for the Jacks ending its Batch.
+function finishOf(moved: Round, seatId: Id<'seats'>, event: RoundEvent): Round['finish'] {
+	const batch = event.kind === 'play' ? event.cards : [];
+	const emptied =
+		!moved.mustCover && moved.handCounts.some((seat) => seat.seatId === seatId && !seat.cardCount);
+	const jacks = emptied ? trailingJacks(batch) : 0;
+	if (declaresBridge(batch, moved.rules)) return { kind: 'bridge', seatId, jacks };
+	if (emptied) return { kind: 'emptyHand', seatId, jacks };
+	return undefined;
 }
 
 // The Round ends once a finishing play has resolved, with no 6 still waiting for a cover and no
@@ -376,8 +382,6 @@ export const play = mutation({
 		const mustCover = top.rank === '6';
 		const next = nextSeatId(round);
 		const effect = drawEffect(batch, round.rules);
-		const bridge = declaresBridge(batch, round.rules);
-		const emptied = !cards.length && !mustCover;
 		await ctx.db.patch('roundHands', hand._id, { cards });
 		const activeSuit = suit ?? top.suit;
 		await commitTurn(
@@ -390,14 +394,7 @@ export const play = mutation({
 				mustCover,
 				effect: effect && { targetSeatId: next, ...effect },
 				drawnCard: null,
-				handCounts: withCardCount(round, hand.seatId, cards.length),
-				...((bridge || emptied) && {
-					finish: {
-						kind: bridge ? 'bridge' : 'emptyHand',
-						seatId: hand.seatId,
-						jacks: emptied ? trailingJacks(batch) : 0
-					}
-				})
+				handCounts: withCardCount(round, hand.seatId, cards.length)
 			},
 			{ kind: 'play', cards: batch, activeSuit }
 		);
