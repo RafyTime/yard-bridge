@@ -106,7 +106,7 @@ test('email code signs in, returns after reload and reopening, then signs out', 
 	await page.screenshot({ path: test.info().outputPath('sign-in-code.png') });
 	await expect(page.getByLabel('Sign-in code')).toHaveAttribute('autocomplete', 'one-time-code');
 	const firstCode = backend.code;
-	await page.getByLabel('Sign-in code').fill('00000000' === firstCode ? '11111111' : '00000000');
+	await page.getByLabel('Sign-in code').fill('000000' === firstCode ? '111111' : '000000');
 	await page.getByRole('button', { name: 'Continue', exact: true }).click();
 	await expect(page.getByRole('alert').filter({ hasText: /\S/ })).toContainText(
 		'invalid or has expired'

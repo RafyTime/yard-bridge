@@ -50,7 +50,7 @@ export async function authBackend(context: BrowserContext) {
 		await pause;
 		if (deliveryFails) return new Response(null, { status: 503 });
 		const email: { text: string } = JSON.parse(String(init?.body));
-		code = email.text.match(/\b\d{8}\b/)![0];
+		code = email.text.match(/\b\d{6}\b/)![0];
 		return Response.json({ id: 'test-email' });
 	};
 

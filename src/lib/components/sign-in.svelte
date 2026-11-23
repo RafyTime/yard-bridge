@@ -145,9 +145,9 @@
 									type="text"
 									inputmode="numeric"
 									autocomplete="one-time-code"
-									pattern={'[0-9]{8}'}
-									minlength={8}
-									maxlength={8}
+									pattern={'[0-9]{6}'}
+									minlength={6}
+									maxlength={6}
 									required
 									class="text-center font-mono text-lg tracking-[0.3em]"
 									aria-invalid={!!error}
