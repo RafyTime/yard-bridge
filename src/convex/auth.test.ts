@@ -140,6 +140,14 @@ test('five wrong codes for one email lock out even the right code', async () => 
 		);
 	}
 	await expect(verify('guest@example.com', guestCode)).rejects.toThrow('Could not verify code');
+	// Requesting a new code does not reset the limit.
+	await t.action(api.auth.signIn, {
+		provider: 'resend-otp',
+		params: { email: 'guest@example.com' }
+	});
+	await expect(verify('guest@example.com', deliveredCode)).rejects.toThrow(
+		'Could not verify code'
+	);
 });
 
 test('a provider delivery failure does not report a sent code or authenticate the player', async () => {
