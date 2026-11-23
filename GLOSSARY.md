@@ -23,7 +23,7 @@ An ordered group of cards played together as one move.
 The Rules configuration setting for which cards may form a Batch: Single card, Same rank, or Match rank or suit. Players see it as "Card grouping".
 
 **Finish**:
-The move that ends a Round once its Pending effect resolves: a Batch that empties its player's hand (going out) or declares a Bridge. A hand that ends on a 6 goes out only once the 6 is covered or its cover is waived.
+The move by which a player runs out of cards or declares a Bridge. The Round ends once that move's Pending effect resolves; a hand emptied on a 6 must cover it first.
 
 **Finish bonus**:
 The 20 points deducted from a player's Penalty points for each Jack ending the Finish that empties their hand.
