@@ -145,9 +145,7 @@ test('five wrong codes for one email lock out even the right code', async () => 
 		provider: 'resend-otp',
 		params: { email: 'guest@example.com' }
 	});
-	await expect(verify('guest@example.com', deliveredCode)).rejects.toThrow(
-		'Could not verify code'
-	);
+	await expect(verify('guest@example.com', deliveredCode)).rejects.toThrow('Could not verify code');
 });
 
 test('a provider delivery failure does not report a sent code or authenticate the player', async () => {
