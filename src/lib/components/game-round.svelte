@@ -209,18 +209,17 @@
 				<section class="flex flex-col gap-3 rounded-xl border p-4" aria-labelledby="result-heading">
 					<h4 id="result-heading" class="font-semibold">{m.round_result()}</h4>
 					<p role="status">{m.round_result_hint()}</p>
-					<!-- Results scored before Bridge endings always ended on an empty hand without a multiplier. -->
-					{#if table.result.ending?.kind === 'bridge'}<p>
+					{#if table.result.ending.kind === 'bridge'}<p>
 							{m.round_result_bridge({ number: seatNumber(table.result.ending.seatId) })}
 						</p>
-					{:else if table.result.ending?.kind === 'emptyHand'}<p>
+					{:else if table.result.ending.kind === 'emptyHand'}<p>
 							{m.round_result_empty({ number: seatNumber(table.result.ending.seatId) })}
 						</p>
-					{:else if table.result.ending?.kind === 'exhausted'}<p>
+					{:else}<p>
 							{m.round_result_exhausted()}
 						</p>{/if}
-					{#if (table.result.multiplier ?? 1) > 1}<p class="text-sm">
-							{m.round_result_multiplier({ multiplier: table.result.multiplier ?? 1 })}
+					{#if table.result.multiplier > 1}<p class="text-sm">
+							{m.round_result_multiplier({ multiplier: table.result.multiplier })}
 						</p>{/if}
 					<ul class="flex flex-col gap-3">
 						{#each table.result.hands as hand (hand.seatId)}<li class="flex flex-col gap-1">

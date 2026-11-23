@@ -24,18 +24,17 @@ export const finishValidator = v.object({
 export const finishBonusPerJack = 20;
 
 // A completed Round's final hands, Penalty points, and accumulated Game scores, shown to
-// every Seat once the Round ends. Results scored before Bridge and exhausted-table endings omit
-// `ending`, `multiplier`, and `finishBonus`; they all ended on an empty hand without either.
+// every Seat once the Round ends.
 export const roundResultValidator = v.object({
-	ending: v.optional(roundEndingValidator),
+	ending: roundEndingValidator,
 	// Applied to held-card points once the played pile has been recycled.
-	multiplier: v.optional(v.number()),
+	multiplier: v.number(),
 	hands: v.array(
 		v.object({
 			seatId: v.id('seats'),
 			cards: v.array(cardValidator),
 			// The Finish bonus, subtracted after the multiplier.
-			finishBonus: v.optional(v.number()),
+			finishBonus: v.number(),
 			points: v.number(),
 			score: v.number()
 		})

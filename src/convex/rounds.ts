@@ -294,7 +294,7 @@ function roundEnding(round: Round): RoundEnding | null {
 	const { finish } = round;
 	if (finish && !round.mustCover && !round.effect)
 		return { kind: finish.kind, seatId: finish.seatId };
-	if ((round.exhaustedPasses ?? 0) >= round.handCounts.length) return { kind: 'exhausted' };
+	if (round.exhaustedPasses >= round.handCounts.length) return { kind: 'exhausted' };
 	return null;
 }
 
@@ -426,7 +426,7 @@ export const draw = mutation({
 				drawnCard: playable,
 				mustCover: playable ? round.mustCover : false,
 				handCounts: withCardCount(round, hand.seatId, cards.length),
-				exhaustedPasses: exhausted ? (round.exhaustedPasses ?? 0) + 1 : 0
+				exhaustedPasses: exhausted ? round.exhaustedPasses + 1 : 0
 			},
 			{
 				kind: 'draw',

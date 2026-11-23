@@ -71,6 +71,7 @@ export function initializeRound({
 		drawnCard: null,
 		mustCover,
 		recycles: 0,
+		exhaustedPasses: 0,
 		version: 0,
 		result: null,
 		handCounts: seats.map((seatId, index) => ({ seatId, cardCount: hands[index].length })),

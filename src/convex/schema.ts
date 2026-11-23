@@ -44,7 +44,7 @@ export default defineSchema({
 		// its Batch when it emptied the hand.
 		finish: v.optional(finishValidator),
 		// Consecutive passes with nothing left to draw or recycle; the Round ends once every Seat has.
-		exhaustedPasses: v.optional(v.number()),
+		exhaustedPasses: v.number(),
 		// Set once the Round ends; every later turn command is rejected.
 		result: v.union(roundResultValidator, v.null())
 	}).index('by_gameId', ['gameId']),
