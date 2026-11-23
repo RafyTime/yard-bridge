@@ -33,6 +33,7 @@ export async function authBackend(context: BrowserContext) {
 	});
 	let code = '';
 	let deliveryFails = false;
+	let dropNextAction = false;
 	let deliveryPause: Promise<void> | undefined;
 	let rulesUpdatePause: Promise<void> | undefined;
 	// Only a scripted Round start sees the scripted randomness; Playwright keeps the real Math.
@@ -158,6 +159,11 @@ export async function authBackend(context: BrowserContext) {
 							);
 						}
 					} else if (message.type === 'Action') {
+						if (dropNextAction) {
+							dropNextAction = false;
+							socket.close();
+							return;
+						}
 						try {
 							const result = await session().action(
 								makeFunctionReference<'action'>(message.udfPath),
@@ -212,6 +218,10 @@ export async function authBackend(context: BrowserContext) {
 		},
 		failDelivery() {
 			deliveryFails = true;
+		},
+		// Drops the connection instead of answering the next action, as a flaky network would.
+		dropNextAction() {
+			dropNextAction = true;
 		},
 		restore() {
 			globalThis.fetch = originalFetch;

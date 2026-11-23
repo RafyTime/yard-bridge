@@ -22,6 +22,7 @@
 	"auth_code_sent": "Código enviado. Revisa tu correo.",
 	"auth_send_error": "No se pudo enviar el código. Comprueba tu conexión e inténtalo de nuevo.",
 	"auth_code_error": "El código no es válido o ha caducado. Inténtalo de nuevo o solicita otro.",
+	"auth_verify_error": "No se pudo comprobar el código. Revisa tu conexión e inténtalo de nuevo.",
 	"auth_loading": "Comprobando tu sesión…",
 	"auth_signed_in": "Has iniciado sesión",
 	"auth_return_hint": "Puedes cerrar la aplicación y volver mientras tu sesión siga siendo válida.",

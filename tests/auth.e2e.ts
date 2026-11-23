@@ -167,27 +167,40 @@ test('code boxes fill as digits are typed, erased, or pasted and a full code sig
 	await expect(boxes).toHaveText(['1', '2', '', '', '', '']);
 	await page.keyboard.press('Backspace');
 	await expect(boxes).toHaveText(['1', '', '', '', '', '']);
+	// A partial code never reaches the server, where it would count toward the sign-in limit.
+	await expect(page.getByRole('button', { name: 'Continue', exact: true })).toBeDisabled();
+	await page.keyboard.press('Enter');
+	await expect(boxes).toHaveText(['1', '', '', '', '', '']);
+	await expect(page.getByRole('alert').filter({ hasText: /\S/ })).toHaveCount(0);
 	await page.keyboard.press('Backspace');
-	// Codes copied from an email often carry a space or dash; the boxes keep only the digits.
-	const wrong = backend.code === '000000' ? '111111' : '000000';
-	await code.evaluate(
-		(input, text) => {
+	const paste = (text: string) =>
+		code.evaluate((input, text) => {
 			const clipboardData = new DataTransfer();
 			clipboardData.setData('text/plain', text);
 			// Firefox drops `clipboardData` from the event constructor, so attach it directly.
-			const paste = new ClipboardEvent('paste', { bubbles: true, cancelable: true });
-			Object.defineProperty(paste, 'clipboardData', { value: clipboardData });
-			input.dispatchEvent(paste);
-		},
-		`${wrong.slice(0, 3)} ${wrong.slice(3)}`
-	);
+			const event = new ClipboardEvent('paste', { bubbles: true, cancelable: true });
+			Object.defineProperty(event, 'clipboardData', { value: clipboardData });
+			input.dispatchEvent(event);
+		}, text);
+	// Codes copied from an email often carry a space or dash; the boxes keep only the digits.
+	const wrong = backend.code === '000000' ? '111111' : '000000';
+	await paste(`${wrong.slice(0, 3)} ${wrong.slice(3)}`);
 	// A rejected code empties the boxes so the next complete code submits itself.
 	await expect(page.getByRole('alert').filter({ hasText: /\S/ })).toContainText(
 		'invalid or has expired'
 	);
 	await expect(boxes).toHaveText(['', '', '', '', '', '']);
 	await expect(code).toBeFocused();
-	await page.keyboard.type(backend.code);
+	// A full code pasted after a stray digit replaces the boxes rather than splicing in.
+	await page.keyboard.type('9');
+	backend.dropNextAction();
+	await paste(backend.code);
+	// A dropped connection keeps the code for a retry instead of calling it invalid.
+	await expect(page.getByRole('alert').filter({ hasText: /\S/ })).toContainText(
+		'Check your connection'
+	);
+	await expect(boxes).toHaveText([...backend.code]);
+	await page.getByRole('button', { name: 'Continue', exact: true }).click();
 	await expect(page.getByRole('heading', { name: 'You are signed in', exact: true })).toBeVisible();
 });
 

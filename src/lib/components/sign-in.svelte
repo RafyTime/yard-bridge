@@ -21,6 +21,7 @@
 	let codeInput = $state<HTMLInputElement | null>(null);
 	let emailInput = $state<HTMLInputElement | null>(null);
 	let notice = $state('');
+	const codeLength = 6;
 
 	// Each step slides in; reduced motion swaps steps instantly.
 	const stepIn = () => ({ y: 8, duration: prefersReducedMotion.current ? 0 : 200 });
@@ -49,24 +50,47 @@
 	}
 
 	async function verifyCode() {
-		if (pending || sentTo === null) return;
+		// A partial code can only fail, and each failure counts toward the sign-in limit.
+		if (pending || sentTo === null || code.length < codeLength) return;
 		pending = true;
 		error = null;
 		notice = '';
-		let signedIn = false;
+		let outcome: 'signedIn' | 'rejected' | 'unreachable';
 		try {
-			signedIn = (await auth.signIn('resend-otp', { email: sentTo, code })).signingIn;
-		} catch {
-			// A failed request reads as a rejected code.
+			outcome = (await auth.signIn('resend-otp', { email: sentTo, code })).signingIn
+				? 'signedIn'
+				: 'rejected';
+		} catch (cause) {
+			// Convex rejects an in-flight action with this message when the socket drops; the
+			// server may never have seen the code. Every other failure is the server refusing it.
+			outcome =
+				cause instanceof Error &&
+				cause.message.includes('Connection lost while action was in flight')
+					? 'unreachable'
+					: 'rejected';
 		} finally {
 			pending = false;
 		}
-		code = '';
-		if (signedIn) return;
-		// Empty the boxes so a rejected code is never resent and the next full code submits itself.
-		error = m.auth_code_error();
+		if (outcome === 'signedIn') {
+			code = '';
+			return;
+		}
+		if (outcome === 'unreachable') {
+			// Keep the code so the player can retry once the connection is back.
+			error = m.auth_verify_error();
+		} else {
+			// Empty the boxes so a rejected code is never resent and the next full code submits itself.
+			code = '';
+			error = m.auth_code_error();
+		}
 		await tick();
 		codeInput?.focus();
+	}
+
+	// bits-ui splices a paste in at the caret; a pasted full code replaces the boxes instead.
+	function replaceWithPastedCode(event: ClipboardEvent) {
+		const digits = event.clipboardData?.getData('text/plain').replace(/\D/g, '') ?? '';
+		if (digits.length === codeLength) codeInput?.select();
 	}
 
 	async function changeEmail() {
@@ -157,9 +181,10 @@
 									name="code"
 									bind:inputRef={codeInput}
 									bind:value={code}
-									maxlength={6}
+									maxlength={codeLength}
 									pattern={REGEXP_ONLY_DIGITS}
 									pasteTransformer={(text) => text.replace(/\D/g, '')}
+									onpastecapture={replaceWithPastedCode}
 									onComplete={() => void verifyCode()}
 									required
 									class="w-full"
@@ -178,7 +203,7 @@
 								</InputOTP.Root>
 								<Field.FieldDescription id="code-hint">{m.auth_code_hint()}</Field.FieldDescription>
 							</Field.Field>
-							<Button type="submit" class="min-h-11" disabled={pending}>
+							<Button type="submit" class="min-h-11" disabled={pending || code.length < codeLength}>
 								{#if pending}{@render busy(m.auth_verifying())}{:else}{m.auth_continue()}{/if}
 							</Button>
 						</Field.FieldGroup>

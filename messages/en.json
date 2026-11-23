@@ -22,6 +22,7 @@
 	"auth_code_sent": "Code sent. Check your inbox.",
 	"auth_send_error": "Could not send a code. Check your connection and try again.",
 	"auth_code_error": "That code is invalid or has expired. Try again or request a new code.",
+	"auth_verify_error": "Could not check the code. Check your connection and try again.",
 	"auth_loading": "Checking your session…",
 	"auth_signed_in": "You are signed in",
 	"auth_return_hint": "You can close the app and return while your session remains valid.",
