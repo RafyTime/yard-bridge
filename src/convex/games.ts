@@ -2,7 +2,7 @@ import { ConvexError, v } from 'convex/values';
 import { mutation, query } from './_generated/server';
 import type { QueryCtx } from './_generated/server';
 import { requirePlayer } from './access';
-import { defaultRules, rulesValidator } from './rules';
+import { currentRules, defaultRules, rulesValidator } from './rules';
 import schema from './schema';
 
 const gameStatus = schema.tables.games.validator.fields.status;
@@ -80,7 +80,7 @@ export const view = query({
 			id: game._id,
 			name: game.name,
 			status: game.status,
-			rules: game.rules,
+			rules: currentRules(game.rules),
 			version: game.version,
 			isHost: game.hostId === player.id,
 			viewerSeatId: seat._id,

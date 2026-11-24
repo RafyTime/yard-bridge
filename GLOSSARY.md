@@ -19,11 +19,20 @@ The saved public record of one accepted move in a round, which every Seat sees t
 **Batch**:
 An ordered group of cards played together as one move.
 
+**Batch mode**:
+The Rules configuration setting for which cards may form a Batch: Single card, Same rank, or Match rank or suit. Players see it as "Card grouping".
+
+**Finish**:
+The move by which a player runs out of cards or declares a Bridge. The Round ends once that move's Pending effect resolves; a hand emptied on a 6 must cover it first.
+
+**Finish bonus**:
+The 20 points deducted from a player's Penalty points for each Jack ending the Finish that empties their hand.
+
 **Bridge declaration**:
 Ending a Round by finishing a batch with all four cards of an eligible rank, even if the declaring player still holds other cards.
 
 **Penalty points**:
-The net points assigned to a player's game score at the end of a round. A finish bonus can make that round's net points negative. The accumulated score helps determine losses and ranking.
+The net points assigned to a player's game score at the end of a round. A Finish bonus can make that round's net points negative. The accumulated score helps determine losses and ranking.
 
 **Pending effect**:
 The draw or skip from a played or opening special card, waiting on the next Seat. That player must resolve it before doing anything else: they accept it, or, under the cancellation Ace rule, cancel it with an Ace. It never carries into a later turn.

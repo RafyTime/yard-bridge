@@ -1,7 +1,7 @@
 import { ConvexError, v } from 'convex/values';
 import { mutation, query } from './_generated/server';
 import { requirePlayer } from './access';
-import { rulesValidator } from './rules';
+import { currentRules, rulesValidator } from './rules';
 
 export const saved = query({
 	args: {},
@@ -13,7 +13,11 @@ export const saved = query({
 			.withIndex('by_ownerId', (q) => q.eq('ownerId', player.id))
 			.order('desc')
 			.take(100);
-		return configurations.map((item) => ({ id: item._id, name: item.name, rules: item.rules }));
+		return configurations.map((item) => ({
+			id: item._id,
+			name: item.name,
+			rules: currentRules(item.rules)
+		}));
 	}
 });
 
@@ -32,7 +36,7 @@ export const save = mutation({
 		return await ctx.db.insert('savedRules', {
 			ownerId: player.id,
 			name: trimmed,
-			rules: game.rules
+			rules: currentRules(game.rules)
 		});
 	}
 });

@@ -19,7 +19,13 @@
 	import type { FunctionReturnType } from 'convex/server';
 	import { useConvexClient, useQuery } from 'convex-svelte';
 	import { api } from '../../convex/_generated/api';
-	import { defaultRules, type RulesConfiguration } from '../../convex/rules';
+	import {
+		defaultRules,
+		findChoice,
+		ruleChoices,
+		type ChoiceSetting,
+		type RulesConfiguration
+	} from '../../convex/rules';
 	import { Button, buttonVariants } from '#lib/components/ui/button/index.js';
 	import { cn } from '#lib/utils.js';
 	import { Input } from '#lib/components/ui/input/index.js';
@@ -87,14 +93,32 @@
 			draft.handSize <= 9
 	);
 	const onOff = (value: boolean) => (value ? m.rules_on() : m.rules_off());
-	const ace = (value: RulesConfiguration['aceBehavior']) =>
-		value === 'skip' ? m.rules_skip() : m.rules_cancel();
-	const starter = (value: RulesConfiguration['starterPolicy']) =>
-		value === 'highest-score'
-			? m.rules_highest()
-			: value === 'previous-starter'
-				? m.rules_previous()
-				: m.rules_random();
+	// A label for every choice, so adding a choice to `rulesValidator` fails here until it has one.
+	const choiceLabels: {
+		[K in ChoiceSetting]: Record<RulesConfiguration[K], () => string>;
+	} = {
+		batchMode: {
+			single: m.rules_grouping_single,
+			'same-rank': m.rules_grouping_same,
+			match: m.rules_grouping_match
+		},
+		bridgeDeclaration: {
+			off: m.rules_off,
+			jacks: m.rules_bridge_jacks,
+			'four-of-a-kind': m.rules_bridge_four
+		},
+		aceBehavior: { skip: m.rules_skip, cancel: m.rules_cancel },
+		recycleMultiplier: { 1: () => '×1', 2: () => '×2', 3: () => '×3' },
+		starterPolicy: {
+			'highest-score': m.rules_highest,
+			'previous-starter': m.rules_previous,
+			random: m.rules_random
+		}
+	};
+	const label = <K extends ChoiceSetting>(key: K, value: RulesConfiguration[K]) =>
+		choiceLabels[key][value]();
+	const choiceOptions = <K extends ChoiceSetting>(key: K) =>
+		ruleChoices[key].map((choice) => ({ value: String(choice), label: label(key, choice) }));
 	const settings = $derived([
 		{
 			key: 'scoreCutoff',
@@ -125,18 +149,34 @@
 			base: onOff(defaultRules.openingEffects)
 		},
 		{
+			key: 'batchMode',
+			help: m.rules_help_batchMode(),
+			label: m.rules_grouping(),
+			value: label('batchMode', game.rules.batchMode),
+			base: label('batchMode', defaultRules.batchMode)
+		},
+		{
+			key: 'drawnCardBatching',
+			help: m.rules_help_drawnCardBatching(),
+			label: m.rules_drawn_grouping(),
+			value: onOff(game.rules.drawnCardBatching),
+			base: onOff(defaultRules.drawnCardBatching)
+		},
+		{
 			key: 'bridgeDeclaration',
 			help: m.rules_help_bridgeDeclaration(),
 			label: m.rules_bridge(),
-			value: onOff(game.rules.bridgeDeclaration),
-			base: onOff(defaultRules.bridgeDeclaration)
+			value: label('bridgeDeclaration', game.rules.bridgeDeclaration),
+			base: label('bridgeDeclaration', defaultRules.bridgeDeclaration),
+			// Single card keeps the Host's Bridge choice but cannot declare one.
+			note: game.rules.batchMode === 'single' ? m.rules_bridge_unavailable() : undefined
 		},
 		{
 			key: 'aceBehavior',
 			help: m.rules_help_aceBehavior(),
 			label: m.rules_ace(),
-			value: ace(game.rules.aceBehavior),
-			base: ace(defaultRules.aceBehavior)
+			value: label('aceBehavior', game.rules.aceBehavior),
+			base: label('aceBehavior', defaultRules.aceBehavior)
 		},
 		{
 			key: 'recycleMultiplier',
@@ -149,8 +189,8 @@
 			key: 'starterPolicy',
 			help: m.rules_help_starterPolicy(),
 			label: m.rules_starter(),
-			value: starter(game.rules.starterPolicy),
-			base: starter(defaultRules.starterPolicy)
+			value: label('starterPolicy', game.rules.starterPolicy),
+			base: label('starterPolicy', defaultRules.starterPolicy)
 		}
 	]);
 	const changes = $derived(settings.filter((setting) => setting.value !== setting.base));
@@ -185,6 +225,13 @@
 		}
 	}
 </script>
+
+{#snippet choiceItems(options: { value: string; label: string }[])}
+	{#each options as option (option.value)}<ToggleGroup.Item
+			value={option.value}
+			class="min-h-11 flex-1 whitespace-normal">{option.label}</ToggleGroup.Item
+		>{/each}
+{/snippet}
 
 {#snippet readyAction()}
 	{#if reviewed}{#if game.isHost}<p class="text-sm text-muted-foreground">
@@ -244,6 +291,8 @@
 				<dd class="flex flex-col items-end gap-1 text-right font-medium">
 					{setting.value}{#if setting.value !== setting.base}<Badge variant="outline"
 							>{m.rules_changed()}</Badge
+						>{/if}{#if setting.note}<span class="text-xs font-normal text-muted-foreground"
+							>{setting.note}</span
 						>{/if}
 				</dd>
 			</div>{/each}
@@ -473,19 +522,13 @@
 										variant="outline"
 										value={String(draft.recycleMultiplier)}
 										disabled={pending}
-										onValueChange={(value) => {
-											if (value === '1' || value === '2' || value === '3')
-												draft.recycleMultiplier = value === '1' ? 1 : value === '2' ? 2 : 3;
-										}}
+										onValueChange={(value) =>
+											(draft.recycleMultiplier =
+												findChoice(ruleChoices.recycleMultiplier, value) ??
+												draft.recycleMultiplier)}
 										aria-label={m.rules_recycle()}
 										class="w-full"
-										><ToggleGroup.Item value="1" class="min-h-11 flex-1 whitespace-normal"
-											>×1</ToggleGroup.Item
-										><ToggleGroup.Item value="2" class="min-h-11 flex-1 whitespace-normal"
-											>×2</ToggleGroup.Item
-										><ToggleGroup.Item value="3" class="min-h-11 flex-1 whitespace-normal"
-											>×3</ToggleGroup.Item
-										></ToggleGroup.Root
+										>{@render choiceItems(choiceOptions('recycleMultiplier'))}</ToggleGroup.Root
 									></Field.FieldSet
 								>
 							{/snippet}</RuleHelp
@@ -499,6 +542,47 @@
 								aria-hidden="true"
 							/>{m.rules_group_effects()}
 						</h4>
+						<RuleHelp label={m.rules_grouping()} description={m.rules_help_batchMode()}
+							>{#snippet children(info)}
+								<Field.FieldSet
+									><div class="flex items-center">
+										<Field.FieldLegend class="mb-0 text-sm">{m.rules_grouping()}</Field.FieldLegend
+										>{@render info()}
+									</div>
+									<ToggleGroup.Root
+										type="single"
+										variant="outline"
+										value={draft.batchMode}
+										disabled={pending}
+										onValueChange={(value) =>
+											(draft.batchMode =
+												findChoice(ruleChoices.batchMode, value) ?? draft.batchMode)}
+										aria-label={m.rules_grouping()}
+										class="w-full"
+										orientation="vertical"
+										>{@render choiceItems(choiceOptions('batchMode'))}</ToggleGroup.Root
+									></Field.FieldSet
+								>
+							{/snippet}</RuleHelp
+						>
+						<RuleHelp
+							label={m.rules_drawn_grouping()}
+							description={m.rules_help_drawnCardBatching()}
+							>{#snippet children(info)}
+								<Field.Field orientation="horizontal"
+									><div class="flex flex-1 items-center">
+										<Field.FieldLabel for="rule-drawnCardBatching" class="text-sm"
+											>{m.rules_drawn_grouping()}</Field.FieldLabel
+										>{@render info()}
+									</div>
+									<Switch
+										id="rule-drawnCardBatching"
+										bind:checked={draft.drawnCardBatching}
+										disabled={pending}
+									/></Field.Field
+								>
+							{/snippet}</RuleHelp
+						>
 						<RuleHelp label={m.rules_king()} description={m.rules_help_kingOfSpades()}
 							>{#snippet children(info)}
 								<Field.Field orientation="horizontal"
@@ -543,17 +627,13 @@
 										variant="outline"
 										value={draft.aceBehavior}
 										disabled={pending}
-										onValueChange={(value) => {
-											if (value === 'skip' || value === 'cancel') draft.aceBehavior = value;
-										}}
+										onValueChange={(value) =>
+											(draft.aceBehavior =
+												findChoice(ruleChoices.aceBehavior, value) ?? draft.aceBehavior)}
 										aria-label={m.rules_ace()}
 										class="w-full"
 										orientation="vertical"
-										><ToggleGroup.Item value="skip" class="min-h-11 flex-1 whitespace-normal"
-											>{m.rules_skip()}</ToggleGroup.Item
-										><ToggleGroup.Item value="cancel" class="min-h-11 flex-1 whitespace-normal"
-											>{m.rules_cancel()}</ToggleGroup.Item
-										></ToggleGroup.Root
+										>{@render choiceItems(choiceOptions('aceBehavior'))}</ToggleGroup.Root
 									></Field.FieldSet
 								>
 							{/snippet}</RuleHelp
@@ -569,17 +649,35 @@
 						</h4>
 						<RuleHelp label={m.rules_bridge()} description={m.rules_help_bridgeDeclaration()}
 							>{#snippet children(info)}
-								<Field.Field orientation="horizontal"
-									><div class="flex flex-1 items-center">
-										<Field.FieldLabel for="rule-bridgeDeclaration" class="text-sm"
-											>{m.rules_bridge()}</Field.FieldLabel
+								<Field.FieldSet
+									><div class="flex items-center">
+										<Field.FieldLegend class="mb-0 text-sm">{m.rules_bridge()}</Field.FieldLegend
 										>{@render info()}
 									</div>
-									<Switch
-										id="rule-bridgeDeclaration"
-										bind:checked={draft.bridgeDeclaration}
-										disabled={pending}
-									/></Field.Field
+									<ToggleGroup.Root
+										type="single"
+										variant="outline"
+										value={draft.bridgeDeclaration}
+										disabled={pending || draft.batchMode === 'single'}
+										onValueChange={(value) =>
+											(draft.bridgeDeclaration =
+												findChoice(ruleChoices.bridgeDeclaration, value) ??
+												draft.bridgeDeclaration)}
+										aria-label={m.rules_bridge()}
+										aria-describedby={draft.batchMode === 'single'
+											? 'bridge-unavailable'
+											: undefined}
+										class="w-full"
+										orientation="vertical"
+										>{@render choiceItems(choiceOptions('bridgeDeclaration'))}</ToggleGroup.Root
+									>
+									<!-- Single card keeps the Bridge choice for when Batches return. -->
+									{#if draft.batchMode === 'single'}<p
+											id="bridge-unavailable"
+											class="text-sm text-muted-foreground"
+										>
+											{m.rules_bridge_unavailable()}
+										</p>{/if}</Field.FieldSet
 								>
 							{/snippet}</RuleHelp
 						>
@@ -595,28 +693,13 @@
 										variant="outline"
 										value={draft.starterPolicy}
 										disabled={pending}
-										onValueChange={(value) => {
-											if (
-												value === 'highest-score' ||
-												value === 'previous-starter' ||
-												value === 'random'
-											)
-												draft.starterPolicy = value;
-										}}
+										onValueChange={(value) =>
+											(draft.starterPolicy =
+												findChoice(ruleChoices.starterPolicy, value) ?? draft.starterPolicy)}
 										aria-label={m.rules_starter()}
 										class="w-full"
 										orientation="vertical"
-										><ToggleGroup.Item
-											value="highest-score"
-											class="min-h-11 flex-1 whitespace-normal"
-											>{m.rules_highest()}</ToggleGroup.Item
-										><ToggleGroup.Item
-											value="previous-starter"
-											class="min-h-11 flex-1 whitespace-normal"
-											>{m.rules_previous()}</ToggleGroup.Item
-										><ToggleGroup.Item value="random" class="min-h-11 flex-1 whitespace-normal"
-											>{m.rules_random()}</ToggleGroup.Item
-										></ToggleGroup.Root
+										>{@render choiceItems(choiceOptions('starterPolicy'))}</ToggleGroup.Root
 									></Field.FieldSet
 								>
 							{/snippet}</RuleHelp
@@ -652,7 +735,10 @@
 												>{m.rules_default({ value: setting.base })}</span
 											>{/if}
 									</div>
-								</div>{/snippet}</RuleHelp
+								</div>
+								{#if setting.note}<p class="pb-2 text-xs text-muted-foreground">
+										{setting.note}
+									</p>{/if}{/snippet}</RuleHelp
 						>
 					</li>{/each}
 			</ul>

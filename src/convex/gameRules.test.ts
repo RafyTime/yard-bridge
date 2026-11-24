@@ -95,3 +95,35 @@ test('the Host saves a private rules snapshot and reuses it without changing the
 	expect(await host.query(api.games.view, { gameId })).toEqual(source);
 	expect((await host.query(api.gameRules.saved, {}))[0].rules.scoreCutoff).toBe(200);
 });
+
+test('rules saved before batch and Bridge modes read as Off or Four of a kind with default batching', async () => {
+	const { t, host, gameId } = await table();
+	const current = await host.query(api.games.view, { gameId });
+	const { batchMode, drawnCardBatching, ...legacy } = current.rules;
+	expect({ batchMode, drawnCardBatching }).toEqual({
+		batchMode: 'same-rank',
+		drawnCardBatching: true
+	});
+	const viewer = await host.query(api.players.viewer, {});
+	await t.run(async (ctx) => {
+		await ctx.db.patch('games', gameId, { rules: { ...legacy, bridgeDeclaration: false } });
+		await ctx.db.insert('savedRules', {
+			ownerId: viewer.id,
+			name: 'Old',
+			rules: { ...legacy, bridgeDeclaration: true }
+		});
+	});
+	expect((await host.query(api.games.view, { gameId })).rules).toEqual({
+		...current.rules,
+		bridgeDeclaration: 'off'
+	});
+	const [saved] = await host.query(api.gameRules.saved, {});
+	expect(saved.rules).toEqual(current.rules);
+	await host.mutation(api.gameRules.save, {
+		gameId,
+		expectedVersion: current.version,
+		name: 'Copied'
+	});
+	const [copied] = await host.query(api.gameRules.saved, {});
+	expect(copied.rules.bridgeDeclaration).toBe('off');
+});

@@ -614,11 +614,12 @@ test('a Seat that owes a 6 cover keeps drawing past an unplayable card, and a co
 	expect(next.playable).toEqual(next.hand);
 });
 
-test('a drawn card is played alone, and a drawn 6 still must be covered', async () => {
+test('with drawn-card batching off, a drawn card is played alone, and a drawn 6 still must be covered', async () => {
 	const { players, views, seatIds } = await opened(
 		[cards('Kc Ks Kd Ad'), cards('Qc Ac 7d 8s 10c')],
 		card('9h'),
-		cards('10h 6c 7c 7s')
+		cards('10h 6c 7c 7s'),
+		{ drawnCardBatching: false }
 	);
 	const [host, guest] = players;
 	let [, view] = await views();
@@ -1411,9 +1412,17 @@ test('a final draw effect resolves on its target before the Round is scored, and
 	);
 	for (const seat of await views())
 		expect(seat.result).toEqual({
+			ending: { kind: 'emptyHand', seatId: seatIds[1] },
+			multiplier: 1,
 			hands: [
-				{ seatId: seatIds[0], cards: cards('Ah Qs 10c 9d 7s'), points: 75, score: 75 },
-				{ seatId: seatIds[1], cards: [], points: 0, score: 0 }
+				{
+					seatId: seatIds[0],
+					cards: cards('Ah Qs 10c 9d 7s'),
+					finishBonus: 0,
+					points: 75,
+					score: 75
+				},
+				{ seatId: seatIds[1], cards: [], finishBonus: 0, points: 0, score: 0 }
 			]
 		});
 });
@@ -1470,9 +1479,11 @@ test('a final 6 cannot finish a Round uncovered, so its player draws a cover fir
 	await guest.mutation(api.rounds.play, { roundId, expectedVersion: 2, cards: cards('Qh') });
 	for (const seat of await views())
 		expect(seat.result).toEqual({
+			ending: { kind: 'emptyHand', seatId: seatIds[1] },
+			multiplier: 1,
 			hands: [
-				{ seatId: seatIds[0], cards: cards('Kc'), points: 10, score: 10 },
-				{ seatId: seatIds[1], cards: [], points: 0, score: 0 }
+				{ seatId: seatIds[0], cards: cards('Kc'), finishBonus: 0, points: 10, score: 10 },
+				{ seatId: seatIds[1], cards: [], finishBonus: 0, points: 0, score: 0 }
 			]
 		});
 });
@@ -1595,3 +1606,354 @@ test.each([
 		expect(view).toMatchObject({ number: 2, starterSeatId: seatIds[starter] });
 	}
 );
+
+type Seated = Awaited<ReturnType<typeof createPlayer>>;
+type Suit = Card['suit'];
+
+// Plays an ordered batch from the viewed table.
+const playBatch = (
+	seat: Seated,
+	view: { id: Id<'rounds'>; version: number },
+	labels: string,
+	suit?: Suit
+) =>
+	seat.mutation(api.rounds.play, {
+		roundId: view.id,
+		expectedVersion: view.version,
+		cards: cards(labels),
+		suit
+	});
+
+test('Single card mode plays one card at a time', async () => {
+	const { players, views } = await opened([cards('Kc Kd'), cards('10h 10s 9c')], card('9h'), [], {
+		batchMode: 'single'
+	});
+	const [view] = await views();
+	await expect(playBatch(players[1], view, '10h 10s')).rejects.toThrow('one card at a time');
+	await playBatch(players[1], view, '10h');
+	expect((await views())[1].hand).toEqual(cards('10s 9c'));
+});
+
+test('Match rank or suit checks each card against the one before it, and a Jack ends the batch', async () => {
+	const { players, views } = await opened(
+		[cards('Kc Kd Qd Ah Ad'), cards('7c 7s 6s 9s Jd Kh')],
+		card('9c'),
+		[],
+		{ batchMode: 'match' }
+	);
+	const [view] = await views();
+	for (const [batch, error] of [
+		['7c Kh', 'does not match'],
+		['7c 7s 6s Kh', 'does not match'],
+		['7c Jd 7s', 'A Jack ends the batch']
+	])
+		await expect(playBatch(players[1], view, batch)).rejects.toThrow(error);
+	await playBatch(players[1], view, '7c 7s 6s 9s');
+	const [host, guest] = await views();
+	expect(guest.hand).toEqual(cards('Jd Kh'));
+	expect(host).toMatchObject({ topCard: card('9s'), mustCover: false, effect: null });
+});
+
+test.each([
+	{ batch: '7c 7s 8s', suit: undefined, effect: { drawCount: 4, skip: true } },
+	{ batch: '7c 7s 10s', suit: undefined, effect: null },
+	{ batch: '8c 7c Jc', suit: 'hearts', effect: null }
+] as const)(
+	'in Match rank or suit, the batch $batch leaves $effect pending',
+	async ({ batch, suit, effect }) => {
+		const { players, views, seatIds } = await opened(
+			[cards('Kd Qd Ah Ad Kh'), cards('7c 7s 8s 10s 8c Jc')],
+			card('9c'),
+			[],
+			{ batchMode: 'match' }
+		);
+		await playBatch(players[1], (await views())[0], batch, suit);
+		for (const seat of await views())
+			expect(seat.effect).toEqual(effect && { targetSeatId: seatIds[0], ...effect });
+	}
+);
+
+test('the target accepts a combined batch effect once: draws four, then is skipped', async () => {
+	const { players, views, seatIds } = await opened(
+		[cards('Kd Qd Ah'), cards('7c 7s 8s 10s')],
+		card('9c'),
+		[],
+		{ batchMode: 'match' }
+	);
+	await playBatch(players[1], (await views())[0], '7c 7s 8s');
+	const [before] = await views();
+	const turn = { roundId: before.id, expectedVersion: before.version };
+	await players[0].mutation(api.rounds.accept, turn);
+	const [host, guest] = await views();
+	expect(host.hand).toHaveLength(7);
+	expect(guest).toMatchObject({
+		effect: null,
+		currentSeatId: seatIds[1],
+		drawCount: before.drawCount - 4
+	});
+	const again = { ...turn, expectedVersion: guest.version };
+	await expect(players[0].mutation(api.rounds.accept, again)).rejects.toThrow('Not your turn');
+});
+
+test('under Ace cancellation, an Ace cancels a combined batch effect and uses the turn', async () => {
+	const { players, views, seatIds } = await opened(
+		[cards('Kd Qd As'), cards('7c 7s 8s 10s')],
+		card('9c'),
+		[],
+		{ batchMode: 'match', aceBehavior: 'cancel' }
+	);
+	await playBatch(players[1], (await views())[0], '7c 7s 8s');
+	const [before] = await views();
+	expect(before.effect).toEqual({ targetSeatId: seatIds[0], drawCount: 4, skip: true });
+	await players[0].mutation(api.rounds.cancel, {
+		roundId: before.id,
+		expectedVersion: before.version,
+		card: card('As')
+	});
+	const { drawCount } = before;
+	const [host, guest] = await views();
+	expect(host).toMatchObject({ effect: null, hand: cards('Kd Qd'), drawCount });
+	expect(guest).toMatchObject({ currentSeatId: seatIds[1], playable: cards('10s') });
+});
+
+test('a drawn 10 starts a batch that completes a Bridge, and the declarer scores held cards', async () => {
+	const { players, views, seatIds, gameId } = await opened(
+		[cards('Kc Kd Ks'), cards('10h 10s 10c Qc')],
+		card('9d'),
+		cards('10d')
+	);
+	const [host, guest] = players;
+	await guest.mutation(api.rounds.draw, { roundId: (await views())[0].id, expectedVersion: 0 });
+	const [hostView, guestView] = await views();
+	expect(guestView).toMatchObject({ drawnCard: card('10d'), playable: cards('10d') });
+	expect(hostView.drawnCard).toBeNull();
+	await expect(playBatch(guest, guestView, '10h 10d 10s 10c')).rejects.toThrow(
+		'Play the card you drew'
+	);
+	await playBatch(guest, guestView, '10d 10h 10s 10c');
+	const result = {
+		ending: { kind: 'bridge', seatId: seatIds[1] },
+		multiplier: 1,
+		hands: [
+			{ seatId: seatIds[0], cards: cards('Kc Kd Ks'), finishBonus: 0, points: 30, score: 30 },
+			{ seatId: seatIds[1], cards: cards('Qc'), finishBonus: 0, points: 10, score: 10 }
+		]
+	};
+	for (const seat of await views()) expect(seat.result).toEqual(result);
+	const game = await host.query(api.games.view, { gameId });
+	expect(game.seats.map((seat) => seat.score)).toEqual([30, 10]);
+});
+
+test('with drawn-card batching off, a drawn card cannot start a Bridge', async () => {
+	const { players, views } = await opened(
+		[cards('Kc Kd Ks'), cards('10h 10s 10c Qc')],
+		card('9d'),
+		cards('10d'),
+		{ drawnCardBatching: false }
+	);
+	const [, guest] = players;
+	await guest.mutation(api.rounds.draw, { roundId: (await views())[0].id, expectedVersion: 0 });
+	const [, view] = await views();
+	await expect(playBatch(guest, view, '10d 10h 10s 10c')).rejects.toThrow(
+		'Play the card you drew alone'
+	);
+	await playBatch(guest, view, '10d');
+	expect((await views())[1].result).toBeNull();
+});
+
+test.each([
+	{ bridgeDeclaration: 'four-of-a-kind', tens: true, jacks: true },
+	{ bridgeDeclaration: 'jacks', tens: false, jacks: true },
+	{ bridgeDeclaration: 'off', tens: false, jacks: false }
+] as const)(
+	'with Bridge $bridgeDeclaration, four 10s declare $tens and four Jacks declare $jacks',
+	async ({ bridgeDeclaration, tens, jacks }) => {
+		for (const [batch, declares, suit] of [
+			['10h 10s 10c 10d', tens, undefined],
+			['Jh Js Jc Jd', jacks, 'clubs']
+		] as const) {
+			const { players, views, seatIds } = await opened(
+				[cards('Kc Kd Ks Qd'), [...cards(batch), card('Qc')]],
+				card('9h'),
+				[],
+				{ bridgeDeclaration }
+			);
+			await playBatch(players[1], (await views())[0], batch, suit);
+			const [view] = await views();
+			// A Bridge with cards still held gets no Finish bonus.
+			const hands = [
+				{
+					seatId: seatIds[0],
+					cards: cards('Kc Kd Ks Qd'),
+					finishBonus: 0,
+					points: 40,
+					score: 40
+				},
+				{ seatId: seatIds[1], cards: cards('Qc'), finishBonus: 0, points: 10, score: 10 }
+			];
+			const ending = { kind: 'bridge', seatId: seatIds[1] };
+			expect(view.result).toEqual(declares ? { ending, multiplier: 1, hands } : null);
+		}
+	}
+);
+
+test('four 6s that still need a cover declare no Bridge', async () => {
+	const { players, views, seatIds } = await opened(
+		[cards('Kd Qd Kc Qh Ad'), cards('6h 6s 6d 6c 9c Kh')],
+		card('9h')
+	);
+	const [, guest] = players;
+	await playBatch(guest, (await views())[0], '6h 6s 6d 6c');
+	let [view] = await views();
+	expect(view).toMatchObject({ result: null, mustCover: true, currentSeatId: seatIds[1] });
+	await playBatch(guest, view, '9c');
+	[view] = await views();
+	expect(view).toMatchObject({ result: null, mustCover: false, currentSeatId: seatIds[0] });
+});
+
+test('a Bridge resolves its remaining penalty on the next Seat before scoring', async () => {
+	const { players, views, seatIds } = await opened(
+		[cards('Kd Kc Ks Qd'), cards('8h 8s 8d 8c Qc')],
+		card('9h'),
+		cards('7c 7d 9c 9d 9s 10c 10d 10s')
+	);
+	const [host, guest] = players;
+	await playBatch(guest, (await views())[0], '8h 8s 8d 8c');
+	let [view] = await views();
+	expect(view).toMatchObject({
+		result: null,
+		effect: { targetSeatId: seatIds[0], drawCount: 8, skip: true }
+	});
+	await host.mutation(api.rounds.accept, { roundId: view.id, expectedVersion: view.version });
+	[view] = await views();
+	expect(view.result).toEqual({
+		ending: { kind: 'bridge', seatId: seatIds[1] },
+		multiplier: 1,
+		hands: [
+			{
+				seatId: seatIds[0],
+				cards: cards('Kd Kc Ks Qd 7c 7d 9c 9d 9s 10c 10d 10s'),
+				finishBonus: 0,
+				points: 70,
+				score: 70
+			},
+			{ seatId: seatIds[1], cards: cards('Qc'), finishBonus: 0, points: 10, score: 10 }
+		]
+	});
+});
+
+test('an empty-hand finish deducts 20 per final Jack, allowing a negative Game score', async () => {
+	const { players, views, seatIds, gameId } = await opened(
+		[cards('Qs'), cards('Jh Jd')],
+		card('9h')
+	);
+	await playBatch(players[1], (await views())[0], 'Jh Jd', 'clubs');
+	const [view] = await views();
+	expect(view.result).toEqual({
+		ending: { kind: 'emptyHand', seatId: seatIds[1] },
+		multiplier: 1,
+		hands: [
+			{ seatId: seatIds[0], cards: cards('Qs'), finishBonus: 0, points: 50, score: 50 },
+			{ seatId: seatIds[1], cards: [], finishBonus: 40, points: -40, score: -40 }
+		]
+	});
+	const game = await players[0].query(api.games.view, { gameId });
+	expect(game.seats.map((seat) => seat.score)).toEqual([50, -40]);
+});
+
+test('the first recycle applies the multiplier once, and a later recycle does not compound it', async () => {
+	const { t, players, views, seatIds } = await opened(
+		[cards('Kc Kd'), cards('10h 9s 9c')],
+		card('9h')
+	);
+	const [host, guest] = players;
+	let [view] = await views();
+	// Empty the draw pile so the next draws recycle the played pile.
+	await t.run((ctx) => ctx.db.patch('rounds', view.id, { drawPile: [] }));
+	await playBatch(guest, view, '10h');
+	[view] = await views();
+	await host.mutation(api.rounds.draw, { roundId: view.id, expectedVersion: view.version });
+	[view] = await views();
+	expect(view.drawnCard).toEqual(card('9h'));
+	await playBatch(host, view, '9h');
+	await playBatch(guest, (await views())[0], '9s');
+	[view] = await views();
+	vi.stubGlobal('Math', scriptedMath(shuffleValues(cards('10h 9h'), cards('10h 9h'))));
+	await host.mutation(api.rounds.draw, { roundId: view.id, expectedVersion: view.version });
+	vi.unstubAllGlobals();
+	[view] = await views();
+	expect(view).toMatchObject({ hand: cards('Kc Kd 10h'), currentSeatId: seatIds[1] });
+	await playBatch(guest, view, '9c');
+	[view] = await views();
+	expect(view.result).toEqual({
+		ending: { kind: 'emptyHand', seatId: seatIds[1] },
+		multiplier: 2,
+		hands: [
+			{ seatId: seatIds[0], cards: cards('Kc Kd 10h'), finishBonus: 0, points: 60, score: 60 },
+			{ seatId: seatIds[1], cards: [], finishBonus: 0, points: 0, score: 0 }
+		]
+	});
+});
+
+test('when nothing can be drawn and every Seat passes once, the Round ends and scores held cards', async () => {
+	const { t, players, views, seatIds } = await opened([cards('Qs'), cards('Kd Ac')], card('9h'));
+	const [host, guest] = players;
+	let [view] = await views();
+	// A full deck always leaves someone a wild 6 or Jack, so this table holds only one more card.
+	await t.run((ctx) => ctx.db.patch('rounds', view.id, { drawPile: cards('8c') }));
+	const draw = async (seat: Seated) => {
+		[view] = await views();
+		await seat.mutation(api.rounds.draw, { roundId: view.id, expectedVersion: view.version });
+	};
+	// Drawing the last card is a miss with a card still available, so it does not count.
+	await draw(guest);
+	await draw(host);
+	expect((await views())[0].result).toBeNull();
+	await draw(guest);
+	const result = {
+		ending: { kind: 'exhausted' },
+		multiplier: 1,
+		hands: [
+			{ seatId: seatIds[0], cards: cards('Qs'), finishBonus: 0, points: 50, score: 50 },
+			{ seatId: seatIds[1], cards: cards('Kd Ac 8c'), finishBonus: 0, points: 25, score: 25 }
+		]
+	};
+	for (const seat of await views()) expect(seat.result).toEqual(result);
+});
+
+test('a final 6 whose cover is waived ends the Round on the empty hand', async () => {
+	const { t, players, views, seatIds } = await opened([cards('Kc'), cards('6h 6d')], card('9c'));
+	let [view] = await views();
+	await playBatch(players[1], view, '6h 6d');
+	// Leave nothing to draw or recycle, so the cover is waived.
+	await t.run((ctx) => ctx.db.patch('rounds', view.id, { drawPile: [], playedPile: cards('6d') }));
+	[view] = await views();
+	expect(view.result).toBeNull();
+	await players[1].mutation(api.rounds.draw, { roundId: view.id, expectedVersion: view.version });
+	[view] = await views();
+	expect(view.result).toEqual({
+		ending: { kind: 'emptyHand', seatId: seatIds[1] },
+		multiplier: 1,
+		hands: [
+			{ seatId: seatIds[0], cards: cards('Kc'), finishBonus: 0, points: 10, score: 10 },
+			{ seatId: seatIds[1], cards: [], finishBonus: 0, points: 0, score: 0 }
+		]
+	});
+});
+
+test('a Bridge of four Jacks that empties the hand still deducts its finishing Jacks', async () => {
+	const { players, views, seatIds } = await opened(
+		[cards('Kc Kd Ks'), cards('Jh Js Jc Jd')],
+		card('9h')
+	);
+	await playBatch(players[1], (await views())[0], 'Jh Js Jc Jd', 'clubs');
+	const [view] = await views();
+	expect(view.result).toEqual({
+		ending: { kind: 'bridge', seatId: seatIds[1] },
+		multiplier: 1,
+		hands: [
+			{ seatId: seatIds[0], cards: cards('Kc Kd Ks'), finishBonus: 0, points: 30, score: 30 },
+			{ seatId: seatIds[1], cards: [], finishBonus: 80, points: -80, score: -80 }
+		]
+	});
+});
